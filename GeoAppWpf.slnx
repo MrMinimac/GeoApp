@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="GeoAppCore/GeoAppCore.csproj" Id="21850f04-8a3c-470d-92d4-0f33a06b6472" />
+  <Project Path="GeoAppWpf/GeoAppWpf.csproj" Id="7bd491e9-2358-4c61-a826-d40e28701d44" />
+  <Project Path="GeoCadPlugin/GeoCadPlugin.csproj" Id="84e8d0f9-dfff-4741-8d91-010d16114226" />
+</Solution>
