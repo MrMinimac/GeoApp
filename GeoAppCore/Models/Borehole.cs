@@ -50,7 +50,6 @@ namespace GeoAppCore
         public double Y { get; set; }
         public double Z { get; set; }
 
-
         private List<LithologyInterval> BuildLithologyIntervals()
         {
             if (_lithologyIntervals != null && _lithologyIntervals.Count != 0)

@@ -1,0 +1,100 @@
+﻿<UserControl
+    x:Class="LegendDesignWpf.Controls.SearchBox"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:LegendDesignWpf.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:LegendDesignWpf.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+
+        <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+        <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <Style x:Key="SearchButtonStyle" TargetType="{x:Type local:FlatButton}">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Margin" Value="2,0,2,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="HoverBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="HoverBrush" Value="{DynamicResource TertiaryBrush}" />
+        </Style>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <Border
+            x:Name="border"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="{Binding BorderBackground, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+            BorderBrush="{Binding BorderInactiveBrush, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+            BorderThickness="0,0,0,1"
+            CornerRadius="{Binding BorderRadius, RelativeSource={RelativeSource AncestorType=local:SearchBox}}" />
+
+        <Grid>
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox
+                x:Name="textBox"
+                Margin="10,0,0,0"
+                IsKeyboardFocusedChanged="TextBoxFocusedChanged"
+                Style="{StaticResource CleanTextBoxStyle}"
+                Tag="{Binding HintText, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+                Text="{Binding InputText, RelativeSource={RelativeSource AncestorType=local:SearchBox}, UpdateSourceTrigger=PropertyChanged}">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Enter" Command="{Binding SearchCommand, RelativeSource={RelativeSource AncestorType=local:SearchBox}}" />
+                </TextBox.InputBindings>
+            </TextBox>
+
+            <local:FlatButton
+                Grid.Column="1"
+                Click="ClearButton_Click"
+                Command="{Binding CancelCommand, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+                Style="{StaticResource SearchButtonStyle}"
+                Visibility="{Binding InputText.Length, RelativeSource={RelativeSource AncestorType=local:SearchBox}, Converter={StaticResource IntToVisibilityConverter}}">
+                <local:PackIcon
+                    Width="10"
+                    Foreground="{Binding BorderInactiveBrush, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+                    Kind="Close" />
+            </local:FlatButton>
+
+            <local:FlatButton
+                Grid.Column="2"
+                Command="{Binding SearchCommand, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+                IsEnabled="{Binding InputText.Length, RelativeSource={RelativeSource AncestorType=local:SearchBox}, Converter={StaticResource IntToBoolConverter}}"
+                Style="{StaticResource SearchButtonStyle}"
+                Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Reversed, RelativeSource={RelativeSource AncestorType=local:SearchBox}}">
+                <local:PackIcon
+                    Width="11"
+                    Foreground="{Binding BorderInactiveBrush, RelativeSource={RelativeSource AncestorType=local:SearchBox}}"
+                    Kind="Search" />
+            </local:FlatButton>
+
+            <Grid
+                Grid.Column="2"
+                Width="26"
+                Height="26"
+                Margin="2,0,2,0">
+                <ProgressBar
+                    Width="15"
+                    Height="15"
+                    IsIndeterminate="True"
+                    Style="{DynamicResource CircularProgressBarStyle}"
+                    Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibilityConverter}, RelativeSource={RelativeSource AncestorType=local:SearchBox}}" />
+            </Grid>
+        </Grid>
+    </Grid>
+
+</UserControl>

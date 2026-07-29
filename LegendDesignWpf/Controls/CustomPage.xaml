@@ -1,0 +1,78 @@
+﻿<UserControl
+    x:Class="LegendDesignWpf.Controls.CustomPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:LegendDesignWpf.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:LegendDesignWpf.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Style="{StaticResource AnimatedUserControlStyle}"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+    </UserControl.Resources>
+
+    <Grid Margin="20,10,0,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!--  // HEADER //  -->
+            <Grid MaxWidth="{Binding HeaderMaxWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,0,47,15">
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--  // Page Title //  -->
+                <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                <!--  // Header Content //  -->
+                <ContentPresenter
+                    Grid.Column="1"
+                    Height="33"
+                    Content="{Binding HeaderContent, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+            </Grid>
+
+            <TextBlock
+                Grid.Row="1"
+                MaxWidth="1000"
+                Margin="0,0,47,15"
+                Foreground="{Binding SubtitleForeground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Style="{StaticResource PageSubTitleTextBlockStyle}"
+                Text="{Binding Subtitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                TextWrapping="Wrap"
+                Visibility="{Binding Subtitle.Length, Converter={StaticResource IntToVisibilityConverter}, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+            <!--  // PLACEHOLDERS //  -->
+            <StackPanel
+                Grid.Row="2"
+                Width="400"
+                Margin="0,0,40,40"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="{Binding PlaceholderVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <local:PackIcon
+                    Margin="10"
+                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                    Kind="{Binding PlaceholderIcon, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                <TextBlock
+                    FontSize="16"
+                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                    Text="{Binding Placeholder, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <ContentPresenter Grid.Row="2" Content="{Binding PageContent, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        </Grid>
+
+    </Grid>
+
+</UserControl>

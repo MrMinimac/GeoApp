@@ -9,16 +9,22 @@ namespace GeoCadPlugin
 
         public void Initialize()
         {
+            Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+                .MdiActiveDocument?
+                .Editor
+                .WriteMessage("\nGeoAppPlugin загружен!");
+
             Application.Idle += OnIdle;
-
             server = new WebServer();
-
             server.Start();
         }
 
         public void Terminate()
         {
-
+            Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+                .MdiActiveDocument?
+                .Editor
+                .WriteMessage("\nLGeoAppPlugin выгружен!");
         }
 
         private void OnIdle(object sender, EventArgs e)

@@ -39,23 +39,10 @@ namespace GeoCadPlugin
                         return;
                     }
 
-                case "/import":
-                case "/import2":
+                case "/export-sections":
+                case "/export-plan":
                     {
-                        using StreamReader reader =
-                            new StreamReader(
-                                context.Request.InputStream,
-                                context.Request.ContentEncoding);
-
-                        string json = await reader.ReadToEndAsync();
-
-                        CommandQueue.Enqueue(() =>
-                        {
-                            int.TryParse(url.ToLower().Replace("/import", ""), out int id);
-                            ImportProject(json, id != 0 ? id : 1);
-                        });
-
-                        await WriteResponse(context, "Imported");
+                        await ExportProject(context);
                         return;
                     }
 
@@ -80,7 +67,34 @@ namespace GeoCadPlugin
             context.Response.Close();
         }
 
-        private void ImportProject(string json, int id)
+        private async Task ExportProject(HttpListenerContext context)
+        {
+            string url = context.Request.Url.AbsolutePath;
+            
+            using StreamReader reader =
+                            new StreamReader(
+                                context.Request.InputStream,
+                                context.Request.ContentEncoding);
+
+            string json = await reader.ReadToEndAsync();
+
+            CommandQueue.Enqueue(() =>
+            {
+                switch (url.ToLower())
+                {
+                    case "/export-sections":
+                        ExportSections(json);
+                        break;
+                    case "/export-plan":
+                        ExportPlan(json);
+                        break;
+                }
+            });
+
+            await WriteResponse(context, "Imported");
+        }
+
+        private void ExportSections(string json)
         {
             GeoDoc project = JsonConvert.DeserializeObject<GeoDoc>(json);
 
@@ -91,14 +105,21 @@ namespace GeoCadPlugin
 
             using (doc.LockDocument())
             {
-                if (id == 1)
-                {
-                    GeoPlanDrawer.Draw(project);
-                }
-                if (id == 2)
-                {
-                    GeoSectionDrawer.Draw(project);
-                }
+                GeoSectionDrawer.Draw(project);
+            }
+        }
+        private void ExportPlan(string json)
+        {
+            GeoDoc project = JsonConvert.DeserializeObject<GeoDoc>(json);
+
+            var doc =
+                Autodesk.AutoCAD.ApplicationServices.Application
+                .DocumentManager
+                .MdiActiveDocument;
+
+            using (doc.LockDocument())
+            {
+                GeoPlanDrawer.Draw(project);
             }
         }
     }
