@@ -75,6 +75,16 @@ namespace GeoAppWpf
                     Converter = new ValueConverter()
                 };
             }
+
+            if (e.PropertyName is nameof(Sample.Lithologies))
+            {
+                var column = (DataGridTextColumn)e.Column;
+
+                column.Binding = new Binding(e.PropertyName)
+                {
+                    Converter = new LitologiesConverter()
+                };
+            }
         }
 
         #endregion

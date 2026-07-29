@@ -128,7 +128,7 @@ namespace GeoCadPlugin.Drawers
                         GeoLayers.Deapths,
                         GeoLayers.PeatThinckness,
                         GeoLayers.SandThickness,
-                        GeoLayers.GoldAvgs,
+                        GeoLayers.Avgs,
                     ]
                  );
 
@@ -167,7 +167,7 @@ namespace GeoCadPlugin.Drawers
                 var avgText = BuildText($"0,0", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
                 ms.AppendEntity(avgText);
                 tr.AddNewlyCreatedDBObject(avgText, true);
-                avgText.Layer = LayerManager.GetLayerName(GeoLayers.GoldAvgs);
+                avgText.Layer = LayerManager.GetLayerName(GeoLayers.Avgs);
 
                 tr.Commit();
             }

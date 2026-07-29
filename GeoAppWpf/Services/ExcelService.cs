@@ -1,6 +1,8 @@
 ﻿using GeoAppCore;
 using Microsoft.Win32;
 using OfficeOpenXml;
+using System.Data.Common;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -74,8 +76,9 @@ namespace GeoAppWpf.Services
             var boreholes = new List<Borehole>();
             string oldkey = "";
 
-            var diametr = TryGetDouble(worksheet, 2, 11);
-            var fineness = TryGetDouble(worksheet, 2, 12);
+            var diametr = TryGetDouble(worksheet, 2, 15);
+            var fineness = TryGetDouble(worksheet, 2, 16);
+            var vScale = TryGetDouble(worksheet, 2, 17);
 
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
             {
@@ -108,11 +111,34 @@ namespace GeoAppWpf.Services
                     sample.Value = ParseDouble(worksheet.Cells[row, 7].Text);
                     sample.Diametr = diametr;
                     sample.Fineness = fineness;
+                    sample.Lithologies = ParseLithology(worksheet, row, 11);
                     currentBorehole.Samples.Add(sample);
                 }
             }
 
             return boreholes;
+        }
+
+        private List<Lithology> ParseLithology(ExcelWorksheet ws, int row, int column)
+        {
+            var lithologies = new List<Lithology>();
+
+            var text = ws.Cells[row, column].Text;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return lithologies;
+
+            var ids = text.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var id in ids)
+            {
+                if (int.TryParse(id.Trim(), out int value) && Enum.IsDefined(typeof(Lithology), value))
+                {
+                    lithologies.Add((Lithology)value);
+                }
+            }
+
+            return lithologies;
         }
 
         private double TryGetDouble(ExcelWorksheet ws, int row, int column)

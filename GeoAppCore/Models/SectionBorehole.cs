@@ -2,16 +2,29 @@
 {
     public class SectionBorehole
     {
-        public Borehole Source { get; set; }
+        private Borehole _source;
 
-        public double Distance { get; set; }
+        public double Distance { get; }
+        public double Elevation { get; }
 
-        public double Elevation { get; set; }
-
-
+        public int Id => _source.Id;
         public double X => Distance;
         public double Top => Elevation;
-        public double Bottom => Elevation - Source.Deapth;
-        public double Deapth => Top - Bottom;
+        public double Bottom => Elevation - _source.Deapth;
+        public double Deapth => _source.Deapth;
+
+        public IEnumerable<Sample> Samples => _source.Samples;
+
+        public SectionBorehole(Borehole borehole, double distance, double elevation)
+        {
+            _source = borehole;
+            Distance = distance;
+            Elevation = elevation;
+        }
+
+        public void GetLitologiesIntervals()
+        {
+
+        }
     }
 }

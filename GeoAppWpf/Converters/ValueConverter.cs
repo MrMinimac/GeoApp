@@ -30,4 +30,24 @@ namespace GeoAppWpf.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class LitologiesConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is List<Lithology> list)
+                return string.Join(",", list.Select(x => (int)x));
+
+            return "";
+        }
+
+        public object ConvertBack(
+            object value,
+            Type targetType,
+            object parameter,
+            CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

@@ -8,15 +8,20 @@ namespace GeoCadPlugin.Managers
         {
             return layer switch
             {
-                GeoLayers.Boreholes => "GEO_Boreholes",
-                GeoLayers.BoreholeNumbers => "GEO_Borehole_Numbers",
-                GeoLayers.PeatThinckness => "GEO_Peat_Thinckness",
-                GeoLayers.SandThickness => "GEO_Sand_Thickness",
-                GeoLayers.AbsoluteElevations => "GEO_Absolute_Elevations",
-                GeoLayers.Deapths => "GEO_Deapths",
-                GeoLayers.GoldAvgs => "GEO_GoldAvgs",
-                GeoLayers.Rulers => "GEO_Rulers",
-                GeoLayers.Tables => "GEO_Tables",
+                GeoLayers.Boreholes => "Скважины",
+                GeoLayers.BoreholeNumbers => "Номера скважин",
+                GeoLayers.PeatThinckness => "Мощности торфов",
+                GeoLayers.SandThickness => "Мощности песков",
+                GeoLayers.AbsoluteElevations => "Абсолютные отметки",
+                GeoLayers.Deapths => "Глубины скважин",
+                GeoLayers.Avgs => "Средние содержания",
+                GeoLayers.Rulers => "Линейки масштаба",
+                GeoLayers.Tables => "Таблицы",
+                GeoLayers.Intervals => "Интервалы проб",
+                GeoLayers.EmptyAvgs => "ПС",
+                GeoLayers.NotDeterminedAvgs => "ЗН",
+                GeoLayers.Header => "Заголовок",
+                GeoLayers.Surface => "Поверхность",
             };
         }
 

@@ -58,24 +58,40 @@ namespace GeoAppCore
                     double dx = bh.X - prev.X;
                     double dy = bh.Y - prev.Y;
 
-                    distance += Math.Sqrt(
-                        dx * dx +
-                        dy * dy);
+                    distance += Math.Sqrt(dx * dx + dy * dy);
                 }
 
-                sections.Add(new SectionBorehole
-                {
-                    Source = bh,
-
-                    // X в разрезе
-                    Distance = distance,
-
-                    // Y в разрезе
-                    Elevation = bh.Z
-                });
+                sections.Add(new SectionBorehole(bh, distance, bh.Z));
             }
 
             return sections;
+        }
+
+        public (string Front, string Backward) GetDirection()
+        {
+            string[] directions =
+            {
+                "С", "СВ", "В", "ЮВ",
+                "Ю", "ЮЗ", "З", "СЗ"
+            };
+
+            int azimuth = (int)Math.Round((Azimuth % 360 + 360) % 360, 0);
+
+            int front = azimuth switch
+            {
+                0 => 0, // С
+                < 90 => 1, // СВ
+                90 => 2, // В
+                < 180 => 3, // ЮВ
+                180 => 4, // Ю
+                < 270 => 5, // ЮЗ
+                270 => 6, // З
+                _ => 7 // СЗ
+            };
+
+            int back = (front + 4) % 8;
+
+            return (directions[front], directions[back]);
         }
     }
 }

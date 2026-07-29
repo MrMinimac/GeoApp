@@ -1,4 +1,5 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
@@ -10,15 +11,11 @@ namespace GeoCadPlugin.Drawers
     {
         public static void Draw(GeoDoc project)
         {
-            double xOffset = 0;
-
-            double rulerStartX = -20;
-
-            double tableLeftOffset = -110;
-            double tableRightOffset = 15;
-            double blockPadding = 15;
-
-            
+            double xOffset = 0; // Смещенее разреза
+            double rulerStartX = -20; // Отступ влево
+            double tableLeftOffset = -110; // Отступ влево
+            double tableRightOffset = 15; // Отступ вправо
+            double blockPadding = 15; // Отступ между разрезами
 
             var editor = Application.DocumentManager.MdiActiveDocument.Editor;
             Database db = Application.DocumentManager.MdiActiveDocument.Database;
@@ -29,32 +26,48 @@ namespace GeoCadPlugin.Drawers
                 BlockTableRecord ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
                 var dc = new DrawContext(db, tr, ms);
 
+                var rulerDrawer = new RulerDrawer(dc);
+                rulerDrawer.VerticalScale = project.VerticalScale;
+
+                LayerManager.CreateLayers(dc.Database, dc.Transaction, [ GeoLayers.Header,GeoLayers.Surface ]);
+
                 foreach (var line in project.BoreholeLines)
                 {
-                    LayerManager.CreateLayers(dc.Database, dc.Transaction, 
-                        [
-                            GeoLayers.Boreholes, 
-                            GeoLayers.Rulers, 
-                            GeoLayers.Tables
-                        ]);
-
                     var sections = line.BuildSections();
-                    var startX = sections.FirstOrDefault()?.X ?? 0;
-                    var endX = sections.LastOrDefault()?.X ?? 0;
 
-                    DrawVertRuler(dc, rulerStartX + xOffset, line.MinZ, line.MaxZ, project.VerticalScale);
-                    DrawLine(dc, sections, project.VerticalScale, xOffset);
+                    // Заголовок
+                    var headerX = (sections[^1].X - sections[0].X) / 2;
+                    var headerY = line.MaxZ;
+                    DrawHeader(dc, line, headerX, headerY, xOffset, project.VerticalScale);
 
-                    var tableStartX = startX + tableLeftOffset + xOffset;
-                    var tableEndX = endX + tableRightOffset + xOffset;
+                    // Скважины
+                    var cbhDrawer = new SectionBoreholeDrawer(dc);
+                    cbhDrawer.VerticalScale = project.VerticalScale;
+                    foreach (var cbh in sections)
+                    {
+                        cbhDrawer.Draw(cbh, xOffset);
+                    }    
+
+                    // Поверхность
+                    DrawSurface(dc, sections, xOffset, project.VerticalScale);
+
+                    // Линейка
+                    rulerDrawer.DrawVertRuler(rulerStartX + xOffset, line.MinZ, line.MaxZ);
+
+                    // Таблица
+                    var startX = sections[0].X;
+                    var endX = sections[^1].X;
+                    var tableStartX = startX + tableLeftOffset;
+                    var tableEndX = endX + tableRightOffset;
                     var tableStartY = line.MinZ;
-
-                    DrawTable(sections, dc, tableStartX, tableEndX, tableStartY, project.VerticalScale);
+                    DrawTable(sections, dc, tableStartX, tableEndX, tableStartY, xOffset, project.VerticalScale);
 
                     // считаем реальную ширину блока
                     double blockMinX = Math.Min(startX + tableLeftOffset, rulerStartX);
                     double blockMaxX = Math.Max(endX, tableEndX);
                     double blockWidth = blockMaxX - blockMinX;
+
+                    // Добавляем смещение
                     xOffset += blockWidth + blockPadding;
                 }
 
@@ -68,16 +81,135 @@ namespace GeoCadPlugin.Drawers
                 $"Общее кол-во проб: {project.BoreholeLines.Sum(x => x.Boreholes.Sum(x => x.SamplesCount))}\n");
         }
 
-        private static void DrawTable(List<SectionBorehole> chbs, DrawContext dc, double tableStartX, double tableEndX, double tableStartY, int verticalScale)
+        #region Surface
+        private static void DrawSurface(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
         {
-            var table = CreateTable(chbs, tableStartX, tableEndX, tableStartY, verticalScale);
-            var tableDrawer = new GeoTableDrawer(table, dc);
+            if (sections.Count < 2)
+                return;
 
+            Polyline polyline = new Polyline();
+
+            for (int i = 0; i < sections.Count; i++)
+            {
+                double x = sections[i].X + xOffset;
+                double y = sections[i].Top * verticalScale;
+
+                polyline.AddVertexAt(
+                    i,
+                    new Point2d(x, y),
+                    0,      // bulge (0 = прямая линия между вершинами)
+                    0,
+                    0);
+            }
+
+            polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
+            dc.ModelSpace.AppendEntity(polyline);
+            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
+        #endregion
+
+        #region Header
+        private static void DrawHeader(DrawContext dc, BoreholeLine line, double X, double Y, double xOffset, double vScale)
+        {
+            X += xOffset;
+            Y *= vScale;
+            Y += 10; // Отступ вверх
+
+            // Номер линии
+            DBText lineNumberText = new DBText
+            {
+                TextString = $"БЛ-{line.Number}",
+                Height = 5,
+                HorizontalMode = TextHorizontalMode.TextCenter,
+                VerticalMode = TextVerticalMode.TextVerticalMid,
+            };
+
+            lineNumberText.AlignmentPoint = new Point3d(X, Y + 14, 0);
+            lineNumberText.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(lineNumberText);
+            dc.Transaction.AddNewlyCreatedDBObject(lineNumberText, true);
+
+            // Азимут
+
+            DBText azimuthText = new DBText
+            {
+                TextString = $"Азимут {line.Azimuth:F0}°",
+                Height = 3,
+                HorizontalMode = TextHorizontalMode.TextCenter,
+                VerticalMode = TextVerticalMode.TextVerticalMid,
+            };
+
+            azimuthText.AlignmentPoint = new Point3d(X, Y + 4, 0);
+            azimuthText.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(azimuthText);
+            dc.Transaction.AddNewlyCreatedDBObject(azimuthText, true);
+
+            // Стрелка
+            Line arrowLine = new Line(new Point3d(X - 25, Y, 0), new Point3d(X + 25, Y, 0));
+            arrowLine.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(arrowLine);
+            dc.Transaction.AddNewlyCreatedDBObject(arrowLine, true);
+
+            double arrowWingStartX = X + 25;
+            double arrowWingEndX = arrowWingStartX - 4.3;
+
+            Line arrowWingLine = new Line(new Point3d(arrowWingStartX, Y, 0), new Point3d(arrowWingEndX, Y - 2.5, 0));
+            arrowWingLine.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(arrowWingLine);
+            dc.Transaction.AddNewlyCreatedDBObject(arrowWingLine, true);
+
+            Line arrowWingLine2 = new Line(new Point3d(arrowWingStartX, Y, 0), new Point3d(arrowWingEndX, Y + 2.5, 0));
+            arrowWingLine2.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(arrowWingLine2);
+            dc.Transaction.AddNewlyCreatedDBObject(arrowWingLine2, true);
+
+            // Direction Front
+
+            var direction = line.GetDirection();
+
+            DBText dirFrontText = new DBText
+            {
+                TextString = $"{direction.Front}",
+                Height = 3,
+                HorizontalMode = TextHorizontalMode.TextCenter,
+                VerticalMode = TextVerticalMode.TextVerticalMid,
+            };
+
+            dirFrontText.AlignmentPoint = new Point3d(X + 35, Y, 0);
+            dirFrontText.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(dirFrontText);
+            dc.Transaction.AddNewlyCreatedDBObject(dirFrontText, true);
+
+            // Direction Backward
+
+            DBText dirBackwardText = new DBText
+            {
+                TextString = $"{direction.Backward}",
+                Height = 3,
+                HorizontalMode = TextHorizontalMode.TextCenter,
+                VerticalMode = TextVerticalMode.TextVerticalMid,
+            };
+
+            dirBackwardText.AlignmentPoint = new Point3d(X - 35, Y, 0);
+            dirBackwardText.Layer = LayerManager.GetLayerName(GeoLayers.Header);
+            dc.ModelSpace.AppendEntity(dirBackwardText);
+            dc.Transaction.AddNewlyCreatedDBObject(dirBackwardText, true);
+        }
+        #endregion
+
+        #region Table
+        private static void DrawTable(List<SectionBorehole> chbs, DrawContext dc, double tableStartX, double tableEndX, double tableStartY, double xOffset, int verticalScale)
+        {
+            var table = CreateTable(chbs, tableStartX, tableEndX, tableStartY, xOffset, verticalScale);
+            var tableDrawer = new GeoTableDrawer(table, dc);
             tableDrawer.DrawTable();
         }
 
-        private static GeoTable CreateTable(List<SectionBorehole> cbhs, double tableStartX, double tableEndX, double tableStartY, int verticalScale)
+        private static GeoTable CreateTable(List<SectionBorehole> cbhs, double tableStartX, double tableEndX, double tableStartY, double xOffset, int verticalScale)
         {
+            tableStartX += xOffset;
+            tableEndX += xOffset;
+
             var boreholeNumbers = new List<GeoTableRowValue>();
             var boreholeDistances = new List<GeoTableRowValue>();
             var boreholeDepths = new List<GeoTableRowValue>();
@@ -99,42 +231,44 @@ namespace GeoCadPlugin.Drawers
             {
                 // Номера скважин
                 var bh = cbhs[i];
-                boreholeNumbers.Add(new GeoTableRowValue(bh.Source.Id.ToString(), bh.X));
+                var bhX = bh.X + xOffset;
+
+                boreholeNumbers.Add(new GeoTableRowValue(bh.Id.ToString(), bhX));
 
                 // Интервалы
                 var distance = i != cbhs.Count - 1 ? (cbhs[i + 1].X - bh.X) : 0;
                 var text = distance != 0 ? distance.ToString("F1") : null;
-                boreholeDistances.Add(new GeoTableRowValue(text, bh.X + distance / 2, [bh.X]));
+                boreholeDistances.Add(new GeoTableRowValue(text, bh.X + distance / 2, [bhX]));
 
                 // Глубины скважин
-                boreholeDepths.Add(new GeoTableRowValue(bh.Source.Deapth.ToString("F1"), bh.X));
+                boreholeDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
 
                 // Пройдено наносами
-                overburdenDepths.Add(new GeoTableRowValue(bh.Source.Deapth.ToString("F1"), bh.X));
+                overburdenDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
 
                 // Пройдено в РКП
-                bedrockDepths.Add(new GeoTableRowValue("-", bh.X));
+                bedrockDepths.Add(new GeoTableRowValue("-", bhX));
 
                 // Пройдено в ПКП
-                weatheredBedrockDepths.Add(new GeoTableRowValue("-", bh.X));
+                weatheredBedrockDepths.Add(new GeoTableRowValue("-", bhX));
 
                 // Мощность торфов
-                peatThicknesses.Add(new GeoTableRowValue("-", bh.X));
+                peatThicknesses.Add(new GeoTableRowValue("-", bhX));
 
                 // Мощность пласта песков
-                sandLayerThicknesses.Add(new GeoTableRowValue("-", bh.X));
+                sandLayerThicknesses.Add(new GeoTableRowValue("-", bhX));
 
                 // Среднее содержание на пласт
-                oreGradeValues.Add(new GeoTableRowValue("0,000", bh.X));
+                oreGradeValues.Add(new GeoTableRowValue("0,000", bhX));
 
                 // Вертикальный запас на пласт
-                oreReserveValues.Add(new GeoTableRowValue("0,000", bh.X));
+                oreReserveValues.Add(new GeoTableRowValue("0,000", bhX));
 
                 // Мощность горной массы
-                rockMassThicknesses.Add(new GeoTableRowValue("-", bh.X));
+                rockMassThicknesses.Add(new GeoTableRowValue("-", bhX));
 
                 // Среднее содержание на горную массу
-                rockMassGradeValues.Add(new GeoTableRowValue("0,000", bh.X));
+                rockMassGradeValues.Add(new GeoTableRowValue("0,000", bhX));
             }
 
             var table = new GeoTable(tableStartX, tableEndX, tableStartY, verticalScale);
@@ -153,95 +287,7 @@ namespace GeoCadPlugin.Drawers
 
             return table;
         }
+        #endregion
 
-        private static void DrawVertRuler(
-            DrawContext dc,
-            double startX,
-            double minZ,
-            double maxZ,
-            int scale,
-            double step = 5,
-            double tickStep = 1,
-            double width = 1)
-        {
-            maxZ = Math.Ceiling(maxZ / step) * step;
-            maxZ = Math.Ceiling(maxZ / step) * step;
-            minZ = Math.Floor(minZ / step) * step;
-
-            LayerManager.CreateLayer(dc.Database, dc.Transaction, GeoLayers.Rulers);
-
-            Line axis = new Line(new Point3d(startX, minZ * scale, 0), new Point3d(startX, maxZ * scale, 0));
-            axis.Layer = LayerManager.GetLayerName(GeoLayers.Rulers);
-            dc.ModelSpace.AppendEntity(axis);
-            dc.Transaction.AddNewlyCreatedDBObject(axis, true);
-
-            Line axis2 = new Line(new Point3d(startX + width, minZ * scale, 0), new Point3d(startX + width, maxZ * scale, 0));
-            axis2.Layer = LayerManager.GetLayerName(GeoLayers.Rulers);
-            dc.ModelSpace.AppendEntity(axis2);
-            dc.Transaction.AddNewlyCreatedDBObject(axis2, true);
-
-            for (double z = minZ; z <= maxZ; z += tickStep)
-            {
-                Line tick = new Line(
-                    new Point3d(startX + width, z * scale, 0),
-                    new Point3d(startX, z * scale, 0));
-
-                tick.Layer = LayerManager.GetLayerName(GeoLayers.Rulers);
-
-                dc.ModelSpace.AppendEntity(tick);
-                dc.Transaction.AddNewlyCreatedDBObject(tick, true);
-            }
-
-            for (double z = minZ; z <= maxZ; z += step)
-            {
-                DBText text = new DBText
-                {
-                    TextString = z.ToString("0"),
-                    Height = 2,
-                    Position = new Point3d(startX - 7, z * scale, 0)
-                };
-
-                text.Layer = LayerManager.GetLayerName(GeoLayers.Rulers);
-
-                dc.ModelSpace.AppendEntity(text);
-                dc.Transaction.AddNewlyCreatedDBObject(text, true);
-            }
-        }
-
-        private static void DrawLine(
-            DrawContext dc,
-            List<SectionBorehole> line,
-            int vertScale,
-            double xOffset)
-        {
-            // рисуем скважины
-            foreach (var cbh in line)
-            {
-                DrawBorehole(dc, cbh, vertScale, xOffset);
-            }
-        }
-
-        private static void DrawBorehole(
-            DrawContext dc,
-            SectionBorehole bh,
-            int Scale,
-            double xOffset)
-        {
-            Line bhLine = new Line(
-                new Point3d(
-                    bh.X + xOffset,
-                    bh.Top * Scale,
-                    0),
-
-                new Point3d(
-                    bh.X + xOffset,
-                    bh.Bottom * Scale,
-                    0));
-
-            bhLine.Layer = LayerManager.GetLayerName(GeoLayers.Boreholes);
-
-            dc.ModelSpace.AppendEntity(bhLine);
-            dc.Transaction.AddNewlyCreatedDBObject(bhLine, true);
-        }
     }
 }

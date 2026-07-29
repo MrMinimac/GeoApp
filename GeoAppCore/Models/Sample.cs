@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace GeoAppCore
 {
@@ -9,6 +10,9 @@ namespace GeoAppCore
         public double To { get; set; }
 
         public double Value { get; set; }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public List<Lithology> Lithologies { get; set; } = new();
 
         [JsonIgnore]
         public double Capacity => Math.Round((3.14 * Diametr * Diametr * Length) / 4);
@@ -27,5 +31,15 @@ namespace GeoAppCore
 
         public double Diametr { get; set; }
         public double Fineness { get; set; }
+
+        public string GetValueString()
+        {
+            return Value switch
+            {
+                0 => "пс",
+                -1 => "зн",
+                _ => AvgValue.ToString()
+            };
+        }
     }
 }

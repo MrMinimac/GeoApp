@@ -13,6 +13,7 @@ namespace GeoCadPlugin.Drawers
         {
             _table = table;
             _dc = drawContext;
+            LayerManager.CreateLayer(_dc.Database, _dc.Transaction, GeoLayers.Tables);
         }
 
         public void DrawTable()
