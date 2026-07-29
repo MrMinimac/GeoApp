@@ -2,7 +2,6 @@
 using GeoAppWpf.Converters;
 using GeoAppWpf.Services;
 using System.Diagnostics;
-using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
@@ -20,38 +19,80 @@ namespace GeoAppWpf
             InitializeComponent();
         }
 
+        #region DataGridEvents
+
+        private void BoreholeLinesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (BoreholeLinesDataGrid.SelectedItem is BoreholeLine line)
+            {
+                BoreholesDataGrid.ItemsSource = line.Boreholes;
+            }
+        }
+
+        private void BoreholeLinesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        {
+            if (e.PropertyName == nameof(BoreholeLine.First) ||
+                e.PropertyName == nameof(BoreholeLine.Last) ||
+                e.PropertyName == nameof(BoreholeLine.Boreholes))
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private void BoreholesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
+        {
+            if (e.PropertyName is nameof(Borehole.AvgValue))
+            {
+                var column = (DataGridTextColumn)e.Column;
+
+                column.Binding = new Binding(e.PropertyName)
+                {
+                    Converter = new ValueConverter()
+                };
+            }
+        }
+
+        private void BoreholesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (BoreholesDataGrid.SelectedItem is Borehole borehole)
+            {
+                SamplesDataGrid.ItemsSource = borehole.Samples;
+            }
+        }
+
+        private void SamplesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
+        {
+            if (e.PropertyName is nameof(Sample.Value)
+                or nameof(Sample.AvgValue)
+                or nameof(Sample.VertReserve)
+                or nameof(Sample.CleanedAvgValue)
+                or nameof(Sample.CleanedVertReserve))
+            {
+                var column = (DataGridTextColumn)e.Column;
+
+                column.Binding = new Binding(e.PropertyName)
+                {
+                    Converter = new ValueConverter()
+                };
+            }
+        }
+
+        #endregion
+
+        #region ButtonEvents
+
         private void ExcelLoadButton_Click(object sender, RoutedEventArgs e)
         {
             var el = new ExcelService();
             _curDoc = el.Load();
-            
+
             if (_curDoc == null)
                 return;
 
-            BoreholeLinesGrid.ItemsSource = _curDoc.BoreholeLines;
-            BoreholeLinesGrid.Visibility = Visibility.Visible;
-        }
-
-        private void BoreholeLinesGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (BoreholeLinesGrid.SelectedItem is BoreholeLine line)
-            {
-                BoreholesGrid.ItemsSource =
-                    line.Boreholes;
-
-                BoreholesGrid.Visibility = Visibility.Visible;
-            }
-        }
-
-        private void BoreholesGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (BoreholesGrid.SelectedItem is Borehole borehole)
-            {
-                SamplesGrid.ItemsSource =
-                    borehole.Samples;
-
-                SamplesGrid.Visibility = Visibility.Visible;
-            }
+            BoreholeLinesDataGrid.ItemsSource = _curDoc.BoreholeLines;
+            BoreholeLinesDataGrid.SelectedItem = BoreholeLinesDataGrid.Items[0];
+            BoreholesDataGrid.SelectedItem = BoreholesDataGrid.Items[0];
+            DataGrids.Visibility = Visibility.Visible;
         }
 
         private async void ImportInAcadButton_Click(object sender, RoutedEventArgs e)
@@ -64,48 +105,13 @@ namespace GeoAppWpf
             ImportInCad(2);
         }
 
-        private async void ImportInCad(int id)
-        {
-            if (_curDoc == null)
-            {
-                MessageBox.Show("Документ пуст.");
-                return;
-            }
-
-            ImportButton.IsEnabled = false;
-            ImportButton2.IsEnabled = false;
-
-            try
-            {
-                await SendToAutoCAD(_curDoc, id);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Произошла ошибка при импорте.\n" +
-                    $"Убедитесь что у вас запущен AutoCad и загружен плагин. " +
-                    $"\n\n{ex.Message}", "Ошибка!");
-
-                Debug.WriteLine(ex.ToString());
-            }
-            finally
-            {
-                ImportButton.IsEnabled = true;
-                ImportButton2.IsEnabled = true;
-            }
-        }
+        #endregion
 
         private async Task SendToAutoCAD(GeoDoc doc, int id)
         {
             using HttpClient client = new HttpClient();
 
             string json = doc.ToJson();
-
-            // Сохраняем JSON на рабочий стол
-            string path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                $"import_app_{DateTime.Now:yyyyMMdd_HHmmss}.json");
-
-            File.WriteAllText(path, json);
 
             var content =
                 new StringContent(
@@ -132,43 +138,25 @@ namespace GeoAppWpf
             }
         }
 
-        private void BoreholeLinesGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        private async void ImportInCad(int id)
         {
-            if (e.PropertyName == nameof(BoreholeLine.First) ||
-                e.PropertyName == nameof(BoreholeLine.Last) ||
-                e.PropertyName == nameof(BoreholeLine.Boreholes))
+            if (_curDoc == null)
             {
-                e.Cancel = true;
+                MessageBox.Show("Документ пуст.");
+                return;
             }
-        }
 
-        private void SamplesGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        {
-            if (e.PropertyName is nameof(Sample.Value)
-                or nameof(Sample.AvgValue)
-                or nameof(Sample.VertReserve)
-                or nameof(Sample.CleanedAvgValue)
-                or nameof(Sample.CleanedVertReserve))
+            try
             {
-                var column = (DataGridTextColumn)e.Column;
-
-                column.Binding = new Binding(e.PropertyName)
-                {
-                    Converter = new ValueConverter()
-                };
+                await SendToAutoCAD(_curDoc, id);
             }
-        }
-
-        private void BoreholesGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        {
-            if (e.PropertyName is nameof(Borehole.AvgValue))
+            catch (Exception ex)
             {
-                var column = (DataGridTextColumn)e.Column;
+                MessageBox.Show($"Произошла ошибка при импорте.\n" +
+                    $"Убедитесь что у вас запущен AutoCad и загружен плагин. " +
+                    $"\n\n{ex.Message}", "Ошибка!");
 
-                column.Binding = new Binding(e.PropertyName)
-                {
-                    Converter = new ValueConverter()
-                };
+                Debug.WriteLine(ex.ToString());
             }
         }
     }

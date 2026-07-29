@@ -1,4 +1,5 @@
 ﻿using GeoAppCore;
+using GeoCadPlugin.Drawers;
 using Newtonsoft.Json;
 using System.Net;
 using System.Text;
@@ -46,25 +47,13 @@ namespace GeoCadPlugin
                                 context.Request.InputStream,
                                 context.Request.ContentEncoding);
 
-                        string json =
-                            await reader.ReadToEndAsync();
-
-
-                        // Сохраняем JSON на рабочий стол
-                        string path = Path.Combine(
-                            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                            $"import_{DateTime.Now:yyyyMMdd_HHmmss}.json");
-
-
-                        File.WriteAllText(path, json);
-
+                        string json = await reader.ReadToEndAsync();
 
                         CommandQueue.Enqueue(() =>
                         {
                             int.TryParse(url.ToLower().Replace("/import", ""), out int id);
                             ImportProject(json, id != 0 ? id : 1);
                         });
-
 
                         await WriteResponse(context, "Imported");
                         return;
