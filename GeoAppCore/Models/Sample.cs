@@ -11,7 +11,6 @@ namespace GeoAppCore
 
         public double Value { get; set; }
 
-        [JsonConverter(typeof(StringEnumConverter))]
         public List<Lithology> Lithologies { get; set; } = new();
 
         [JsonIgnore]

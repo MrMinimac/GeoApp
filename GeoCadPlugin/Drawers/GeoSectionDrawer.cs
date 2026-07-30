@@ -106,6 +106,36 @@ namespace GeoCadPlugin.Drawers
             dc.ModelSpace.AppendEntity(polyline);
             dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
         }
+
+        private static void DrawLithologies(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
+        {
+            if (sections.Count < 2)
+                return;
+
+            Polyline polyline = new Polyline();
+
+            for (int i = 0; i < sections.Count; i++)
+            {
+                var section = sections[i];
+
+                for (int j = 0; j < section.LithologiesIntervals.Count(); j++)
+                {
+                    double x = sections[i].X + xOffset;
+                    double y = sections[i].Top * verticalScale;
+
+                    polyline.AddVertexAt(
+                        i,
+                        new Point2d(x, y),
+                        0,      // bulge (0 = прямая линия между вершинами)
+                        0,
+                        0);
+                }
+            }
+
+            polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
+            dc.ModelSpace.AppendEntity(polyline);
+            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
         #endregion
 
         #region Header

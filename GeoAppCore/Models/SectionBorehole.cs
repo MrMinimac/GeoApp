@@ -12,6 +12,7 @@
         public double Top => Elevation;
         public double Bottom => Elevation - _source.Deapth;
         public double Deapth => _source.Deapth;
+        public List<LithologyInterval> LithologiesIntervals => _source.LithologyIntervals;
 
         public IEnumerable<Sample> Samples => _source.Samples;
 
@@ -20,11 +21,6 @@
             _source = borehole;
             Distance = distance;
             Elevation = elevation;
-        }
-
-        public void GetLitologiesIntervals()
-        {
-
         }
     }
 }
