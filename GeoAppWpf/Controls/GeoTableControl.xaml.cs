@@ -54,7 +54,7 @@ namespace GeoAppWpf.Controls
         {
             if (e.PropertyName == nameof(BoreholeLine.First) ||
                 e.PropertyName == nameof(BoreholeLine.Last) ||
-                e.PropertyName == nameof(BoreholeLine.Boreholes))
+                e.PropertyName == nameof(BoreholeLine.Boreholes) )
             {
                 e.Cancel = true;
             }
@@ -62,6 +62,11 @@ namespace GeoAppWpf.Controls
 
         private void BoreholesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
+            if (e.PropertyName == nameof(Borehole.LithologyIntervals))
+            {
+                e.Cancel = true;
+            }
+
             if (e.PropertyName is nameof(Borehole.AvgValue))
             {
                 var column = (DataGridTextColumn)e.Column;

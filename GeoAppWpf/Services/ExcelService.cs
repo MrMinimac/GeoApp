@@ -7,7 +7,7 @@ using System.Windows;
 
 namespace GeoAppWpf.Services
 {
-    public class ExcelService
+    public class ExcelService : IExcelService
     {
         public ExcelService()
         {

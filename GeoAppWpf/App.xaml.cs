@@ -1,5 +1,6 @@
 ﻿using GeoAppCore.Services;
 using GeoAppWpf.Services;
+using GeoAppWpf.TestServices;
 using GeoAppWpf.ViewModels;
 using LegendDesignWpf.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,7 +41,7 @@ namespace GeoAppWpf
             services.AddSingleton<SettingsService>(sp => new SettingsService(AppDirectory));
 
             services.AddSingleton<ACadService>();
-            services.AddSingleton<ExcelService>();
+            services.AddSingleton <IExcelService, TestExcelService>();
 
             services.AddSingleton<QuickPanelViewModel>();
             services.AddSingleton<MainViewModel>();
