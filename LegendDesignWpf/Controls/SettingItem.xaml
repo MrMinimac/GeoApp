@@ -1,0 +1,85 @@
+﻿<UserControl
+    x:Class="LegendDesignWpf.Controls.SettingItem"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:LegendDesignWpf.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:LegendDesignWpf.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+
+        <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+
+        <Style TargetType="{x:Type local:SettingItem}">
+            <Setter Property="Opacity" Value="1" />
+
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource SecondaryBrush}" CornerRadius="8">
+
+        <Grid Margin="20,10,20,10">
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Style="{StaticResource ItemTitleTextBlockStyle}"
+                    Text="{Binding Title, RelativeSource={RelativeSource AncestorType=local:SettingItem}}" />
+
+                <TextBlock
+                    Style="{StaticResource ItemSubTitleTextBlockStyle}"
+                    Text="{Binding Description, RelativeSource={RelativeSource AncestorType=local:SettingItem}}"
+                    Visibility="{Binding Description.Length, RelativeSource={RelativeSource AncestorType=local:SettingItem}, Converter={StaticResource IntToVisibilityConverter}}" />
+
+                <ContentPresenter Margin="0,5,0,0" Content="{Binding ControlContent, RelativeSource={RelativeSource AncestorType=local:SettingItem}}">
+                    <ContentPresenter.Style>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContentPosition, RelativeSource={RelativeSource AncestorType=local:SettingItem}}" Value="Bottom">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentPresenter.Style>
+                </ContentPresenter>
+
+            </StackPanel>
+
+            <ContentPresenter
+                Grid.Column="1"
+                Margin="20,0,0,0"
+                Content="{Binding ControlContent, RelativeSource={RelativeSource AncestorType=local:SettingItem}}">
+                <ContentPresenter.Style>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContentPosition, RelativeSource={RelativeSource AncestorType=local:SettingItem}}" Value="Right">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentPresenter.Style>
+            </ContentPresenter>
+
+        </Grid>
+
+    </Border>
+
+</UserControl>

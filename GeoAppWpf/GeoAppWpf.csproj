@@ -9,23 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <COMReference Include="AutoCAD">
-      <WrapperTool>tlbimp</WrapperTool>
-      <VersionMinor>0</VersionMinor>
-      <VersionMajor>1</VersionMajor>
-      <Guid>4d6c720c-0525-4d94-841b-6d5378a564e2</Guid>
-      <Lcid>0</Lcid>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="EPPlus" Version="8.6.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
+    <ProjectReference Include="..\LegendDesignWpf\LegendDesignWpf.csproj" />
   </ItemGroup>
 
 </Project>
