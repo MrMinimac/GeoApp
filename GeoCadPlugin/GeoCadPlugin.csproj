@@ -13,13 +13,13 @@
 
   <ItemGroup>
     <Reference Include="accoremgd">
-      <HintPath>E:\Program Files\ACAD23\dlls\accoremgd.dll</HintPath>
+      <HintPath>dlls\accoremgd.dll</HintPath>
     </Reference>
     <Reference Include="Acdbmgd">
-      <HintPath>E:\Program Files\ACAD23\dlls\acdbmgd.dll</HintPath>
+      <HintPath>dlls\acdbmgd.dll</HintPath>
     </Reference>
     <Reference Include="Acmgd">
-      <HintPath>E:\Program Files\ACAD23\dlls\acmgd.dll</HintPath>
+      <HintPath>dlls\acmgd.dll</HintPath>
     </Reference>
   </ItemGroup>
 

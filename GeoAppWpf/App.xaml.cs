@@ -38,11 +38,15 @@ namespace GeoAppWpf
         private void ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<SettingsService>(sp => new SettingsService(AppDirectory));
+
             services.AddSingleton<ACadService>();
+            services.AddSingleton<ExcelService>();
+
             services.AddSingleton<QuickPanelViewModel>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<TableViewModel>();
+
             services.AddTransient<MainWindow>();
         }
 

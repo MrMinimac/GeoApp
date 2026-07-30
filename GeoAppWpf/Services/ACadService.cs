@@ -1,29 +1,30 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Services;
 using System.Diagnostics;
-using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace GeoAppWpf.Services
 {
     public class ACadService
     {
-        public GeoDoc? Document { get; set; }
+        private GeoDoc? _document;
 
-        public bool LoadDocument()
+        public event Action<GeoDoc>? DocumentChanged;
+
+        public GeoDoc? Document
         {
-            var el = new ExcelService();
-            Document = el.Load();
+            get => _document;
+            set
+            {
+                if (value == null)
+                    return;
 
-            if (Document == null)
-                return false;
-
-            return true;
+                _document = value;
+                DocumentChanged?.Invoke(value);
+            }
         }
-
 
         public async Task ExportSections()
         {
