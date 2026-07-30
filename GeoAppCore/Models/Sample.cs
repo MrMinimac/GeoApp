@@ -11,7 +11,6 @@ namespace GeoAppCore
 
         public double Value { get; set; }
 
-        public List<Lithology> Lithologies { get; set; } = new();
 
         [JsonIgnore]
         public double Capacity => Math.Round((3.14 * Diametr * Diametr * Length) / 4);
@@ -27,6 +26,7 @@ namespace GeoAppCore
         public double X { get; set; }
         public double Y { get; set; }
         public double Z { get; set; }
+        public List<Lithology> Lithologies { get; set; } = new();
 
         public double Diametr { get; set; }
         public double Fineness { get; set; }

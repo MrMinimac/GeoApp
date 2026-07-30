@@ -11,7 +11,6 @@ namespace GeoAppCore
         public int Id { get; set; }
 
         public List<Sample> Samples = new List<Sample>();
-        public List<LithologyInterval> LithologyIntervals => BuildLithologyIntervals();
 
         [JsonIgnore]
         public double Deapth
@@ -49,6 +48,8 @@ namespace GeoAppCore
         public double X { get; set; }
         public double Y { get; set; }
         public double Z { get; set; }
+
+        public List<LithologyInterval> LithologyIntervals => BuildLithologyIntervals();
 
         private List<LithologyInterval> BuildLithologyIntervals()
         {
