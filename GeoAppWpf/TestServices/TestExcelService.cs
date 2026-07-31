@@ -7,21 +7,43 @@ namespace GeoAppWpf.TestServices
     {
         public GeoDoc? Load()
         {
+            //         ПАРАМЕТРЫ            //
+
+            const double diametr = 146;
+            const double fineness = 0.9;
+            const int borholeLinesCount = 2;
+            const int boreholesCount = 30;
+            const int boreholesStep = 2;
+            const int samplesCount = 20;
+
+            //         ПАРАМЕТРЫ            //
+
+
             var doc = new GeoDoc();
+            double bLineDistX = 71.6;
+            double bLineDistY = -82.6;
 
-            double x = 0;
-            double y = 0;
-
-            for (int i = 1; i <= 2; i++)
+            for (int i = 1; i <= borholeLinesCount; i++)
             {
+                double x = bLineDistX;
+                double y = bLineDistY;
+                double z = Random.Shared.Next(8900, 9000) / 100.0;
+
                 var boreholes = new List<Borehole>();
 
-                for (int l = 1; l < 60; l += 2)
+                for (int l = 1; l < boreholesCount * boreholesStep; l += 2)
                 {
-                    x += Random.Shared.Next(140, 150) / 10.0;
-                    y += Random.Shared.Next(240, 250) / 10.0;
+                    x += Random.Shared.Next(150, 250) / 10.0;
+                    y += Random.Shared.Next(50, 150) / 10.0;
 
-                    double z = Random.Shared.Next(70000, 90000) / 100.0;
+                    if (l < boreholesCount / 2)
+                    {
+                        z -= Random.Shared.Next(0, 200) / 100.0;
+                    }
+                    else
+                    {
+                        z += Random.Shared.Next(0, 200) / 100.0;
+                    }
 
                     var bh = new Borehole
                     {
@@ -36,7 +58,7 @@ namespace GeoAppWpf.TestServices
                     double depth = 0;
                     double accumulated = 0;
 
-                    for (int s = 0; s < 20; s++)
+                    for (int s = 0; s < samplesCount; s++)
                     {
                         double value = s < 3 ? 0 : Random.Shared.Next(-1000, 1000) / 1000.0;
 
@@ -47,13 +69,14 @@ namespace GeoAppWpf.TestServices
 
                         double length;
 
-                        if (s < 2)
+                        if (s < 3)
                         {
                             length = 0.5;
                         }
-                        else if (s >= 2 &&
+                        else if (s >= 3 &&
                                  bh.Samples[s - 1].Value == 0 &&
-                                 bh.Samples[s - 2].Value == 0)
+                                 bh.Samples[s - 2].Value == 0 &&
+                                 bh.Samples[s - 3].Value == 0)
                         {
                             // Две предыдущие пустые -> крупный интервал
                             length = 0.5;
@@ -73,8 +96,8 @@ namespace GeoAppWpf.TestServices
                             To = Math.Round(to, 1),
                             Length = length,
                             Value = value,
-                            Fineness = 0.9,
-                            Diametr = 90,
+                            Fineness = fineness,
+                            Diametr = diametr,
                             X = Math.Round(x, 4),
                             Y = Math.Round(y, 4),
                             Z = Math.Round(z - to, 4),
@@ -89,6 +112,9 @@ namespace GeoAppWpf.TestServices
                 }
 
                 doc.BoreholeLines.Add(new BoreholeLine { Number = i, Boreholes = boreholes });
+
+                bLineDistX += 71.6;
+                bLineDistY += -82.6;
             }
 
             return doc;

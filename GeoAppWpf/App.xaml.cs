@@ -20,7 +20,7 @@ namespace GeoAppWpf
             base.OnStartup(e);
 
             var services = new ServiceCollection();
-            
+
             ConfigureServices(services);
             await Check();
 
@@ -41,7 +41,7 @@ namespace GeoAppWpf
             services.AddSingleton<SettingsService>(sp => new SettingsService(AppDirectory));
 
             services.AddSingleton<ACadService>();
-            services.AddSingleton <IExcelService, TestExcelService>();
+            services.AddSingleton<IExcelService, TestExcelService>();
 
             services.AddSingleton<QuickPanelViewModel>();
             services.AddSingleton<MainViewModel>();
