@@ -14,7 +14,7 @@
 
     <ld:CustomPage Title="Таблица" HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
         <ld:CustomPage.PageContent>
-            <controls:GeoTableControl Document="{Binding Document}" />
+            <controls:GeoTableControl Documents="{Binding Documents}" />
         </ld:CustomPage.PageContent>
     </ld:CustomPage>
 

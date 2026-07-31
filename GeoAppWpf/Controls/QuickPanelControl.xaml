@@ -13,6 +13,7 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Файл">
                 <MenuItem Command="{Binding ImportFromExcel}" Header="Открыть таблицу Excel" />
+                <MenuItem Command="{Binding ImportDXF}" Header="Открыть DXF файл" />
                 <MenuItem Header="Экспорт в AutoCad">
                     <MenuItem Command="{Binding ExportPlanInACAD}" Header="План" />
                     <MenuItem Command="{Binding ExportSectionsInACAD}" Header="Разрез" />

@@ -12,36 +12,29 @@
     <Grid Grid.Row="1" Margin="10">
 
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" MinWidth="100" />
+            <ColumnDefinition Width="200" />
             <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="Auto" MinWidth="100" />
-            <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="*" MinWidth="100" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!--  Буровые линии  -->
         <GroupBox Grid.Column="0">
 
             <GroupBox.Header>
-                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Буровые Линии" />
+                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Дерево" />
             </GroupBox.Header>
 
-            <DataGrid
-                x:Name="BoreholeLinesDataGrid"
-                Grid.Column="0"
-                HorizontalAlignment="Stretch"
-                AutoGenerateColumns="True"
-                AutoGeneratingColumn="BoreholeLinesDataGrid_AutoGeneratingColumn"
-                CanUserAddRows="False"
-                CanUserDeleteRows="False"
-                CanUserResizeRows="False"
-                HeadersVisibility="Column"
-                IsReadOnly="True"
-                ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                ScrollViewer.VerticalScrollBarVisibility="Auto"
-                SelectionChanged="BoreholeLinesDataGrid_SelectionChanged"
-                SelectionMode="Single"
-                SelectionUnit="FullRow" />
+            <TreeView
+                x:Name="GeoTree"
+                ItemsSource="{Binding Documents, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                PreviewMouseRightButtonDown="GeoTree_PreviewMouseRightButtonDown"
+                SelectedItemChanged="TreeView_SelectedItemChanged">
+
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                        <TextBlock Text="{Binding Name}" />
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
 
         </GroupBox>
 
@@ -54,17 +47,16 @@
             ResizeBehavior="PreviousAndNext"
             ShowsPreview="False" />
 
-        <!--  Скважины  -->
         <GroupBox Grid.Column="2">
 
             <GroupBox.Header>
-                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Скважины" />
+                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Свойства" />
             </GroupBox.Header>
 
             <DataGrid
-                x:Name="BoreholesDataGrid"
+                x:Name="PropertiesDataGrid"
                 AutoGenerateColumns="True"
-                AutoGeneratingColumn="BoreholesDataGrid_AutoGeneratingColumn"
+                AutoGeneratingColumn="PropertiesDataGrid_AutoGeneratingColumn"
                 CanUserAddRows="False"
                 CanUserDeleteRows="False"
                 CanUserResizeRows="False"
@@ -72,39 +64,7 @@
                 IsReadOnly="True"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                SelectionChanged="BoreholesDataGrid_SelectionChanged"
-                SelectionMode="Single"
-                SelectionUnit="FullRow" />
-
-        </GroupBox>
-
-        <GridSplitter
-            Grid.Column="3"
-            Width="5"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Stretch"
-            Background="Transparent"
-            ResizeBehavior="PreviousAndNext"
-            ShowsPreview="False" />
-
-        <!--  Пробы  -->
-        <GroupBox Grid.Column="4">
-
-            <GroupBox.Header>
-                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Пробы" />
-            </GroupBox.Header>
-
-            <DataGrid
-                x:Name="SamplesDataGrid"
-                AutoGenerateColumns="True"
-                AutoGeneratingColumn="SamplesDataGrid_AutoGeneratingColumn"
-                CanUserAddRows="False"
-                CanUserDeleteRows="False"
-                CanUserResizeRows="False"
-                HeadersVisibility="Column"
-                IsReadOnly="True"
-                ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                SelectionChanged="PropertiesDataGrid_SelectionChanged"
                 SelectionMode="Single"
                 SelectionUnit="FullRow" />
 

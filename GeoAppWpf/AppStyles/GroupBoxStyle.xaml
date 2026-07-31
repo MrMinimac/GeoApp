@@ -36,7 +36,7 @@
                             Grid.ColumnSpan="4"
                             BorderBrush="Transparent"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
+                            CornerRadius="3.5">
                             <Border.OpacityMask>
                                 <MultiBinding Converter="{StaticResource BorderGapMaskConverter}" ConverterParameter="7">
                                     <Binding ElementName="Header" Path="ActualWidth" />

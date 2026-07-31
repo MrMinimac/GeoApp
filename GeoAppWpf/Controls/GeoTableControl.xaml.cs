@@ -1,8 +1,12 @@
 ﻿using GeoAppCore;
 using GeoAppWpf.Converters;
+using GeoAppWpf.Models;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace GeoAppWpf.Controls
 {
@@ -14,46 +18,119 @@ namespace GeoAppWpf.Controls
         }
 
         #region Document Property
-        public GeoDoc Document
+        public ObservableCollection<GeoTreeNode> Documents
         {
-            get => (GeoDoc)GetValue(DocumentProperty);
-            set => SetValue(DocumentProperty, value);
+            get => (ObservableCollection<GeoTreeNode>)GetValue(DocumentsProperty);
+            set => SetValue(DocumentsProperty, value);
         }
 
-        public static readonly DependencyProperty DocumentProperty =
-            DependencyProperty.Register(nameof(Document), typeof(GeoDoc), 
-                typeof(GeoTableControl), new PropertyMetadata(null, OnDocumentChanged));
+        public static readonly DependencyProperty DocumentsProperty =
+            DependencyProperty.Register(nameof(Documents), typeof(ObservableCollection<GeoTreeNode>),
+                typeof(GeoTableControl), new PropertyMetadata(null));
         #endregion
 
-        private static void OnDocumentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        #region TreeViewEvents
+
+        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            var control = d as GeoTableControl;
-
-            if (control == null)
-                return;
-
-            if (control.Document != null && control.Document.BoreholeLines.Count > 0)
+            if (e.NewValue is GeoTreeNode node)
             {
-                control.BoreholeLinesDataGrid.ItemsSource = control.Document?.BoreholeLines;
-                control.BoreholeLinesDataGrid.SelectedItem = control.BoreholeLinesDataGrid.Items[0];
-                control.BoreholesDataGrid.SelectedItem = control.BoreholesDataGrid.Items[0];
+                switch (node)
+                {
+                    case BoreholeLineNode lineNode:
+                        PropertiesDataGrid.ItemsSource = lineNode.Line.Boreholes;
+                        break;
+
+                    case BoreholeNode boreholeNode:
+                        PropertiesDataGrid.ItemsSource = boreholeNode.Borehole.Samples;
+                        break;
+
+                    case GeoDocumentNode doc:
+                        PropertiesDataGrid.ItemsSource = doc.Document.BoreholeLines;
+                        break;
+
+                    case DxfDocumentNode dxfdoc:
+                        PropertiesDataGrid.ItemsSource = dxfdoc.Entities;
+                        break;
+
+                    case EntitiesNode entities:
+                        PropertiesDataGrid.ItemsSource = entities.Vertexes;
+                        break;
+
+                    //case SampleNode sampleNode:
+                    //    PropertiesDataGrid.ItemsSource = sampleNode.Sample;
+                    //    break;
+                }
             }
         }
+
+        private void GeoTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var item = FindParent<TreeViewItem>((DependencyObject)e.OriginalSource);
+
+            if (item == null)
+                return;
+
+            if (item.DataContext is EntitiesNode)
+            {
+                item.IsSelected = true;
+
+                var menu = new ContextMenu();
+
+                var open3D = new MenuItem
+                {
+                    Header = "Открыть 3D просмотр"
+                };
+
+                open3D.Click += Open3D_Click;
+
+                menu.Items.Add(open3D);
+
+                menu.PlacementTarget = item;
+                menu.IsOpen = true;
+            }
+
+            e.Handled = true;
+        }
+
+        private void Open3D_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Parent is ContextMenu menu && menu.PlacementTarget is TreeViewItem item)
+            {
+                if (GeoTree.SelectedItem is EntitiesNode node)
+                {
+                    var viewer = new Viewer3D(new DXFDrawer(node.Entity));
+                    viewer.Show();
+                }
+            }
+                
+        }
+
+        #endregion
 
         #region DataGridEvents
 
-        private void BoreholeLinesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        private void PropertiesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            if (BoreholeLinesDataGrid.SelectedItem is BoreholeLine line)
-            {
-                BoreholesDataGrid.ItemsSource = line.Boreholes;
-            }
+            
         }
 
-        private void BoreholeLinesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        private void PropertiesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
         {
+            if (e.PropertyName == "Color")
+            {
+                var templateColumn = new DataGridTemplateColumn
+                {
+                    Header = "Цвет",
+                    CellTemplate = (DataTemplate)FindResource("ColorTemplate")
+                };
+
+                e.Column = templateColumn;
+            }
+
             switch (e.PropertyName)
             {
+                case nameof(Borehole.Id):
                 case nameof(BoreholeLine.Number):
                     e.Column.Header = "№";
                     break;
@@ -70,20 +147,6 @@ namespace GeoAppWpf.Controls
                     e.Cancel = true;
                     break;
 
-                default:
-                    e.Column.Header = e.PropertyName;
-                    break;
-            }
-        }
-
-        private void BoreholesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        {
-            switch (e.PropertyName)
-            {
-                case nameof(Borehole.Id):
-                    e.Column.Header = "№";
-                    break;
-
                 case nameof(Borehole.Deapth):
                     e.Column.Header = "Глубина";
                     break;
@@ -95,40 +158,6 @@ namespace GeoAppWpf.Controls
                 case nameof(Borehole.LithologyIntervals):
                 case nameof(Borehole.LineNumber):
                 case nameof(Borehole.Key):
-                    e.Cancel = true;
-                    break;
-
-                case nameof(Borehole.AvgValue):
-                    e.Column.Header = "Ср. сод.";
-                    var column = (DataGridTextColumn)e.Column;
-                    column.Binding = new Binding(e.PropertyName)
-                    {
-                        Converter = new ValueConverter()
-                    };
-                    break;
-
-                default:
-                    e.Column.Header = e.PropertyName;
-                    break;
-            }
-        }
-
-        private void BoreholesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (BoreholesDataGrid.SelectedItem is Borehole borehole)
-            {
-                SamplesDataGrid.ItemsSource = borehole.Samples;
-            }
-        }
-
-        private void SamplesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        {
-            switch (e.PropertyName)
-            {
-                case nameof(Sample.Diametr):
-                case nameof(Sample.Fineness):
-                case nameof(Sample.X):
-                case nameof(Sample.Y):
                     e.Cancel = true;
                     break;
 
@@ -181,7 +210,6 @@ namespace GeoAppWpf.Controls
                     break;
             }
         }
-
         private static void GenerateValueColumn(DataGridAutoGeneratingColumnEventArgs e, IValueConverter converter, string headerText)
         {
             e.Column.Header = headerText;
@@ -194,5 +222,18 @@ namespace GeoAppWpf.Controls
         }
 
         #endregion
+
+        private static T? FindParent<T>(DependencyObject obj) where T : DependencyObject
+        {
+            while (obj != null)
+            {
+                if (obj is T result)
+                    return result;
+
+                obj = VisualTreeHelper.GetParent(obj);
+            }
+
+            return null;
+        }
     }
 }

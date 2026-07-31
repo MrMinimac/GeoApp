@@ -42,6 +42,7 @@ namespace GeoAppWpf
 
             services.AddSingleton<ACadService>();
             services.AddSingleton<IExcelService, TestExcelService>();
+            services.AddSingleton<DXFService>();
 
             services.AddSingleton<QuickPanelViewModel>();
             services.AddSingleton<MainViewModel>();

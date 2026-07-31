@@ -1,8 +1,8 @@
-﻿using GeoAppCore;
+﻿using GeoAppWpf.Models;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
-using System.Windows;
+using System.Collections.ObjectModel;
 
 namespace GeoAppWpf.ViewModels
 {
@@ -10,25 +10,27 @@ namespace GeoAppWpf.ViewModels
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ACadService _acService;
-        private GeoDoc? _document;
+        private readonly DXFService _dxfService;
 
-        public GeoDoc? Document
-        {
-            get => _document;
-            set
-            {
-                _document = value;
-                OnPropertyChanged();
-            }
-        }
+        public ObservableCollection<GeoTreeNode> Documents { get; set; } = new();
 
         public TableViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
+
             _acService = _serviceProvider.GetRequiredService<ACadService>();
+            _dxfService = _serviceProvider.GetRequiredService<DXFService>();
+
             _acService.DocumentChanged += (doc) =>
             {
-                Document = doc;
+                var docView = new GeoDocumentNode(doc);
+                docView.Name = "Excel File";
+                Documents.Add(docView);
+            };
+
+            _dxfService.DocumentChanged += (doc) =>
+            {
+                Documents.Add(new DxfDocumentNode(doc));
             };
         }
     }
