@@ -10,6 +10,9 @@
                 <ResourceDictionary Source="/LegendDesignWpf;component/Themes/DarkTheme.xaml" />
                 <ResourceDictionary Source="/LegendDesignWpf;component/Themes/Generic.xaml" />
                 <ResourceDictionary Source="/MVVM/DataTemplate.xaml" />
+                <ResourceDictionary Source="/AppStyles/TextStyles.xaml" />
+                <ResourceDictionary Source="/AppStyles/GroupBoxStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/DataGridStyle.xaml" />
 
                 <!--  Converters  -->
                 <ResourceDictionary>

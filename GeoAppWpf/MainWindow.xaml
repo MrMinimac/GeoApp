@@ -9,8 +9,8 @@
     xmlns:local="clr-namespace:GeoAppWpf"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="GeoCadApp"
-    Width="800"
-    Height="450"
+    Width="1280"
+    Height="720"
     mc:Ignorable="d">
 
     <Grid>

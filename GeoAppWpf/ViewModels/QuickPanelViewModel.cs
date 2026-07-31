@@ -11,13 +11,13 @@ namespace GeoAppWpf.ViewModels
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ACadService _acadService;
-        private readonly ExcelService _excelService;
+        private readonly IExcelService _excelService;
 
         public QuickPanelViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _acadService = _serviceProvider.GetRequiredService<ACadService>();
-            _excelService = _serviceProvider.GetRequiredService<ExcelService>();
+            _excelService = _serviceProvider.GetRequiredService<IExcelService>();
         }
 
         #region Commands
@@ -26,7 +26,6 @@ namespace GeoAppWpf.ViewModels
         {
             var doc = _excelService.Load();
             _acadService.Document = doc;
-            MessageBox.Show("Документ передан!");
         });
 
         public ICommand ExportSectionsInACAD => new RelayCommand(async () =>

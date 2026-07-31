@@ -29,7 +29,6 @@ namespace GeoAppWpf.ViewModels
             _acService.DocumentChanged += (doc) =>
             {
                 Document = doc;
-                MessageBox.Show("Документ загружен!");
             };
         }
     }
