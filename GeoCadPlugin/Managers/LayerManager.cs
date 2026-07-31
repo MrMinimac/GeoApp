@@ -22,6 +22,7 @@ namespace GeoCadPlugin.Managers
                 GeoLayers.NotDeterminedAvgs => "ЗН",
                 GeoLayers.Header => "Заголовок",
                 GeoLayers.Surface => "Поверхность",
+                GeoLayers.Litologies => "Литология",
             };
         }
 

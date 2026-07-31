@@ -17,5 +17,6 @@
         NotDeterminedAvgs,
         Header,
         Surface,
+        Litologies,
     }
 }

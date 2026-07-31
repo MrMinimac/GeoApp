@@ -1,8 +1,8 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
-using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
+using GeoAppCore.Models;
 using GeoCadPlugin.Managers;
 
 namespace GeoCadPlugin.Drawers
@@ -29,7 +29,7 @@ namespace GeoCadPlugin.Drawers
                 var rulerDrawer = new RulerDrawer(dc);
                 rulerDrawer.VerticalScale = project.VerticalScale;
 
-                LayerManager.CreateLayers(dc.Database, dc.Transaction, [ GeoLayers.Header,GeoLayers.Surface ]);
+                LayerManager.CreateLayers(dc.Database, dc.Transaction, [GeoLayers.Header, GeoLayers.Surface, GeoLayers.Litologies]);
 
                 foreach (var line in project.BoreholeLines)
                 {
@@ -46,10 +46,12 @@ namespace GeoCadPlugin.Drawers
                     foreach (var cbh in sections)
                     {
                         cbhDrawer.Draw(cbh, xOffset);
-                    }    
+                    }
 
                     // Поверхность
                     DrawSurface(dc, sections, xOffset, project.VerticalScale);
+
+                    DrawLithologies(dc, sections, xOffset, project.VerticalScale);
 
                     // Линейка
                     rulerDrawer.DrawVertRuler(rulerStartX + xOffset, line.MinZ, line.MaxZ);
@@ -81,6 +83,109 @@ namespace GeoCadPlugin.Drawers
                 $"Общее кол-во проб: {project.BoreholeLines.Sum(x => x.Boreholes.Sum(x => x.SamplesCount))}\n");
         }
 
+        private static void DrawLithologies(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
+        {
+            if (sections.Count < 2)
+                return;
+
+            var lithologies = sections
+                .SelectMany(x => x.LithologiesIntervals)
+                .Select(x => x.Lithologies)
+                .Distinct(new LithologyComparer())
+                .ToList();
+
+
+            var layers = BuildLayers(sections, lithologies);
+
+            foreach (var layer in layers)
+            {
+                DrawLayer(dc, layer, xOffset, verticalScale);
+            }
+        }
+
+        private static void DrawLayer(DrawContext dc, GeologicalLayer layer, double xOffset, int verticalScale)
+        {
+            if (layer.Points.Count < 2)
+                return;
+
+            var polyline = new Polyline();
+
+            foreach (var point in layer.Points)
+            {
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(
+                        point.X + xOffset,
+                        point.Top * verticalScale),
+                    0, 0, 0);
+            }
+
+
+            for (int i = layer.Points.Count - 1; i >= 0; i--)
+            {
+                var point = layer.Points[i];
+
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(
+                        point.X + xOffset,
+                        point.Bottom * verticalScale),
+                    0, 0, 0);
+            }
+
+
+            polyline.Closed = true;
+
+            polyline.Layer = LayerManager.GetLayerName(GeoLayers.Litologies);
+            dc.ModelSpace.AppendEntity(polyline);
+            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
+
+        private static List<GeologicalLayer> BuildLayers(List<SectionBorehole> sections, List<List<Lithology>> lithologies)
+        {
+            var layers = new List<GeologicalLayer>();
+
+            foreach (var lithologySet in lithologies)
+            {
+                var layer = new GeologicalLayer
+                {
+                    Lithologies = new List<Lithology>(lithologySet)
+                };
+
+
+                foreach (var section in sections)
+                {
+                    double depth = 0;
+
+                    foreach (var interval in section.LithologiesIntervals)
+                    {
+                        if (interval.Lithologies
+                            .OrderBy(x => x)
+                            .SequenceEqual(
+                                lithologySet.OrderBy(x => x)))
+                        {
+                            layer.Points.Add(new LayerPoint
+                            {
+                                X = section.X,
+
+                                Top = section.Top - depth,
+
+                                Bottom = section.Top - depth - interval.Length
+                            });
+
+                            break;
+                        }
+
+                        depth += interval.Length;
+                    }
+                }
+
+                layers.Add(layer);
+            }
+
+            return layers;
+        }
+
         #region Surface
         private static void DrawSurface(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
         {
@@ -100,36 +205,6 @@ namespace GeoCadPlugin.Drawers
                     0,      // bulge (0 = прямая линия между вершинами)
                     0,
                     0);
-            }
-
-            polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
-            dc.ModelSpace.AppendEntity(polyline);
-            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
-        }
-
-        private static void DrawLithologies(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
-        {
-            if (sections.Count < 2)
-                return;
-
-            Polyline polyline = new Polyline();
-
-            for (int i = 0; i < sections.Count; i++)
-            {
-                var section = sections[i];
-
-                for (int j = 0; j < section.LithologiesIntervals.Count(); j++)
-                {
-                    double x = sections[i].X + xOffset;
-                    double y = sections[i].Top * verticalScale;
-
-                    polyline.AddVertexAt(
-                        i,
-                        new Point2d(x, y),
-                        0,      // bulge (0 = прямая линия между вершинами)
-                        0,
-                        0);
-                }
             }
 
             polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
@@ -319,5 +394,24 @@ namespace GeoCadPlugin.Drawers
         }
         #endregion
 
+    }
+
+    public class LithologyComparer : IEqualityComparer<List<Lithology>>
+    {
+        public bool Equals(List<Lithology> x, List<Lithology> y)
+        {
+            return x.OrderBy(a => a)
+                .SequenceEqual(y.OrderBy(a => a));
+        }
+
+        public int GetHashCode(List<Lithology> obj)
+        {
+            int hash = 17;
+
+            foreach (var item in obj.OrderBy(x => x))
+                hash = hash * 31 + item.GetHashCode();
+
+            return hash;
+        }
     }
 }

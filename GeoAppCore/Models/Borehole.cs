@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace GeoAppCore
 {
@@ -11,6 +12,8 @@ namespace GeoAppCore
         public int Id { get; set; }
 
         public List<Sample> Samples = new List<Sample>();
+
+        [JsonIgnore]
         public List<LithologyInterval> LithologyIntervals => BuildLithologyIntervals();
 
         [JsonIgnore]
@@ -59,6 +62,7 @@ namespace GeoAppCore
 
             foreach (var sample in Samples.OrderBy(x => x.From))
             {
+
                 var last = _lithologyIntervals.LastOrDefault();
 
                 if (last != null &&
@@ -79,6 +83,16 @@ namespace GeoAppCore
                     });
                 }
             }
+
+            var intervalsList = new List<string>();
+
+            foreach (var interval in _lithologyIntervals)
+            {
+                var s = string.Join(",", interval.Lithologies.Select(x => (int)x));
+                intervalsList.Add($"{interval.From} - {interval.To} = {s}");
+            }
+
+            Debug.WriteLine($"\nСкв. {Id}\n [ {string.Join("; ", intervalsList)} ]\n");
 
             return _lithologyIntervals;
         }
