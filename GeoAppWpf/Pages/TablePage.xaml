@@ -14,7 +14,21 @@
 
     <ld:CustomPage Title="Таблица" HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
         <ld:CustomPage.PageContent>
-            <controls:GeoTableControl Documents="{Binding Documents}" />
+            <Grid>
+                <controls:GeoTableControl
+                    DisplayItems="{Binding DisplayItems}"
+                    Documents="{Binding Documents}"
+                    SelectedNode="{Binding SelectedNode}"
+                    Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <TextBlock
+                    Margin="0,0,0,50"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource LabelSmallTextStyle}"
+                    Text="Загрузите документ, что бы увидеть данные."
+                    Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Reversed}" />
+            </Grid>
         </ld:CustomPage.PageContent>
     </ld:CustomPage>
 

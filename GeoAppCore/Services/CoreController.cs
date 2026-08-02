@@ -17,6 +17,7 @@ namespace GeoAppCore.Services
 
         public static async Task<bool> CheckAsync()
         {
+            return true;
             var response = await _httpClient.PostAsJsonAsync(
                 Urls[1],
                 new

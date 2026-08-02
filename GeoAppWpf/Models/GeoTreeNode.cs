@@ -6,7 +6,6 @@ namespace GeoAppWpf.Models
     {
         public string Name { get; set; }
 
-        public ObservableCollection<GeoTreeNode> Children { get; }
-            = new();
+        public ObservableCollection<GeoTreeNode> Children { get; } = new();
     }
 }

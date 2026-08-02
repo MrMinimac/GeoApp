@@ -10,9 +10,6 @@ namespace GeoAppWpf.Models
         {
             Borehole = borehole;
             Name = $"Скв. {borehole.Id}";
-
-            foreach (var sample in borehole.Samples)
-                Children.Add(new SampleNode(sample));
         }
     }
 }

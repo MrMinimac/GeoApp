@@ -11,7 +11,7 @@ namespace GeoAppWpf.Models
         public DxfDocumentNode(DxfDocument doc)
         {
             Document = doc;
-            Name = "DXF File";
+            Name = doc.Name;
 
             foreach (var entity in doc.Entities.All)
             {

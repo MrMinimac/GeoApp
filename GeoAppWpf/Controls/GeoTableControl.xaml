@@ -62,6 +62,7 @@
                 CanUserResizeRows="False"
                 HeadersVisibility="Column"
                 IsReadOnly="True"
+                ItemsSource="{Binding DisplayItems, RelativeSource={RelativeSource AncestorType=UserControl}}"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 SelectionChanged="PropertiesDataGrid_SelectionChanged"
