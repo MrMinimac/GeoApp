@@ -23,8 +23,13 @@ namespace GeoAppWpf.Services
             if (dialog.ShowDialog() == true)
             {
                 string filePath = dialog.FileName;
+                var doc = LoadExcel(filePath);
 
-                return LoadExcel(filePath);
+                if (doc == null)
+                    return null;
+
+                doc.Name = Path.GetFileName(filePath);
+                return doc;
             }
 
             return null;

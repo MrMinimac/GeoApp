@@ -126,7 +126,7 @@
                     Margin="3"
                     VerticalAlignment="Center"
                     Data="{StaticResource Checkmark}"
-                    Fill="{StaticResource Menu.Static.Foreground}"
+                    Fill="{DynamicResource Menu.Static.Foreground}"
                     FlowDirection="LeftToRight"
                     Visibility="Collapsed" />
                 <ContentPresenter
@@ -441,7 +441,7 @@
                     HorizontalAlignment="Left"
                     VerticalAlignment="Center"
                     Data="{StaticResource RightArrow}"
-                    Fill="{StaticResource ForegroundBrush}" />
+                    Fill="{DynamicResource ForegroundBrush}" />
                 <Popup
                     x:Name="PART_Popup"
                     AllowsTransparency="true"

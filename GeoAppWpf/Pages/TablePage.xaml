@@ -12,7 +12,7 @@
     d:DesignWidth="800"
     mc:Ignorable="d">
 
-    <ld:CustomPage Title="Таблица" HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
+    <ld:CustomPage Title="Данные" HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
         <ld:CustomPage.PageContent>
             <Grid>
                 <controls:GeoTableControl

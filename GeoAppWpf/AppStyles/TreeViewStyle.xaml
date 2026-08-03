@@ -16,6 +16,7 @@
                 <ControlTemplate TargetType="{x:Type TreeView}">
                     <Border
                         x:Name="Bd"
+                        Background="Transparent"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
                         CornerRadius="4"
@@ -23,12 +24,8 @@
                         <ScrollViewer
                             x:Name="_tv_scrollviewer_"
                             Padding="{TemplateBinding Padding}"
-                            Background="{TemplateBinding Background}"
                             CanContentScroll="false"
-                            Focusable="false"
-                            HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
-                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
-                            VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                            Focusable="false">
                             <ItemsPresenter />
                         </ScrollViewer>
                     </Border>

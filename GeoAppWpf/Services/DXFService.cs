@@ -1,10 +1,7 @@
 ﻿using GeoAppCore.Services;
-using HelixToolkit.Wpf;
 using Microsoft.Win32;
 using netDxf;
-using System.Diagnostics;
 using System.IO;
-using System.Text;
 
 namespace GeoAppWpf.Services
 {
@@ -37,8 +34,9 @@ namespace GeoAppWpf.Services
                 if (dialog.ShowDialog() == true)
                 {
                     string filePath = dialog.FileName;
-                    Document = DxfDocument.Load(filePath);
-                    Document.Name = Path.GetFileNameWithoutExtension(filePath);
+                    var doc = DxfDocument.Load(filePath);
+                    doc.Name = Path.GetFileName(filePath);
+                    Document = doc;
                 }
             }
             catch (Exception ex)
@@ -61,7 +59,7 @@ namespace GeoAppWpf.Services
 
                     var datReader = new MacromineDatReader();
                     var doc = datReader.ReadToDxf(filePath);
-                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
+                    doc.Name = Path.GetFileName(filePath);
                     Document = doc;
                 }
             }

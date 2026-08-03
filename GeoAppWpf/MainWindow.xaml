@@ -19,8 +19,6 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <controls:QuickPanelControl Margin="5,0,5,0" DataContext="{Binding QuickPanelViewModel}" />
-
         <Grid Grid.Row="1">
 
             <Grid.ColumnDefinitions>
@@ -30,12 +28,23 @@
 
             <!--  Правая часть (кнопки навигации)  -->
             <StackPanel Margin="0,8,0,0">
+
+                <controls:QuickPanelControl DataContext="{Binding QuickPanelViewModel}" />
+
+                <Border
+                    Height="1.5"
+                    Margin="10"
+                    Background="{DynamicResource InactiveBrush}"
+                    CornerRadius="2" />
+
                 <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Table}}">
                     <ld:PackIcon Width="20" Kind="Table" />
                 </ld:NavButton>
+
                 <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Settings}}">
                     <ld:PackIcon Width="20" Kind="Settings" />
                 </ld:NavButton>
+
             </StackPanel>
 
             <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />

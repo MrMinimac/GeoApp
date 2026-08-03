@@ -4,6 +4,7 @@ namespace GeoAppCore
 {
     public class GeoDoc
     {
+        public string Name { get; set; }
         public List<BoreholeLine> BoreholeLines { get; set; } = new();
 
         public int VerticalScale { get; set; } = 10;

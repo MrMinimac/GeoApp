@@ -92,8 +92,7 @@
                             <Setter TargetName="Thumb" Property="Background" Value="{DynamicResource ButtonSelectBrush}" />
                             <Setter Property="Opacity" Value="1" />
                         </Trigger>
-                        <Trigger SourceName="Thumb" Property="IsDragging" Value="True">
-                        </Trigger>
+                        <Trigger SourceName="Thumb" Property="IsDragging" Value="True" />
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Thumb" Property="Visibility" Value="Hidden" />
                             <Setter TargetName="Arrows" Property="Visibility" Value="Hidden" />
@@ -197,7 +196,7 @@
                             x:Name="Corner"
                             Grid.Row="1"
                             Grid.Column="1"
-                            Fill="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+                            Fill="Transparent" />
                         <ScrollContentPresenter
                             x:Name="PART_ScrollContentPresenter"
                             Grid.Row="0"

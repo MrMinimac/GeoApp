@@ -17,26 +17,18 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <GroupBox Grid.Column="0">
+        <TreeView
+            x:Name="GeoTree"
+            ItemsSource="{Binding Documents, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            PreviewMouseRightButtonDown="GeoTree_PreviewMouseRightButtonDown"
+            SelectedItemChanged="TreeView_SelectedItemChanged">
 
-            <GroupBox.Header>
-                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Дерево" />
-            </GroupBox.Header>
-
-            <TreeView
-                x:Name="GeoTree"
-                ItemsSource="{Binding Documents, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                PreviewMouseRightButtonDown="GeoTree_PreviewMouseRightButtonDown"
-                SelectedItemChanged="TreeView_SelectedItemChanged">
-
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                        <TextBlock Text="{Binding Name}" />
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
-
-        </GroupBox>
+            <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                    <TextBlock Text="{Binding Name}" />
+                </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
 
         <GridSplitter
             Grid.Column="1"
@@ -47,30 +39,22 @@
             ResizeBehavior="PreviousAndNext"
             ShowsPreview="False" />
 
-        <GroupBox Grid.Column="2">
-
-            <GroupBox.Header>
-                <TextBlock Style="{StaticResource LabelSmallTextStyle}" Text="Свойства" />
-            </GroupBox.Header>
-
-            <DataGrid
-                x:Name="PropertiesDataGrid"
-                AutoGenerateColumns="True"
-                AutoGeneratingColumn="PropertiesDataGrid_AutoGeneratingColumn"
-                CanUserAddRows="False"
-                CanUserDeleteRows="False"
-                CanUserResizeRows="False"
-                HeadersVisibility="Column"
-                IsReadOnly="True"
-                ItemsSource="{Binding DisplayItems, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                ScrollViewer.VerticalScrollBarVisibility="Auto"
-                SelectionChanged="PropertiesDataGrid_SelectionChanged"
-                SelectionMode="Single"
-                SelectionUnit="FullRow" />
-
-        </GroupBox>
-
+        <DataGrid
+            x:Name="PropertiesDataGrid"
+            Grid.Column="2"
+            AutoGenerateColumns="True"
+            AutoGeneratingColumn="PropertiesDataGrid_AutoGeneratingColumn"
+            CanUserAddRows="False"
+            CanUserDeleteRows="False"
+            CanUserResizeRows="False"
+            HeadersVisibility="Column"
+            IsReadOnly="True"
+            ItemsSource="{Binding DisplayItems, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+            ScrollViewer.VerticalScrollBarVisibility="Auto"
+            SelectionChanged="PropertiesDataGrid_SelectionChanged"
+            SelectionMode="Single"
+            SelectionUnit="FullRow" />
     </Grid>
 
 </UserControl>
