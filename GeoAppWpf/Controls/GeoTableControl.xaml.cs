@@ -1,5 +1,8 @@
 ﻿using GeoAppCore.Services;
 using GeoAppWpf.Models;
+using Microsoft.Win32;
+using netDxf;
+using netDxf.Entities;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -79,10 +82,52 @@ namespace GeoAppWpf.Controls
                 {
                     Header = "Открыть 3D просмотр"
                 };
-
                 open3D.Click += Open3D_Click;
+                menu.Items.Add(open3D);
+
+                menu.PlacementTarget = item;
+                menu.IsOpen = true;
+            }
+
+            if (item.DataContext is DxfDocumentNode)
+            {
+                item.IsSelected = true;
+
+                var menu = new ContextMenu();
+
+                var open3D = new MenuItem
+                {
+                    Header = "Открыть 3D просмотр"
+                };
+                open3D.Click += Open3D_All_Click;
+
+
+                var save = new MenuItem
+                {
+                    Header = "Сохранить как"
+                };
+
+
+                var saveDxf = new MenuItem
+                {
+                    Header = "DXF (AutoCAD)"
+                };
+                saveDxf.Click += SaveDxf_Click;
+
+
+                var saveDat = new MenuItem
+                {
+                    Header = "DAT (Micromine)"
+                };
+                saveDat.Click += SaveDat_Click;
+
+
+                save.Items.Add(saveDxf);
+                save.Items.Add(saveDat);
+
 
                 menu.Items.Add(open3D);
+                menu.Items.Add(save);
 
                 menu.PlacementTarget = item;
                 menu.IsOpen = true;
@@ -91,13 +136,62 @@ namespace GeoAppWpf.Controls
             e.Handled = true;
         }
 
+        private void SaveDat_Click(object sender, RoutedEventArgs e)
+        {
+            if (GeoTree.SelectedItem is not DxfDocumentNode node)
+                return;
+
+            var dialog = new SaveFileDialog
+            {
+                Filter = "DAT files (*.dat)|*.dat",
+                DefaultExt = ".dat",
+                FileName = node.Name + ".dat"
+            };
+
+            if (dialog.ShowDialog() == true)
+                node.Save(dialog.FileName);
+        }
+
+        private void SaveDxf_Click(object sender, RoutedEventArgs e)
+        {
+            if (GeoTree.SelectedItem is not DxfDocumentNode node)
+                return;
+
+            var dialog = new SaveFileDialog
+            {
+                Filter = "DXF files (*.dxf)|*.dxf",
+                DefaultExt = ".dxf",
+                FileName = node.Name + ".dxf"
+            };
+
+            if (dialog.ShowDialog() == true)
+                node.Document.Save(dialog.FileName);
+        }
+
+        private void Open3D_All_Click(object sender, RoutedEventArgs e)
+        {
+            if (GeoTree.SelectedItem is DxfDocumentNode doc)
+            {
+                var list = new List<EntityObject>();
+
+                foreach (var node in doc.Entities)
+                {
+                    if (node.Entity is Polyline3D pl)
+                        list.Add(node.Entity);
+                }
+
+                var viewer = new Viewer3D(new DXFDrawer(list));
+                viewer.Show();
+            }
+        }
+
         private void Open3D_Click(object sender, RoutedEventArgs e)
         {
             if (sender is MenuItem menuItem && menuItem.Parent is ContextMenu menu && menu.PlacementTarget is TreeViewItem item)
             {
                 if (GeoTree.SelectedItem is EntitiesNode node)
                 {
-                    var viewer = new Viewer3D(new DXFDrawer(node.Entity));
+                    var viewer = new Viewer3D(new DXFDrawer([node.Entity]));
                     viewer.Show();
                 }
             }
@@ -109,7 +203,7 @@ namespace GeoAppWpf.Controls
 
         private void PropertiesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            
+
         }
 
         private void PropertiesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)

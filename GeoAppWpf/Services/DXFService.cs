@@ -1,12 +1,10 @@
-﻿using GeoAppCore;
+﻿using GeoAppCore.Services;
+using HelixToolkit.Wpf;
 using Microsoft.Win32;
 using netDxf;
-using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace GeoAppWpf.Services
 {
@@ -30,14 +28,22 @@ namespace GeoAppWpf.Services
 
         public void Import()
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-
-            dialog.Filter = "DXF files (*.dxf)|*.dxf";
-
-            if (dialog.ShowDialog() == true)
+            try
             {
-                string filePath = dialog.FileName;
-                Document = DxfDocument.Load(filePath);
+                OpenFileDialog dialog = new OpenFileDialog();
+
+                dialog.Filter = "DXF files (*.dxf)|*.dxf";
+
+                if (dialog.ShowDialog() == true)
+                {
+                    string filePath = dialog.FileName;
+                    Document = DxfDocument.Load(filePath);
+                    Document.Name = Path.GetFileNameWithoutExtension(filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                LocaleService.ShowError(ex);
             }
         }
     }

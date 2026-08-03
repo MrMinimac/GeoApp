@@ -1,6 +1,6 @@
 ﻿using GeoAppWpf.Converters;
 using GeoAppWpf.Models;
-using netDxf.Entities;
+using System.Windows;
 
 namespace GeoAppCore.Services
 {
@@ -15,6 +15,14 @@ namespace GeoAppCore.Services
 
     public static class LocaleService
     {
+        public static void ShowError(Exception e)
+        {
+            MessageBox.Show(
+                e.Message,
+                LocaleService.Get(Message.ErrTittle),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
         public static string Get(Message m)
         {
             return m switch 
