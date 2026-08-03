@@ -60,8 +60,9 @@ namespace GeoAppWpf.Services
                     string filePath = dialog.FileName;
 
                     var datReader = new MacromineDatReader();
-                    Document = datReader.ReadToDxf(filePath);
-                    Document.Name = Path.GetFileNameWithoutExtension(filePath);
+                    var doc = datReader.ReadToDxf(filePath);
+                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
+                    Document = doc;
                 }
             }
             catch (Exception ex)
