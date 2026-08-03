@@ -1,7 +1,6 @@
 ﻿using GeoAppCore.Services;
 using GeoAppWpf.Models;
 using Microsoft.Win32;
-using netDxf;
 using netDxf.Entities;
 using System.Collections;
 using System.Collections.ObjectModel;

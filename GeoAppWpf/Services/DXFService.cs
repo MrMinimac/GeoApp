@@ -46,5 +46,28 @@ namespace GeoAppWpf.Services
                 LocaleService.ShowError(ex);
             }
         }
+
+        public void ImportDat()
+        {
+            try
+            {
+                OpenFileDialog dialog = new OpenFileDialog();
+
+                dialog.Filter = "DAT files (*.dat)|*.dat";
+
+                if (dialog.ShowDialog() == true)
+                {
+                    string filePath = dialog.FileName;
+
+                    var datReader = new MacromineDatReader();
+                    Document = datReader.ReadToDxf(filePath);
+                    Document.Name = Path.GetFileNameWithoutExtension(filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                LocaleService.ShowError(ex);
+            }
+        }
     }
 }

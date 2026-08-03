@@ -24,6 +24,11 @@ namespace GeoAppWpf.ViewModels
 
         #region Commands
 
+        public ICommand ImportMacromineDat => new RelayCommand(async () =>
+        {
+            _dxfService.ImportDat();
+        });
+
         public ICommand ImportDXF => new RelayCommand(async () =>
         {
             _dxfService.Import();

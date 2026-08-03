@@ -15,6 +15,7 @@
                 <MenuItem Header="Импорт">
                     <MenuItem Command="{Binding ImportFromExcel}" Header="Файл Excel" />
                     <MenuItem Command="{Binding ImportDXF}" Header="Файл DXF" />
+                    <MenuItem Command="{Binding ImportMacromineDat}" Header="Файл DAT (Macromine)" />
                 </MenuItem>
                 <MenuItem Header="Экспорт в AutoCad">
                     <MenuItem Command="{Binding ExportPlanInACAD}" Header="План" />

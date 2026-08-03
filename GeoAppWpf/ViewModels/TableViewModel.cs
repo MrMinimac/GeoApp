@@ -98,7 +98,7 @@ namespace GeoAppWpf.ViewModels
                 BoreholeLineNode n => n.Line.Boreholes,
                 BoreholeNode n => n.Borehole.Samples,
                 GeoDocumentNode n => n.Document.BoreholeLines,
-                DxfDocumentNode n => n.Entities,
+                DxfDocumentNode n => n.Children,
                 EntitiesNode n => n.Vertexes,
                 _ => null
             };
