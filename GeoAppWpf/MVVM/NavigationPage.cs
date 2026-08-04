@@ -2,8 +2,8 @@
 {
     public enum NavigationPage
     {
+        Home,
         Table,
         Settings,
-        Home,
     }
 }

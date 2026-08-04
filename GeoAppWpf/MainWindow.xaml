@@ -41,9 +41,9 @@
                     <ld:PackIcon Width="20" Kind="Home" />
                 </ld:NavButton>
 
-                <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Table}}">
+                <!--<ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Table}}">
                     <ld:PackIcon Width="20" Kind="Table" />
-                </ld:NavButton>
+                </ld:NavButton>-->
 
                 <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Settings}}">
                     <ld:PackIcon Width="20" Kind="Settings" />

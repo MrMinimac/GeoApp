@@ -57,6 +57,8 @@ namespace GeoAppWpf.ViewModels
 
         public ICommand Open3DCommand => throw new NotImplementedException();
 
+        public ICommand SaveAsCommand => throw new NotImplementedException();
+
         public TableViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;

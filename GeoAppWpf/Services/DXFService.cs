@@ -35,7 +35,7 @@ namespace GeoAppWpf.Services
                 {
                     string filePath = dialog.FileName;
                     var doc = DxfDocument.Load(filePath);
-                    doc.Name = Path.GetFileName(filePath);
+                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
                     Document = doc;
                 }
             }
@@ -59,7 +59,7 @@ namespace GeoAppWpf.Services
 
                     var datReader = new MacromineDatReader();
                     var doc = datReader.ReadToDxf(filePath);
-                    doc.Name = Path.GetFileName(filePath);
+                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
                     Document = doc;
                 }
             }

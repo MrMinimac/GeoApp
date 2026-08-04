@@ -16,18 +16,30 @@
                 <ControlTemplate TargetType="{x:Type TreeView}">
                     <Border
                         x:Name="Bd"
-                        Background="Transparent"
+                        Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
                         CornerRadius="4"
                         SnapsToDevicePixels="true">
-                        <ScrollViewer
-                            x:Name="_tv_scrollviewer_"
-                            Padding="{TemplateBinding Padding}"
-                            CanContentScroll="false"
-                            Focusable="false">
-                            <ItemsPresenter />
-                        </ScrollViewer>
+                        <Grid>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Margin="7,3,0,4"
+                                Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                Text="Загруженные документы" />
+                            <ScrollViewer
+                                x:Name="_tv_scrollviewer_"
+                                Grid.Row="1"
+                                Padding="{TemplateBinding Padding}"
+                                CanContentScroll="false"
+                                Focusable="false">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="false">

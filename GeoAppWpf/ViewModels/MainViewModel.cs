@@ -45,13 +45,13 @@ namespace GeoAppWpf.ViewModels
         public MainViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
+            _homeViewModel = _serviceProvider.GetRequiredService<HomeViewModel>();
             _tableViewModel = _serviceProvider.GetRequiredService<TableViewModel>();
             _settingsViewModel = _serviceProvider.GetRequiredService<SettingsViewModel>();
-            _homeViewModel = _serviceProvider.GetRequiredService<HomeViewModel>();
 
             QuickPanelViewModel = serviceProvider.GetRequiredService<QuickPanelViewModel>();
 
-            _currentPage = _tableViewModel;
+            _currentPage = _homeViewModel;
             CurrentPage = _currentPage;
         }
 
@@ -59,9 +59,9 @@ namespace GeoAppWpf.ViewModels
         {
             CurrentPage = page switch
             {
-                NavigationPage.Table => _tableViewModel,
-                NavigationPage.Settings => _settingsViewModel,
                 NavigationPage.Home => _homeViewModel,
+                //NavigationPage.Table => _tableViewModel,
+                NavigationPage.Settings => _settingsViewModel,
                 _ => _tableViewModel
             };
         }

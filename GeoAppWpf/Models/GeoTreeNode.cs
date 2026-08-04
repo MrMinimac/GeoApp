@@ -7,13 +7,13 @@ namespace GeoAppWpf.Models
 {
     public class TreeMenuItem
     {
-        public string Header { get; set; }
+        public string Header { get; init; }
 
-        public ICommand Command { get; set; }
+        public ICommand Command { get; init; }
 
-        public object? CommandParameter { get; set; }
+        public object? CommandParameter { get; init; }
 
-        public ObservableCollection<TreeMenuItem> Items { get; } = [];
+        public ObservableCollection<TreeMenuItem> Items { get; init; } = [];
     }
 
     public abstract class GeoTreeNode : BaseViewModel
@@ -31,6 +31,8 @@ namespace GeoAppWpf.Models
 				OnPropertyChanged();
 			}
 		}
+
+        public string Extension { get; init; }
 
         public ITreeCommandProvider CommandProvider { get; }
 

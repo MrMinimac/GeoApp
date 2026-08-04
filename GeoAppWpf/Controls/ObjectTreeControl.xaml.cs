@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Xml.Linq;
 
 namespace GeoAppWpf.Controls
 {
@@ -38,7 +39,7 @@ namespace GeoAppWpf.Controls
         public static readonly DependencyProperty SelectedNodeProperty =
             DependencyProperty.Register(nameof(SelectedNode), typeof(GeoTreeNode),
                 typeof(ObjectTreeControl), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
-        
+
         #endregion
 
         #region Command Provider Property
@@ -78,18 +79,28 @@ namespace GeoAppWpf.Controls
                 var menu = new ContextMenu();
 
                 foreach (var treeMenuItem in node.MenuItems)
-                    menu.Items.Add(new MenuItem
-                    {
-                        Header = treeMenuItem.Header,
-                        Command = treeMenuItem.Command,
-                        CommandParameter = treeMenuItem.CommandParameter ?? node
-                    });
+                    menu.Items.Add(CreateMenuItem(treeMenuItem, node));
 
                 menu.PlacementTarget = item;
                 menu.IsOpen = true;
             }
 
             e.Handled = true;
+        }
+
+        private MenuItem CreateMenuItem(TreeMenuItem item, GeoTreeNode node)
+        {
+            var menuItem = new MenuItem
+            {
+                Header = item.Header,
+                Command = item.Command,
+                CommandParameter = item.CommandParameter ?? node
+            };
+
+            foreach (var child in item.Items)
+                menuItem.Items.Add(CreateMenuItem(child, node));
+
+            return menuItem;
         }
         #endregion
     }

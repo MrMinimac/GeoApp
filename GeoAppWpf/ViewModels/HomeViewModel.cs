@@ -13,7 +13,16 @@ namespace GeoAppWpf.ViewModels
     public interface ITreeCommandProvider
     {
         ICommand Open3DCommand { get; }
+        ICommand SaveAsCommand { get; }
     }
+
+    public enum SupportExtensions
+    {
+        DAT,
+        DXF
+    }
+
+    public record SaveRequest(GeoTreeNode Node, SupportExtensions Extension);
 
     public class HomeViewModel : BaseViewModel, ITreeCommandProvider
     {
@@ -82,6 +91,16 @@ namespace GeoAppWpf.ViewModels
             {
                 foreach (var entity in dxfNode.Document.Entities.All)
                     ViewportController.Add(new DrawerObject(entity));
+            }
+        });
+
+        public ICommand SaveAsCommand => new RelayCommand<SaveRequest>(async (req) =>
+        {
+            switch (req.Node)
+            {
+                case DxfDocumentNode:
+                    ((DxfDocumentNode)req.Node).Save(req.Extension);
+                    break;
             }
         });
 

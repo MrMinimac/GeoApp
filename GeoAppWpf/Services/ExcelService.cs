@@ -28,7 +28,7 @@ namespace GeoAppWpf.Services
                 if (doc == null)
                     return null;
 
-                doc.Name = Path.GetFileName(filePath);
+                doc.Name = Path.GetFileNameWithoutExtension(filePath);
                 return doc;
             }
 
