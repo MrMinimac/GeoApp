@@ -1,4 +1,5 @@
 ﻿using GeoAppCore.Services;
+using GeoAppWpf.Helpers;
 using GeoAppWpf.Models;
 using Microsoft.Win32;
 using netDxf.Entities;
@@ -6,10 +7,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.Controls
 {
@@ -70,7 +68,7 @@ namespace GeoAppWpf.Controls
 
         private void GeoTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var item = FindParent<TreeViewItem>((DependencyObject)e.OriginalSource);
+            var item = VisualHelper.FindParent<TreeViewItem>((DependencyObject)e.OriginalSource);
 
             if (item == null)
                 return;
@@ -183,7 +181,7 @@ namespace GeoAppWpf.Controls
                 if (dialog.ShowDialog() == true)
                 {
                     node.Document.Save(dialog.FileName);
-                }    
+                }
             }
         }
 
@@ -263,18 +261,5 @@ namespace GeoAppWpf.Controls
             }
         }
         #endregion
-
-        private static T? FindParent<T>(DependencyObject obj) where T : DependencyObject
-        {
-            while (obj != null)
-            {
-                if (obj is T result)
-                    return result;
-
-                obj = VisualTreeHelper.GetParent(obj);
-            }
-
-            return null;
-        }
     }
 }

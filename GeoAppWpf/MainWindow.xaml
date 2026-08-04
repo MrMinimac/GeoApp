@@ -37,6 +37,10 @@
                     Background="{DynamicResource InactiveBrush}"
                     CornerRadius="2" />
 
+                <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Home}}">
+                    <ld:PackIcon Width="20" Kind="Home" />
+                </ld:NavButton>
+
                 <ld:NavButton IsChecked="{Binding SelectedPage, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static enums:NavigationPage.Table}}">
                     <ld:PackIcon Width="20" Kind="Table" />
                 </ld:NavButton>

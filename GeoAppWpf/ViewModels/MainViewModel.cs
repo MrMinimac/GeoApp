@@ -10,6 +10,7 @@ namespace GeoAppWpf.ViewModels
         private readonly IServiceProvider _serviceProvider;
         private readonly SettingsViewModel _settingsViewModel;
         private readonly TableViewModel _tableViewModel;
+        private readonly HomeViewModel _homeViewModel;
         private NavigationPage _selectedPage;
         private object _currentPage;
 
@@ -46,6 +47,7 @@ namespace GeoAppWpf.ViewModels
             _serviceProvider = serviceProvider;
             _tableViewModel = _serviceProvider.GetRequiredService<TableViewModel>();
             _settingsViewModel = _serviceProvider.GetRequiredService<SettingsViewModel>();
+            _homeViewModel = _serviceProvider.GetRequiredService<HomeViewModel>();
 
             QuickPanelViewModel = serviceProvider.GetRequiredService<QuickPanelViewModel>();
 
@@ -59,6 +61,7 @@ namespace GeoAppWpf.ViewModels
             {
                 NavigationPage.Table => _tableViewModel,
                 NavigationPage.Settings => _settingsViewModel,
+                NavigationPage.Home => _homeViewModel,
                 _ => _tableViewModel
             };
         }

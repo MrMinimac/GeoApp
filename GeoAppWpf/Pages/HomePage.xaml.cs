@@ -2,9 +2,9 @@
 
 namespace GeoAppWpf.Pages
 {
-    public partial class TablePage : UserControl
+    public partial class HomePage : UserControl
     {
-        public TablePage()
+        public HomePage()
         {
             InitializeComponent();
         }

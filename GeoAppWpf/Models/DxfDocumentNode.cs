@@ -1,4 +1,5 @@
-﻿using netDxf;
+﻿using GeoAppWpf.ViewModels;
+using netDxf;
 using netDxf.Entities;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -12,14 +13,23 @@ namespace GeoAppWpf.Models
         public DxfDocument Document { get; }
         public ObservableCollection<DxfEntityView> Entities { get; } = new();
 
-        public DxfDocumentNode(DxfDocument doc)
+        public override IReadOnlyList<TreeMenuItem> MenuItems => 
+        [
+            new()
+            {
+                Header = "Открыть 3D просмотр",
+                Command = CommandProvider.Open3DCommand
+            }
+        ];
+
+        public DxfDocumentNode(DxfDocument doc, ITreeCommandProvider commandProvider) : base(commandProvider)
         {
             Document = doc;
             Name = doc.Name;
 
             foreach (var entity in doc.Entities.All)
             {
-                Children.Add(new EntitiesNode(entity));
+                Children.Add(new EntitiesNode(entity, CommandProvider));
                 Entities.Add(new DxfEntityView(entity));
             }
         }

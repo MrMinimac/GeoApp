@@ -1,4 +1,5 @@
-﻿using GeoAppWpf.Models;
+﻿using GeoAppWpf.Controls;
+using GeoAppWpf.Models;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,15 +10,26 @@ using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels
 {
-    public class TableViewModel : BaseViewModel, ITreeCommandProvider
+    public interface ITreeCommandProvider
+    {
+        ICommand Open3DCommand { get; }
+    }
+
+    public class HomeViewModel : BaseViewModel, ITreeCommandProvider
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ACadService _acService;
         private readonly DXFService _dxfService;
+        private bool _documentsAny;
+        private GeoTreeNode? _selectedNode;
+        private IEnumerable? _displayItems;
+
+        #region Public Properties
+
+        public ViewportController ViewportController { get; }
 
         public ObservableCollection<GeoTreeNode> Documents { get; set; } = new();
 
-        private bool _documentsAny;
         public bool DocumentsAny {
             get => _documentsAny;
             set
@@ -27,7 +39,6 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
-        private GeoTreeNode? _selectedNode;
         public GeoTreeNode? SelectedNode {
             get => _selectedNode;
             set
@@ -41,7 +52,6 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
-        private IEnumerable? _displayItems;
         public IEnumerable? DisplayItems
         {
             get => _displayItems;
@@ -55,14 +65,36 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
-        public ICommand Open3DCommand => throw new NotImplementedException();
+        #endregion
 
-        public TableViewModel(IServiceProvider serviceProvider)
+        #region Commands
+
+        public ICommand Open3DCommand => new RelayCommand<GeoTreeNode>(async (node) =>
+        {
+            if (!ViewportController.IsAttached)
+                return;
+
+            if (node is EntitiesNode entityNode)
+            {
+                ViewportController.Add(new DrawerObject(entityNode.Entity));
+            }
+            else if (node is DxfDocumentNode dxfNode)
+            {
+                foreach (var entity in dxfNode.Document.Entities.All)
+                    ViewportController.Add(new DrawerObject(entity));
+            }
+        });
+
+        #endregion
+
+        public HomeViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
 
             _acService = _serviceProvider.GetRequiredService<ACadService>();
             _dxfService = _serviceProvider.GetRequiredService<DXFService>();
+
+            ViewportController = new ViewportController();
 
             _acService.DocumentChanged += (doc) =>
             {

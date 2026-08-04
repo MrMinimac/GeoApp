@@ -1,4 +1,5 @@
 ﻿using GeoAppCore;
+using GeoAppWpf.ViewModels;
 
 namespace GeoAppWpf.Models
 {
@@ -6,12 +7,12 @@ namespace GeoAppWpf.Models
     {
         public GeoDoc Document { get; }
 
-        public GeoDocumentNode(GeoDoc doc)
+        public GeoDocumentNode(GeoDoc doc, ITreeCommandProvider commandProvider) : base(commandProvider)
         {
             Document = doc;
 
             foreach (var line in doc.BoreholeLines)
-                Children.Add(new BoreholeLineNode(line));
+                Children.Add(new BoreholeLineNode(line, CommandProvider));
         }
     }
 }

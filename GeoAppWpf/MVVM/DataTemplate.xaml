@@ -4,6 +4,10 @@
     xmlns:Pages="clr-namespace:GeoAppWpf.Pages"
     xmlns:vm="clr-namespace:GeoAppWpf.ViewModels">
 
+    <DataTemplate DataType="{x:Type vm:HomeViewModel}">
+        <Pages:HomePage />
+    </DataTemplate>
+
     <DataTemplate DataType="{x:Type vm:TableViewModel}">
         <Pages:TablePage />
     </DataTemplate>
@@ -11,5 +15,7 @@
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
         <Pages:SettingsPage />
     </DataTemplate>
+
+
 
 </ResourceDictionary>

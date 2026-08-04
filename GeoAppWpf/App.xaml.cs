@@ -48,6 +48,7 @@ namespace GeoAppWpf
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<TableViewModel>();
+            services.AddSingleton<HomeViewModel>();
 
             services.AddTransient<MainWindow>();
         }

@@ -1,4 +1,5 @@
-﻿using netDxf;
+﻿using GeoAppWpf.ViewModels;
+using netDxf;
 using netDxf.Entities;
 
 namespace GeoAppWpf.Models
@@ -9,7 +10,16 @@ namespace GeoAppWpf.Models
 
         public IEnumerable<Vector3> Vertexes { get; }
 
-        public EntitiesNode(EntityObject entity)
+        public override IReadOnlyList<TreeMenuItem> MenuItems =>
+        [
+            new()
+            {
+                Header = "Открыть 3D просмотр",
+                Command = CommandProvider.Open3DCommand
+            }
+        ];
+
+        public EntitiesNode(EntityObject entity, ITreeCommandProvider commandProvider) : base(commandProvider)
         {
             Entity = entity;
             Name = entity.Type.ToString();

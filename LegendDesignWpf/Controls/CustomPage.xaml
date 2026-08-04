@@ -22,7 +22,10 @@
             </Grid.RowDefinitions>
 
             <!--  // HEADER //  -->
-            <Grid MaxWidth="{Binding HeaderMaxWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,0,47,15">
+            <Grid
+                MaxWidth="{Binding HeaderMaxWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Margin="0,0,47,15"
+                Visibility="{Binding Title.Length, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IntToVisibilityConverter}}">
 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

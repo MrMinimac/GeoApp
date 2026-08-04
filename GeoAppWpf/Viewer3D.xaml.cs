@@ -451,6 +451,8 @@ namespace GeoAppWpf
         public LinesVisual3D Actual { get; set; }
         public LinesVisual3D LastVisual { get; set; }
 
+        public event Action<DrawerObject>? Changed;
+
         public DrawerObject(EntityObject entity)
         {
             Entity = entity;
@@ -487,8 +489,13 @@ namespace GeoAppWpf
             }
             else
             {
-                throw new Exception("Supported only polyline 3D");
+                throw new Exception("Supported only Polyline3D and Face3D");
             }
+        }
+
+        public void RequestUpdate()
+        {
+            Changed?.Invoke(this);
         }
 
         private Color GetDarkColor(Color color)
