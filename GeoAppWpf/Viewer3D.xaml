@@ -27,6 +27,9 @@
                 <MenuItem Header="_Масштаб">
                     <MenuItem Click="ChangeScale_Click" Header="Уменьшить на 20%" />
                 </MenuItem>
+                <MenuItem Header="_Каркас">
+                    <MenuItem Click="Build_Click" Header="Построить" />
+                </MenuItem>
             </Menu>
         </DockPanel>
 

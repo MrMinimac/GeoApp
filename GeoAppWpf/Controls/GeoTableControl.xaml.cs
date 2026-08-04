@@ -6,13 +6,17 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.Controls
 {
     public partial class GeoTableControl : UserControl
     {
+        private DXFDrawer _drawer;
+
         public GeoTableControl()
         {
             InitializeComponent();
@@ -147,8 +151,11 @@ namespace GeoAppWpf.Controls
                 FileName = node.Name + ".dat"
             };
 
-            if (dialog.ShowDialog() == true)
-                node.Save(dialog.FileName);
+            if (_drawer != null)
+            {
+                if (dialog.ShowDialog() == true)
+                    node.Save(dialog.FileName, _drawer._visuals);
+            }
         }
 
         private void SaveDxf_Click(object sender, RoutedEventArgs e)
@@ -163,9 +170,23 @@ namespace GeoAppWpf.Controls
                 FileName = node.Name + ".dxf"
             };
 
-            if (dialog.ShowDialog() == true)
-                node.Document.Save(dialog.FileName);
+            if (_drawer != null)
+            {
+                foreach (var en in _drawer._visuals)
+                {
+                    if (en.Entity is Face3D face)
+                    {
+                        node.Document.Entities.Add(face);
+                    }
+                }
+
+                if (dialog.ShowDialog() == true)
+                {
+                    node.Document.Save(dialog.FileName);
+                }    
+            }
         }
+
 
         private void Open3D_All_Click(object sender, RoutedEventArgs e)
         {
@@ -179,7 +200,9 @@ namespace GeoAppWpf.Controls
                         list.Add(node.Entity);
                 }
 
-                var viewer = new Viewer3D(new DXFDrawer(list));
+                _drawer = new DXFDrawer(list);
+
+                var viewer = new Viewer3D(_drawer);
                 viewer.Show();
             }
         }
@@ -190,7 +213,9 @@ namespace GeoAppWpf.Controls
             {
                 if (GeoTree.SelectedItem is EntitiesNode node)
                 {
-                    var viewer = new Viewer3D(new DXFDrawer([node.Entity]));
+                    _drawer = new DXFDrawer([node.Entity]);
+
+                    var viewer = new Viewer3D(_drawer);
                     viewer.Show();
                 }
             }
