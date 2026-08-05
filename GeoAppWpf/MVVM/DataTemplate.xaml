@@ -8,14 +8,8 @@
         <Pages:HomePage />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type vm:TableViewModel}">
-        <Pages:TablePage />
-    </DataTemplate>
-
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
         <Pages:SettingsPage />
     </DataTemplate>
-
-
 
 </ResourceDictionary>

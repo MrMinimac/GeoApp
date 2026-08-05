@@ -8,9 +8,8 @@ namespace GeoAppWpf.Models
     public class DrawerObject
     {
         public Color Color { get; set; } = Colors.White;
-        public EntityObject Entity { get; private set; }
-        public Visual3D Actual { get; set; }
-        public Visual3D LastVisual { get; set; }
+        public EntityObject? Entity { get; private set; }
+        public Visual3D Visual { get; set; }
 
         public event Action<DrawerObject>? Changed;
 
@@ -44,7 +43,7 @@ namespace GeoAppWpf.Models
                     ? Colors.Blue
                     : Color;
 
-            SetVisualColor(Actual, color);
+            SetVisualColor(Visual, color);
         }
 
         public DrawerObject(EntityObject entity)
@@ -56,14 +55,9 @@ namespace GeoAppWpf.Models
                 var dxfColor = pl.Color;
                 Color = Color.FromArgb(255, dxfColor.R, dxfColor.G, dxfColor.B);
 
-                Actual = new LinesVisual3D
+                Visual = new LinesVisual3D
                 {
                     Color = Color
-                };
-
-                LastVisual = new LinesVisual3D
-                {
-                    Color = GetDarkColor(Color)
                 };
             }
             else if (Entity is Face3D face)
@@ -71,14 +65,9 @@ namespace GeoAppWpf.Models
                 var dxfColor = face.Color;
                 Color = Color.FromArgb(255, dxfColor.R, dxfColor.G, dxfColor.B);
 
-                Actual = new LinesVisual3D
+                Visual = new LinesVisual3D
                 {
                     Color = Color
-                };
-
-                LastVisual = new LinesVisual3D
-                {
-                    Color = GetDarkColor(Color)
                 };
             }
             else if (Entity is Point point)
@@ -86,14 +75,9 @@ namespace GeoAppWpf.Models
                 var dxfColor = point.Color;
                 Color = Color.FromArgb(255, dxfColor.R, dxfColor.G, dxfColor.B);
 
-                Actual = new LinesVisual3D
+                Visual = new LinesVisual3D
                 {
                     Color = Color
-                };
-
-                LastVisual = new LinesVisual3D
-                {
-                    Color = GetDarkColor(Color)
                 };
             }
             else
@@ -107,20 +91,7 @@ namespace GeoAppWpf.Models
             if (visual == null)
                 throw new ArgumentNullException(nameof(visual));
 
-            // Устанавливаем базовый Visual3D для всех типов объектов
-            Actual = visual;
-
-            // Теперь проверка 'is ScreenSpaceVisual3D' сработает корректно, 
-            // так как проверятся базовый тип Visual3D
-            if (visual is ScreenSpaceVisual3D scrVisual)
-            {
-                LastVisual = scrVisual;
-                SetVisualColor(LastVisual, GetDarkColor(scrVisual.Color));
-            }
-            else
-            {
-                LastVisual = null;
-            }
+            Visual = visual;
         }
 
         public void RequestUpdate()

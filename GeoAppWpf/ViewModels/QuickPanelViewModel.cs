@@ -1,8 +1,6 @@
-﻿using GeoAppCore.Services;
-using GeoAppWpf.Services;
+﻿using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
-using System.Windows;
 using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels

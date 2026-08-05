@@ -1,40 +1,26 @@
-﻿using GeoAppWpf.Controls;
+﻿using GeoAppWpf.Interfaces;
 using GeoAppWpf.Models;
+using GeoAppWpf.Operations;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
-using netDxf.Entities;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.ViewModels
 {
-    public interface ITreeCommandProvider
-    {
-        ICommand Open3DCommand { get; }
-        ICommand SaveAsCommand { get; }
-    }
-
-    public enum SupportExtensions
-    {
-        DAT,
-        DXF
-    }
-
-    public record SaveRequest(GeoTreeNode Node, SupportExtensions Extension);
-
     public class HomeViewModel : BaseViewModel, ITreeCommandProvider
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ACadService _acService;
         private readonly DXFService _dxfService;
+        private readonly UndoManager _undoManager;
         private bool _documentsAny;
         private GeoTreeNode? _selectedNode;
         private IEnumerable? _displayItems;
+        private IMessageBox _messageBox;
 
         #region Public Properties
 
@@ -79,60 +65,34 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
-        public IReadOnlyList<TreeMenuItem> DockPanelItems =>
-        [
-            new()
-            {
-                Header = "Камера",
-                Items =
-                [
-                    new()
-                    {
-                        Header = "Центр",
-                    },
-                ]
-            },
-            new()
-            {
-                Header = "Правка",
-                Items =
-                [
-                    new()
-                    {
-                        Header = "Снять последнее выделение",
-                        Command = UnselectLastCommand
-                    },
-                    new()
-                    {
-                        Header = "Снять все выделения",
-                        Command = UnselectAllCommand
-                    },
-                    new()
-                    {
-                        Header = "Выбрать все",
-                        Command = SelectAllCommand
-                    },
-                ]
-            },
-            new()
-            {
-                Header = "Редактирование",
-                Items =
-                [
-                    new()
-                    {
-                        Header = "Построить каркас",
-                        Command = BuildCarcasCommand,
-                    }
-                ]
-            }
-        ];
+        private readonly IReadOnlyList<TreeMenuItem> _dockPanelItems;
+        public IReadOnlyList<TreeMenuItem> DockPanelItems => _dockPanelItems;
 
         #endregion
 
         #region Commands
 
-        public ICommand Open3DCommand => new RelayCommand<GeoTreeNode>(async (node) =>
+        private readonly RelayCommand<GeoTreeNode> _open3DCommand;
+        private readonly RelayCommand<SaveRequest> _saveAsCommand;
+        private readonly RelayCommand _buildCarcasCommand;
+        private readonly RelayCommand _undoCommand;
+        private readonly RelayCommand _redoCommand;
+        private readonly RelayCommand _unselectAllCommand;
+        private readonly RelayCommand _unselectLastCommand;
+        private readonly RelayCommand _selectAllCommand;
+        private readonly RelayCommand _zoomExtentsCommand;
+
+        public ICommand Open3DCommand => _open3DCommand;
+        public ICommand SaveAsCommand => _saveAsCommand;
+        public ICommand BuildCarcasCommand => _buildCarcasCommand;
+        public ICommand UndoCommand => _undoCommand;
+        public ICommand RedoCommand => _redoCommand;
+        public ICommand UnselectAllCommand => _unselectAllCommand;
+        public ICommand UnselectLastCommand => _unselectLastCommand;
+        public ICommand SelectAllCommand => _selectAllCommand;
+        public ICommand ZoomExtentsCommand => _zoomExtentsCommand;
+
+        private void Open3D(GeoTreeNode node)
         {
             if (!ViewportController.IsAttached)
                 return;
@@ -143,108 +103,44 @@ namespace GeoAppWpf.ViewModels
             }
             else if (node is DxfDocumentNode dxfNode)
             {
-                foreach (var entity in dxfNode.Document.Entities.All)
-                    ViewportController.Add(new DrawerObject(entity));
+                var entities = dxfNode.Document.Entities.All;
+                var objs = entities.Select(e => new DrawerObject(e));
+                ViewportController.AddRange(objs);
             }
-        });
-
-        public ICommand SaveAsCommand => new RelayCommand<SaveRequest>(async (req) =>
+        }
+        private void SaveAs(SaveRequest request)
         {
-            switch (req.Node)
+            switch (request.Node)
             {
                 case DxfDocumentNode:
-                    ((DxfDocumentNode)req.Node).Save(req.Extension);
+                    ((DxfDocumentNode)request.Node).Save(request.Extension);
                     break;
             }
-        });
-
-        public ICommand BuildCarcasCommand => new RelayCommand(() =>
+        }
+        private void BuildCarcas()
         {
-            var selectedVisuals = ViewportController.Visuals
-                .Where(x => x.IsSelected);
-
-            var selectedEntities = selectedVisuals
-                .Where(x => x.Entity is Polyline3D)
-                .Select(x => (Polyline3D)x.Entity)
-                .ToList();
-
-            // 1. Экстраполяция
-            var extrapolateEntities = Extrapolator.Extrapolate(selectedEntities, 25, 0.1);
-            var allContours = selectedEntities.Concat(extrapolateEntities).ToList();
-
-            if (allContours.Count < 2) return;
-
-            // 2. Генерируем каркас (сущности DXF, включая Face3D)
-            var faces = CarcasBuiler.Build(allContours)?.ToList();
-            if (faces == null || !faces.Any()) return;
-
-            // 3. Сохраняем в DXF документ
             var dxfDoc = Documents
                 .OfType<DxfDocumentNode>()
                 .Select(x => x.Document)
                 .FirstOrDefault();
 
-            dxfDoc?.Entities.Add(faces);
-
-            // 4. Рисуем линии каркаса
-            foreach (var entity in faces)
-                ViewportController.Add(new DrawerObject(entity));
-
-            // 5. Рисуем каркас как объект
-            if (faces.Any())
+            if (dxfDoc == null)
             {
-                GeometryModel3D solidModel = CarcasMeshBuilder.BuildFromFaces(
-                    faces,
-                    Colors.Orange, // Цвет
-                    opacity: 0.75  // Прозрачность
-                );
-
-                var modelVisual = new ModelVisual3D { Content = solidModel };
-                ViewportController.Add(new DrawerObject(modelVisual));
+                _messageBox.ShowError("DXF документ не открыт.");
+                return;
             }
 
-            ViewportController.UnselectAll();
-        });
+            var operation = new BuildCarcasOperation(dxfDoc, ViewportController);
 
-        /*
-        public ICommand BuildCarcasCommand => new RelayCommand(() =>
-        {
-            var selectedVisuals = ViewportController.Visuals
-                .Where(x => x.IsSelected);
-
-            var selectedEntities = selectedVisuals
-                .Where(x => x.Entity is Polyline3D)
-                .Select(x => (Polyline3D)x.Entity)
-                .ToList();
-
-            var extrapolateEntities = Extrapolator.Extrapolate(selectedEntities, 25);
-
-            foreach (var extEn in extrapolateEntities)
-                selectedEntities.Add(extEn);
-
-            var carcasEntities = CarcasBuiler.Build(selectedEntities);
-
-            if (carcasEntities == null || carcasEntities.Count() == 0)
-                return;
-
-            var dxfDoc = Documents
-                .Where(x => x is DxfDocumentNode)
-                .Select(x => ((DxfDocumentNode)x).Document)
-                .First();
-
-            dxfDoc?.Entities.Add(carcasEntities);
-
-            foreach (var entity in carcasEntities)
-                ViewportController.Add(new DrawerObject(entity));
-
-            foreach (var visual in selectedVisuals)
-                visual.IsSelected = false;
-        });
-        */
-
-        public ICommand UnselectAllCommand => new RelayCommand(ViewportController.UnselectAll);
-        public ICommand UnselectLastCommand => new RelayCommand(ViewportController.UnselectLast);
-        public ICommand SelectAllCommand => new RelayCommand(ViewportController.SelectAll);
+            try
+            {
+                _undoManager.Execute(operation);
+            }
+            catch (Exception e)
+            {
+                _messageBox.ShowError(e.Message);
+            }
+        }
 
         #endregion
 
@@ -254,6 +150,8 @@ namespace GeoAppWpf.ViewModels
 
             _acService = _serviceProvider.GetRequiredService<ACadService>();
             _dxfService = _serviceProvider.GetRequiredService<DXFService>();
+            _messageBox = _serviceProvider.GetRequiredService<IMessageBox>();
+            _undoManager = _serviceProvider.GetRequiredService<UndoManager>();
 
             ViewportController = new ViewportController();
 
@@ -279,12 +177,28 @@ namespace GeoAppWpf.ViewModels
 
                     DisplayItems = item switch
                     {
-                        DxfDocumentNode n => n.Entities,
+                        DxfDocumentNode n => n.EntityViews,
                         GeoDocumentNode n => n.Document.BoreholeLines,
                         _ => null
                     };
                 }
             };
+
+
+
+            _open3DCommand = new RelayCommand<GeoTreeNode>(Open3D);
+            _saveAsCommand = new RelayCommand<SaveRequest>(SaveAs);
+            _buildCarcasCommand = new RelayCommand(BuildCarcas);
+            _undoCommand = new RelayCommand(_undoManager.Undo, () => _undoManager.CanUndo);
+            _redoCommand = new RelayCommand(_undoManager.Redo, () => _undoManager.CanRedo);
+            _unselectAllCommand = new RelayCommand(ViewportController.UnselectAll);
+            _unselectLastCommand = new RelayCommand(ViewportController.UnselectLast);
+            _selectAllCommand = new RelayCommand(ViewportController.SelectAll);
+            _zoomExtentsCommand = new RelayCommand(ViewportController.ZoomExtents);
+
+            _undoManager.StateChanged += UndoManager_StateChanged;
+
+            _dockPanelItems = BuildDockPanelItems();
         }
 
         public void OnSelectedItemChanged(GeoTreeNode node)
@@ -294,10 +208,79 @@ namespace GeoAppWpf.ViewModels
                 BoreholeLineNode n => n.Line.Boreholes,
                 BoreholeNode n => n.Borehole.Samples,
                 GeoDocumentNode n => n.Document.BoreholeLines,
-                DxfDocumentNode n => n.Entities,
+                DxfDocumentNode n => n.EntityViews,
                 EntitiesNode n => n.Vertexes,
                 _ => null
             };
+        }
+
+        private void UndoManager_StateChanged()
+        {
+            _undoCommand.RaiseCanExecuteChanged();
+            _redoCommand.RaiseCanExecuteChanged();
+        }
+
+        private IReadOnlyList<TreeMenuItem> BuildDockPanelItems()
+        {
+            return
+            [
+                new()
+                {
+                    Header = "Камера",
+                    Items =
+                    [
+                        new()
+                        {
+                            Header = "Центр",
+                            Command = ZoomExtentsCommand
+                        },
+                    ]
+                },
+                new()
+                {
+                    Header = "Правка",
+                    Items =
+                    [
+                        new()
+                        {
+                            Header = "Отменить",
+                            Command = UndoCommand
+                        },
+                        new()
+                        {
+                            Header = "Вернуть",
+                            Command = RedoCommand
+                        },
+                        new()
+                        {
+                            Header = "Снять последнее выделение",
+                            Command = UnselectLastCommand
+                        },
+                        new()
+                        {
+                            Header = "Снять все выделения",
+                            Command = UnselectAllCommand
+                        },
+                        new()
+                        {
+                            Header = "Выбрать все",
+                            Command = SelectAllCommand
+                        },
+                    ]
+                },
+                new()
+                {
+                    Header = "Редактирование",
+                    Items =
+                    [
+                        new()
+                        {
+                            Header = "Построить каркас",
+                            Command = BuildCarcasCommand,
+                        }
+                    ]
+                }
+            ];
         }
     }
 }

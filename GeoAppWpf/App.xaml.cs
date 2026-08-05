@@ -1,4 +1,5 @@
 ﻿using GeoAppCore.Services;
+using GeoAppWpf.Interfaces;
 using GeoAppWpf.Services;
 using GeoAppWpf.TestServices;
 using GeoAppWpf.ViewModels;
@@ -40,14 +41,15 @@ namespace GeoAppWpf
         {
             services.AddSingleton<SettingsService>(sp => new SettingsService(AppDirectory));
 
+            services.AddSingleton<UndoManager>();
             services.AddSingleton<ACadService>();
             services.AddSingleton<IExcelService, TestExcelService>();
             services.AddSingleton<DXFService>();
+            services.AddSingleton<IMessageBox, MessageBoxService>();
 
             services.AddSingleton<QuickPanelViewModel>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<SettingsViewModel>();
-            services.AddSingleton<TableViewModel>();
             services.AddSingleton<HomeViewModel>();
 
             services.AddTransient<MainWindow>();

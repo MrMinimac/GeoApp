@@ -30,13 +30,26 @@ namespace GeoAppWpf.Services
             _viewport = null;
         }
 
+        public void ZoomExtents()
+        {
+            _viewport?.ZoomExtents();
+        }
+
         #region Select / Unselect
 
         public void Select(Visual3D visual)
         {
-            var obj = _visuals.FirstOrDefault(x => x.Actual == visual);
+            var obj = _visuals.FirstOrDefault(x => x.Visual == visual);
             if (obj == null) return;
             Select(obj);
+        }
+
+        public void SelectRange(List<DrawerObject> objs)
+        {
+            foreach (var obj in objs)
+            {
+                Select(obj);
+            }
         }
 
         public void Select(DrawerObject obj)
@@ -56,7 +69,7 @@ namespace GeoAppWpf.Services
 
         public void Unselect(Visual3D visual)
         {
-            var obj = _visuals.FirstOrDefault(x => x.Actual == visual);
+            var obj = _visuals.FirstOrDefault(x => x.Visual == visual);
             if (obj == null) return;
             Unselect(obj);
         }
@@ -82,7 +95,7 @@ namespace GeoAppWpf.Services
 
         public void ToggleSelection(Visual3D visual)
         {
-            var obj = _visuals.FirstOrDefault(x => x.Actual == visual);
+            var obj = _visuals.FirstOrDefault(x => x.Visual == visual);
             if (obj == null) return;
             ToggleSelection(obj);
         }
@@ -101,7 +114,7 @@ namespace GeoAppWpf.Services
 
         public void Hover(Visual3D visual)
         {
-            var obj = _visuals.FirstOrDefault(x => x.Actual == visual);
+            var obj = _visuals.FirstOrDefault(x => x.Visual == visual);
 
             if (obj == null || obj == _hoveredObject)
                 return;
@@ -128,19 +141,45 @@ namespace GeoAppWpf.Services
         {
             if (_viewport == null)
                 throw new ArgumentNullException("Viewport");
+            
+            bool viewportEmpty = _visuals.Count == 0;
+
+            AddInternal(obj);
+            obj.RequestUpdate();
+
+            if (viewportEmpty) 
+                _viewport.ZoomExtents();
+        }
+
+        public void AddRange(IEnumerable<DrawerObject> objs)
+        {
+            if (_viewport == null)
+                throw new ArgumentNullException("Viewport");
+            
+            bool viewportEmpty = _visuals.Count == 0;
+
+            foreach (var obj in objs)
+            {
+                AddInternal(obj);
+                obj.RequestUpdate();
+            }
+
+            if (viewportEmpty)
+                _viewport.ZoomExtents();
+        }
+
+        private void AddInternal(DrawerObject obj)
+        {
+            if (_visuals.Contains(obj) && _viewport.Children.Contains(obj.Visual))
+                return;
 
             obj.Changed += Update;
 
-            _visuals.Add(obj);
+            if (!_visuals.Contains(obj))
+                _visuals.Add(obj);
 
-            if (!_viewport.Children.Contains(obj.Actual))
-            {
-                _viewport.Children.Add(obj.Actual);
-                if (obj.LastVisual != null)
-                    _viewport.Children.Add(obj.LastVisual);
-            }
-
-            obj.RequestUpdate();
+            if (!_viewport.Children.Contains(obj.Visual))
+                _viewport.Children.Add(obj.Visual);
         }
 
         public void Remove(DrawerObject obj)
@@ -152,45 +191,33 @@ namespace GeoAppWpf.Services
 
             _visuals.Remove(obj);
 
-            if (_viewport.Children.Contains(obj.Actual))
-            {
-                _viewport.Children.Remove(obj.Actual);
-                _viewport.Children.Remove(obj.LastVisual);
-            }
+            if (_viewport.Children.Contains(obj.Visual))
+                _viewport.Children.Remove(obj.Visual);
         }
 
         public void Update(DrawerObject obj)
         {
-
             switch (obj.Entity)
             {
                 case Face3D:
-                    UpdateFace3D(obj, (Face3D)obj.Entity);
+                    UpdateFace3D(obj);
                     break;
                 case Polyline3D:
-                    UpdatePolyline3D(obj, (Polyline3D)obj.Entity);
+                    UpdatePolyline3D(obj);
                     break;
             }
 
             _viewport?.UpdateLayout();
         }
 
-        private void UpdatePolyline3D(DrawerObject obj, Polyline3D polyline3D)
+        private void UpdatePolyline3D(DrawerObject obj)
         {
-            if (obj.LastVisual is not ScreenSpaceVisual3D lastVisual)
+            if (obj.Visual is not ScreenSpaceVisual3D actual)
                 return;
-
-            if (obj.Actual is not ScreenSpaceVisual3D actual)
-                return;
-
-            lastVisual.Points.Clear();
-
-            foreach (var p in actual.Points)
-                lastVisual.Points.Add(p);
 
             actual.Points.Clear();
 
-            var points = polyline3D.Vertexes
+            var points = ((Polyline3D)obj.Entity).Vertexes
                 .Select(v => new Point3D(v.X, v.Y, v.Z))
                 .ToList();
 
@@ -201,18 +228,13 @@ namespace GeoAppWpf.Services
             }
         }
 
-        private void UpdateFace3D(DrawerObject obj, Face3D face3D)
+        private void UpdateFace3D(DrawerObject obj)
         {
-            if (obj.LastVisual is not ScreenSpaceVisual3D lastVisual)
+            if (obj.Visual is not ScreenSpaceVisual3D actual)
                 return;
 
-            if (obj.Actual is not ScreenSpaceVisual3D actual)
+            if (obj.Entity is not Face3D face3D)
                 return;
-
-            lastVisual.Points.Clear();
-
-            foreach (var p in actual.Points)
-                lastVisual.Points.Add(p);
 
             actual.Points.Clear();
 

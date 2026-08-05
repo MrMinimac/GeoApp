@@ -1,7 +1,6 @@
-﻿using GeoAppWpf.ViewModels;
+﻿using GeoAppWpf.Interfaces;
 using LegendDesignWpf.Core.MVVM;
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 
 namespace GeoAppWpf.Models
 {

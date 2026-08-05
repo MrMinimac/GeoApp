@@ -1,4 +1,6 @@
-﻿using GeoAppWpf.ViewModels;
+﻿using GeoAppWpf.Enums;
+using GeoAppWpf.Interfaces;
+using GeoAppWpf.ViewModels;
 using Microsoft.Win32;
 using netDxf;
 using netDxf.Entities;
@@ -12,7 +14,7 @@ namespace GeoAppWpf.Models
     public class DxfDocumentNode : GeoTreeNode
     {
         public DxfDocument Document { get; }
-        public ObservableCollection<DxfEntityView> Entities { get; } = new();
+        public ObservableCollection<DxfEntityView> EntityViews { get; } = new();
 
         public override IReadOnlyList<TreeMenuItem> MenuItems => 
         [
@@ -50,7 +52,7 @@ namespace GeoAppWpf.Models
             foreach (var entity in doc.Entities.All)
             {
                 Children.Add(new EntitiesNode(entity, CommandProvider));
-                Entities.Add(new DxfEntityView(entity));
+                EntityViews.Add(new DxfEntityView(entity));
             }
         }
 

@@ -1,4 +1,5 @@
 ﻿using GeoAppCore;
+using GeoAppWpf.Interfaces;
 using GeoAppWpf.ViewModels;
 
 namespace GeoAppWpf.Models

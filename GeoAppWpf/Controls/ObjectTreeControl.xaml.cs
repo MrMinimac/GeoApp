@@ -1,4 +1,5 @@
 ﻿using GeoAppWpf.Helpers;
+using GeoAppWpf.Interfaces;
 using GeoAppWpf.Models;
 using GeoAppWpf.ViewModels;
 using System.Collections.ObjectModel;

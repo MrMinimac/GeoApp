@@ -311,7 +311,7 @@ namespace GeoAppWpf.Services
         }
     }
 
-    public class CarcasBuiler
+    public class CarcasBuilder
     {
         private static int _carcasId = 0;
         private static Layer _curLayer;

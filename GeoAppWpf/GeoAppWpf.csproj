@@ -25,4 +25,8 @@
     <ProjectReference Include="..\LegendDesignWpf\LegendDesignWpf.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Node\" />
+  </ItemGroup>
+
 </Project>
