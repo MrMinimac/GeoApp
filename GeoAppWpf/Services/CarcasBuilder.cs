@@ -1,25 +1,327 @@
-﻿using HelixToolkit.Wpf;
-using LegendDesignWpf.Controls;
-using netDxf;
+﻿using netDxf;
 using netDxf.Entities;
-using System.Diagnostics;
-using System.Windows.Media;
-using System.Windows.Media.Media3D;
+using netDxf.Tables;
 
-namespace GeoAppWpf
+namespace GeoAppWpf.Services
 {
-    public interface IDrawer3D
+    public class PolylineOperations
     {
-        void Draw(HelixViewport3D viewport);
-        void Update();
-        void Build();
-        void ChangeScale(double scale);
+        public static IEnumerable<Polyline3D> Sort(IEnumerable<Polyline3D> polylines)
+        {
+            var list = polylines.ToList();
+
+            // 1. Умная сортировка: находим центры всех объектов для определения направления
+
+            var centers = GetCenters(list);
+
+            double minX = centers.Values.Min(c => c.X), maxX = centers.Values.Max(c => c.X);
+            double minY = centers.Values.Min(c => c.Y), maxY = centers.Values.Max(c => c.Y);
+            double minZ = centers.Values.Min(c => c.Z), maxZ = centers.Values.Max(c => c.Z);
+
+            // Определяем ось с наибольшим разбросом, чтобы сортировать по ней
+            double rangeX = maxX - minX;
+            double rangeY = maxY - minY;
+            double rangeZ = maxZ - minZ;
+
+            if (rangeX >= rangeY && rangeX >= rangeZ)
+                list = list.OrderBy(p => centers[p].X).ToList();
+            else if (rangeY >= rangeX && rangeY >= rangeZ)
+                list = list.OrderBy(p => centers[p].Y).ToList();
+            else
+                list = list.OrderBy(p => centers[p].Z).ToList();
+
+            return list;
+        }
+
+        public static Dictionary<Polyline3D, Vector3> GetCenters(IEnumerable<Polyline3D> polylines)
+        {
+            return polylines.ToDictionary(p => p, p => GetCenter(p));
+        }
+
+        public static Vector3 GetCenter(Polyline3D polyline)
+        {
+            var vertexes = polyline.Vertexes;
+            if (vertexes == null || !vertexes.Any())
+                return new Vector3(0, 0, 0);
+
+            // Вычисляем среднее арифметическое всех точек полилинии
+            double x = vertexes.Average(v => v.X);
+            double y = vertexes.Average(v => v.Y);
+            double z = vertexes.Average(v => v.Z);
+
+            return new Vector3(x, y, z);
+        }
+
+        public static void MovePolyline(Polyline3D polyline, Vector3 offset)
+        {
+            for (int i = 0; i < polyline.Vertexes.Count; i++)
+            {
+                var v = polyline.Vertexes[i];
+                polyline.Vertexes[i] += offset;
+            }
+        }
+
+        public static void ChangeScale(Polyline3D polyline3D, double scale)
+        {
+            var vertexes = polyline3D.Vertexes.ToArray();
+
+            // 1. Группируем индексы по дистанции в плоскости XY (с допуском погрешности 0.05)
+            var groups = GroupVerticalvertexes(vertexes);
+
+            if (groups.Count == 0)
+                return;
+
+            // 2. Вычисляем геометрический центр контура по X и Y
+            double sumX = 0;
+            double sumY = 0;
+
+            foreach (var group in groups)
+            {
+                var v = vertexes[group[0]];
+                sumX += v.X;
+                sumY += v.Y;
+            }
+
+            if (groups.Count == 0) return;
+
+            double centerX = sumX / groups.Count;
+            double centerY = sumY / groups.Count;
+            double xyScaleFactor = 1.0 - scale;
+
+            // 3. Обрабатываем каждую вертикаль
+            foreach (var group in groups)
+            {
+                var baseV = vertexes[group[0]];
+                double dirX = baseV.X - centerX;
+                double dirY = baseV.Y - centerY;
+
+                double newX = centerX + (dirX * xyScaleFactor);
+                double newY = centerY + (dirY * xyScaleFactor);
+
+                bool hasValidHeight = false;
+                double minZ = double.MaxValue;
+                double maxZ = double.MinValue;
+
+                if (group.Count >= 2)
+                {
+                    foreach (var idx in group)
+                    {
+                        double z = vertexes[idx].Z;
+                        if (z < minZ) minZ = z;
+                        if (z > maxZ) maxZ = z;
+                    }
+
+                    if (Math.Abs(maxZ - minZ) >= 0.001)
+                    {
+                        hasValidHeight = true;
+                    }
+                }
+
+                if (hasValidHeight)
+                {
+                    double height = maxZ - minZ;
+                    double offsetZ = height * (scale / 2.0);
+
+                    double newMinZ = minZ + offsetZ;
+                    double newMaxZ = maxZ - offsetZ;
+
+                    foreach (var idx in group)
+                    {
+                        var v = vertexes[idx];
+                        bool isLower = Math.Abs(v.Z - minZ) < Math.Abs(v.Z - maxZ);
+                        vertexes[idx] = new Vector3(newX, newY, isLower ? newMinZ : newMaxZ);
+                    }
+                }
+                else
+                {
+                    foreach (var idx in group)
+                    {
+                        var v = vertexes[idx];
+                        vertexes[idx] = new Vector3(newX, newY, v.Z);
+                    }
+                }
+            }
+
+            // 5. Записываем изменения
+            for (int i = 0; i < vertexes.Length; i++)
+            {
+                polyline3D.Vertexes[i] = vertexes[i];
+            }
+        }
+
+        public static List<List<int>> GroupVerticalvertexes(Vector3[] vertices, double tolerance = 0.05)
+        {
+            var groups = new List<List<int>>();
+
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                bool found = false;
+
+                foreach (var group in groups)
+                {
+                    var v = vertices[group[0]];
+
+                    double dx = v.X - vertices[i].X;
+                    double dy = v.Y - vertices[i].Y;
+
+                    if (dx * dx + dy * dy < tolerance * tolerance)
+                    {
+                        group.Add(i);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    groups.Add([i]);
+            }
+
+            return groups;
+        }
+    }
+
+    public class Extrapolator
+    {
+        /// <summary>
+        /// Выполняет экстраполяцию крайних полилиний относительно существующего набора объектов.
+        ///
+        /// Метод предназначен для создания дополнительных крайних сечений за пределами
+        /// исходного диапазона полилиний. Для этого:
+        /// <list type="number">
+        /// <item>
+        /// Полилинии сортируются в пространственном порядке.
+        /// </item>
+        /// <item>
+        /// Определяются центры первого, второго, предпоследнего и последнего элементов.
+        /// </item>
+        /// <item>
+        /// Крайние полилинии клонируются и смещаются наружу по направлению продолжения ряда.
+        /// </item>
+        /// <item>
+        /// Новые полилинии уменьшаются в масштабе, чтобы обеспечить плавное уменьшение
+        /// при удалении от исходных данных.
+        /// </item>
+        /// </list>
+        ///
+        /// Если передан только один элемент или набор пустой, метод не выполняет
+        /// полноценную экстраполяцию и возвращает исходный результат.
+        /// </summary>
+        /// <param name="polylines">
+        /// Исходный набор трёхмерных полилиний, для которых необходимо создать
+        /// дополнительные крайние элементы.
+        /// </param>
+        /// <param name="defaultDistance">
+        /// Расстояние смещения по умолчанию, используемое если невозможно определить
+        /// направление и расстояние между соседними полилиниями.
+        /// </param>
+        /// <param name="scale">
+        /// Коэффициент уменьшения масштаба создаваемых крайних полилиний.
+        /// Значение 0.1 означает уменьшение размера на 10%.
+        /// </param>
+        /// <returns>
+        /// Коллекция из двух новых полилиний:
+        /// первая — продолжение в начале ряда,
+        /// вторая — продолжение в конце ряда.
+        /// </returns>
+        public static IEnumerable<Polyline3D> Extrapolate(IEnumerable<Polyline3D> polylines, double defaultDistance = 0, double scale = 0.2)
+        {
+            // Сортируем полилинии для определения начала и конца ряда
+            var list = PolylineOperations.Sort(polylines).ToList();
+
+            if (list.Count == 0)
+                return list;
+
+            // Получаем центры всех полилиний для анализа их взаимного положения
+            var centers = PolylineOperations.GetCenters(list);
+
+
+            // Создаем копии крайних полилиний.
+            // Исходные объекты не изменяются.
+            var first = (Polyline3D)list.First().Clone();
+            var last = (Polyline3D)list.Last().Clone();
+
+
+            // Расстояние смещения.
+            // По умолчанию используется заданное значение,
+            // но при наличии нескольких объектов рассчитывается автоматически.
+            double distExtrapolateFirst = defaultDistance;
+            double distExtrapolateLast = defaultDistance;
+
+
+            // Направления смещения по умолчанию.
+            // Используются только если невозможно вычислить реальное направление.
+            Vector3 firstDirection = new Vector3(-1, 0, 0);
+            Vector3 lastDirection = new Vector3(1, 0, 0);
+
+            if (list.Count >= 2 && defaultDistance == 0)
+            {
+                var c1 = centers[list[0]];
+                var c2 = centers[list[1]];
+
+                var cPreLast = centers[list[^2]];
+                var cLast = centers[list[^1]];
+
+
+                // Определяем расстояние между соседними центрами.
+                // Новые полилинии будут вынесены на половину этого расстояния.
+                double dFirst = Vector3.Distance(c1, c2);
+                double dLast = Vector3.Distance(cLast, cPreLast);
+
+
+                distExtrapolateFirst = dFirst / 2.0;
+                distExtrapolateLast = dLast / 2.0;
+
+
+                // Направление продолжения первого элемента.
+                // Вектор направлен от второго объекта к первому.
+                if (dFirst > 0.0001)
+                {
+                    firstDirection = c1 - c2;
+                    firstDirection.Normalize();
+                }
+
+
+                // Направление продолжения последнего элемента.
+                // Вектор направлен от предпоследнего объекта к последнему.
+                if (dLast > 0.0001)
+                {
+                    // lastDirection = cLast - cPreLast;
+                    // lastDirection.Normalize();
+                }
+            }
+
+            // Перемещаем крайние копии наружу относительно исходного ряда
+            PolylineOperations.MovePolyline(
+                first,
+                firstDirection * distExtrapolateFirst);
+
+            PolylineOperations.MovePolyline(
+                last,
+                lastDirection * distExtrapolateLast);
+
+
+            // Уменьшаем размеры крайних полилиний,
+            // чтобы они плавно переходили в исходную геометрию
+            PolylineOperations.ChangeScale(first, scale);
+            PolylineOperations.ChangeScale(last, scale);
+
+
+            // Возвращаем только созданные экстремальные элементы
+            return [first, last];
+        }
     }
 
     public class CarcasBuiler
     {
+        private static int _carcasId = 0;
+        private static Layer _curLayer;
+
         public static List<Face3D>? Build(IEnumerable<Polyline3D> polylines)
         {
+            _carcasId++;
+            string blockName = polylines.Count() < 4 ? "C2" : "C1";
+            _curLayer = new Layer($"{_carcasId}-{blockName}");
+
             // 1. Собираем все контуры
             List<List<Vector3>> allContours = new List<List<Vector3>>();
 
@@ -59,8 +361,14 @@ namespace GeoAppWpf
                 {
                     int nextJ = (j + 1) % targetPointsCount;
 
-                    meshTriangles.Add(new Face3D(contourA[j], contourB[j], contourA[nextJ]));
-                    meshTriangles.Add(new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]));
+                    var face1 = new Face3D(contourA[j], contourB[j], contourA[nextJ]);
+                    face1.Layer = _curLayer;
+
+                    var face2 = new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]);
+                    face2.Layer = _curLayer;
+
+                    meshTriangles.Add(face1);
+                    meshTriangles.Add(face2);
                 }
             }
 
@@ -288,7 +596,10 @@ namespace GeoAppWpf
                 int currIdx = V[bestI];
                 int nextIdx = V[(bestI + 1) % count];
 
-                faces.Add(new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]));
+                var face = new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]);
+                face.Layer = _curLayer;
+
+                faces.Add(face);
                 V.RemoveAt(bestI);
                 count--;
             }
@@ -442,532 +753,6 @@ namespace GeoAppWpf
             double dy = a.Y - b.Y;
             double dz = a.Z - b.Z;
             return Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        }
-    }
-
-    public class DrawerObject
-    {
-        public EntityObject Entity { get; private set; }
-        public LinesVisual3D Actual { get; set; }
-        public LinesVisual3D LastVisual { get; set; }
-
-        public event Action<DrawerObject>? Changed;
-
-        public DrawerObject(EntityObject entity)
-        {
-            Entity = entity;
-
-            if (Entity is Polyline3D pl)
-            {
-                var dxfColor = pl.Color;
-                var lineColor = Color.FromArgb(255, dxfColor.R, dxfColor.G, dxfColor.B);
-
-                Actual = new LinesVisual3D
-                {
-                    Color = lineColor
-                };
-
-                LastVisual = new LinesVisual3D
-                {
-                    Color = GetDarkColor(lineColor)
-                };
-            }
-            else if (Entity is Face3D face)
-            {
-                var dxfColor = face.Color;
-                var lineColor = Color.FromArgb(255, 255, 0, 0);
-
-                Actual = new LinesVisual3D
-                {
-                    Color = lineColor
-                };
-
-                LastVisual = new LinesVisual3D
-                {
-                    Color = GetDarkColor(lineColor)
-                };
-            }
-            else
-            {
-                throw new Exception("Supported only Polyline3D and Face3D");
-            }
-        }
-
-        public void RequestUpdate()
-        {
-            Changed?.Invoke(this);
-        }
-
-        private Color GetDarkColor(Color color)
-        {
-            var R = (byte)(color.R - 50);
-            var G = (byte)(color.G - 50);
-            var B = (byte)(color.B - 50);
-
-            if (R < 0) R = 0;
-            if (G < 0) G = 0;
-            if (B < 0) B = 0;
-
-            return Color.FromArgb(100, R, G, B);
-        }
-
-        public void ChangeScale(double scale)
-        {
-            if (Entity is not Polyline3D polyline3D)
-                return;
-
-            var vertexes = polyline3D.Vertexes.ToArray();
-
-            Debug.WriteLine($"\nBEFORE:");
-            for (int i = 0; i < vertexes.Length; i++)
-            {
-                var v = vertexes[i];
-                Debug.WriteLine($"{i}. {v.X}, {v.Y}, {v.Z}\n");
-            }
-
-            // 1. Группируем индексы по дистанции (с допуском погрешности 0.01)
-            var groups = new List<List<int>>();
-            for (int i = 0; i < vertexes.Length; i++)
-            {
-                var vCurrent = vertexes[i];
-                bool foundGroup = false;
-
-                foreach (var group in groups)
-                {
-                    var vGroup = vertexes[group[0]];
-                    double dx = vGroup.X - vCurrent.X;
-                    double dy = vGroup.Y - vCurrent.Y;
-
-                    // Если точки в плоскости XY находятся ближе чем на 0.01, это одна вертикаль
-                    if (Math.Sqrt(dx * dx + dy * dy) < 0.05)
-                    {
-                        group.Add(i);
-                        foundGroup = true;
-                        break;
-                    }
-                }
-
-                if (!foundGroup)
-                {
-                    groups.Add(new List<int> { i });
-                }
-            }
-
-            // 2. СЖИМАЕМ МОЩНОСТЬ (ПО Z)
-            foreach (var group in groups)
-            {
-                if (group.Count < 2) continue;
-
-                double minZ = double.MaxValue;
-                double maxZ = double.MinValue;
-
-                foreach (var idx in group)
-                {
-                    double z = vertexes[idx].Z;
-                    if (z < minZ) minZ = z;
-                    if (z > maxZ) maxZ = z;
-                }
-
-                if (Math.Abs(maxZ - minZ) < 0.001) continue;
-
-                double height = maxZ - minZ;
-                double offset = height * (scale / 2.0);
-
-                double newMinZ = minZ + offset;
-                double newMaxZ = maxZ - offset;
-
-                foreach (var idx in group)
-                {
-                    var v = vertexes[idx];
-                    bool isLower = Math.Abs(v.Z - minZ) < Math.Abs(v.Z - maxZ);
-                    vertexes[idx] = new Vector3(v.X, v.Y, isLower ? newMinZ : newMaxZ);
-                }
-            }
-
-            // 3. ВЫКЛИНИВАНИЕ ПО ДЛИНЕ
-            if (groups.Count >= 2)
-            {
-                var tipAGroup = groups[0];
-                var tipBGroup = groups[0];
-                double maxDistSq = -1;
-
-                // Ищем самые удаленные группы
-                for (int i = 0; i < groups.Count; i++)
-                {
-                    for (int j = i + 1; j < groups.Count; j++)
-                    {
-                        var vI = vertexes[groups[i][0]];
-                        var vJ = vertexes[groups[j][0]];
-
-                        double dx = vI.X - vJ.X;
-                        double dy = vI.Y - vJ.Y;
-                        double distSq = dx * dx + dy * dy;
-
-                        if (distSq > maxDistSq)
-                        {
-                            maxDistSq = distSq;
-                            tipAGroup = groups[i];
-                            tipBGroup = groups[j];
-                        }
-                    }
-                }
-
-                double totalLength = Math.Sqrt(maxDistSq);
-                double targetShiftDist = totalLength * (scale / 2.0);
-
-                void ShiftTip(List<int> groupToShift)
-                {
-                    int N = vertexes.Length;
-                    Vector3? adjacentPoint = null;
-                    double minValidDistSq = maxDistSq * 0.0001;
-
-                    foreach (int idx in groupToShift)
-                    {
-                        var vTip = vertexes[idx];
-
-                        // Проверяем предыдущую
-                        int prevIdx = (idx - 1 + N) % N;
-                        var vPrev = vertexes[prevIdx];
-                        double distSqPrev = (vTip.X - vPrev.X) * (vTip.X - vPrev.X) + (vTip.Y - vPrev.Y) * (vTip.Y - vPrev.Y);
-                        if (distSqPrev > minValidDistSq)
-                        {
-                            adjacentPoint = vPrev;
-                            break;
-                        }
-
-                        // Проверяем следующую
-                        int nextIdx = (idx + 1) % N;
-                        var vNext = vertexes[nextIdx];
-                        double distSqNext = (vTip.X - vNext.X) * (vTip.X - vNext.X) + (vTip.Y - vNext.Y) * (vTip.Y - vNext.Y);
-                        if (distSqNext > minValidDistSq)
-                        {
-                            adjacentPoint = vNext;
-                            break;
-                        }
-                    }
-
-                    if (!adjacentPoint.HasValue)
-                    {
-                        var otherGroup = (groupToShift == tipAGroup) ? tipBGroup : tipAGroup;
-                        adjacentPoint = vertexes[otherGroup[0]];
-                    }
-
-                    if (adjacentPoint.HasValue)
-                    {
-                        var baseV = vertexes[groupToShift[0]];
-
-                        double dirX = adjacentPoint.Value.X - baseV.X;
-                        double dirY = adjacentPoint.Value.Y - baseV.Y;
-                        double distToAdj = Math.Sqrt(dirX * dirX + dirY * dirY);
-
-                        if (distToAdj > 0.001)
-                        {
-                            double actualShift = Math.Min(targetShiftDist, distToAdj * 0.99);
-                            double normX = dirX / distToAdj;
-                            double normY = dirY / distToAdj;
-
-                            double newX = baseV.X + normX * actualShift;
-                            double newY = baseV.Y + normY * actualShift;
-
-                            foreach (var idx in groupToShift)
-                            {
-                                var oldV = vertexes[idx];
-                                vertexes[idx] = new Vector3(newX, newY, oldV.Z);
-                            }
-                        }
-                    }
-                }
-
-                ShiftTip(tipAGroup);
-                ShiftTip(tipBGroup);
-            }
-
-            // 4. Копируем обратно
-            for (int i = 0; i < vertexes.Length; i++)
-            {
-                polyline3D.Vertexes[i] = vertexes[i];
-            }
-
-            Debug.WriteLine($"\nAFTER:");
-            for (int i = 0; i < polyline3D.Vertexes.Count; i++)
-            {
-                var v = polyline3D.Vertexes[i];
-                Debug.WriteLine($"{i}. {v.X}, {v.Y}, {v.Z}\n");
-            }
-        }
-
-        public void ChangeScalePolyline2(double scale)
-        {
-            if (Entity is not Polyline3D polyline3D)
-                return;
-
-            var vertexes = polyline3D.Vertexes.ToArray();
-
-            // 1. Группируем индексы по дистанции в плоскости XY (с допуском погрешности 0.05)
-            var groups = new List<List<int>>();
-
-            for (int i = 0; i < vertexes.Length; i++)
-            {
-                var vCurrent = vertexes[i];
-                bool foundGroup = false;
-
-                foreach (var group in groups)
-                {
-                    var vGroup = vertexes[group[0]];
-                    double dx = vGroup.X - vCurrent.X;
-                    double dy = vGroup.Y - vCurrent.Y;
-
-                    // Если точки лежат рядом (разница меньше 0.05), считаем их одной вертикалью
-                    if (Math.Sqrt(dx * dx + dy * dy) < 0.05)
-                    {
-                        group.Add(i);
-                        foundGroup = true;
-                        break;
-                    }
-                }
-
-                if (!foundGroup)
-                {
-                    groups.Add(new List<int> { i });
-                }
-            }
-
-            // 2. Вычисляем геометрический центр (Центроид) контура по X и Y
-            double sumX = 0;
-            double sumY = 0;
-
-            foreach (var group in groups)
-            {
-                var v = vertexes[group[0]]; // Берем базу группы
-                sumX += v.X;
-                sumY += v.Y;
-            }
-
-            if (groups.Count == 0) return; // Защита от пустых массивов
-
-            double centerX = sumX / groups.Count;
-            double centerY = sumY / groups.Count;
-
-            // Множитель для X и Y
-            double xyScaleFactor = 1.0 - scale;
-
-            // 3. Обрабатываем каждую вертикаль (группу)
-            foreach (var group in groups)
-            {
-                // --- ВЫЧИСЛЯЕМ НОВЫЕ X и Y ДЛЯ ВСЕХ ---
-                var baseV = vertexes[group[0]];
-                double dirX = baseV.X - centerX;
-                double dirY = baseV.Y - centerY;
-
-                double newX = centerX + (dirX * xyScaleFactor);
-                double newY = centerY + (dirY * xyScaleFactor);
-
-                // --- ПРОВЕРЯЕМ ОСЬ Z ---
-                bool hasValidHeight = false;
-                double minZ = double.MaxValue;
-                double maxZ = double.MinValue;
-
-                // Ищем высоту только если в группе больше одной точки
-                if (group.Count >= 2)
-                {
-                    foreach (var idx in group)
-                    {
-                        double z = vertexes[idx].Z;
-                        if (z < minZ) minZ = z;
-                        if (z > maxZ) maxZ = z;
-                    }
-
-                    if (Math.Abs(maxZ - minZ) >= 0.001)
-                    {
-                        hasValidHeight = true;
-                    }
-                }
-
-                // Если есть полноценная высота — сжимаем Z + сдвигаем X/Y
-                if (hasValidHeight)
-                {
-                    double height = maxZ - minZ;
-                    double offsetZ = height * (scale / 2.0);
-
-                    double newMinZ = minZ + offsetZ;
-                    double newMaxZ = maxZ - offsetZ;
-
-                    foreach (var idx in group)
-                    {
-                        var v = vertexes[idx];
-                        bool isLower = Math.Abs(v.Z - minZ) < Math.Abs(v.Z - maxZ);
-
-                        vertexes[idx] = new Vector3(newX, newY, isLower ? newMinZ : newMaxZ);
-                    }
-                }
-                else
-                {
-                    // Если точка одна или высота нулевая — просто применяем новые X и Y, Z не трогаем
-                    foreach (var idx in group)
-                    {
-                        var v = vertexes[idx];
-                        vertexes[idx] = new Vector3(newX, newY, v.Z);
-                    }
-                }
-            }
-
-            // 5. Записываем изменения
-            for (int i = 0; i < vertexes.Length; i++)
-            {
-                polyline3D.Vertexes[i] = vertexes[i];
-            }
-        }
-    }
-
-    public class DXFDrawer : IDrawer3D
-    {
-        public List<DrawerObject> _visuals = new();
-        private HelixViewport3D? _viewport;
-
-        public DXFDrawer(List<EntityObject> entities)
-        {
-            foreach (var entity in entities)
-                _visuals.Add(new DrawerObject(entity));
-        }
-
-        public void Draw(HelixViewport3D viewport)
-        {
-            _viewport = viewport; // Сохраняем ссылку на вьюпорт, если это еще не сделано
-
-            foreach (var visual in _visuals)
-            {
-                // Пропускаем объект, если это не полилиния и не 3D-грань
-                if (!(visual.Entity is Polyline3D) && !(visual.Entity is Face3D))
-                    continue;
-
-                if (!viewport.Children.Contains(visual.Actual))
-                {
-                    viewport.Children.Add(visual.Actual);
-                    viewport.Children.Add(visual.LastVisual);
-                }
-            }
-
-            Update();
-        }
-
-        public void Build()
-        {
-            var lines = _visuals
-                .Where(x => x.Entity is Polyline3D)
-                .Select(x => ((Polyline3D)x.Entity))
-                .ToList();
-
-            var meshTriangles = CarcasBuiler.Build(lines);
-
-            if (meshTriangles == null)
-                return;
-
-            // 6. Добавление всех треугольников на сцену
-            foreach (var face in meshTriangles)
-            {
-                var newVisual = new DrawerObject(face);
-                _visuals.Add(newVisual);
-
-                if (_viewport != null)
-                {
-                    _viewport.Children.Add(newVisual.Actual);
-                    _viewport.Children.Add(newVisual.LastVisual);
-                }
-            }
-
-            Update();
-        }
-
-        public void ChangeScale(double scale)
-        {
-            foreach (var visual in _visuals)
-                visual.ChangeScalePolyline2(scale);
-
-            Update();
-        }
-
-        public void Update()
-        {
-            foreach (var visual in _visuals)
-            {
-                if (visual.Entity is Face3D face3D)
-                {
-                    visual.LastVisual.Points.Clear();
-
-                    foreach (var p in visual.Actual.Points)
-                        visual.LastVisual.Points.Add(p);
-
-                    visual.Actual.Points.Clear();
-
-                    // В netDxf вершины Face3D хранятся в отдельных свойствах
-                    var p1 = new Point3D(face3D.FirstVertex.X, face3D.FirstVertex.Y, face3D.FirstVertex.Z);
-                    var p2 = new Point3D(face3D.SecondVertex.X, face3D.SecondVertex.Y, face3D.SecondVertex.Z);
-                    var p3 = new Point3D(face3D.ThirdVertex.X, face3D.ThirdVertex.Y, face3D.ThirdVertex.Z);
-
-                    // Добавляем 3 линии (6 точек), чтобы нарисовать контур треугольника
-                    // Линия 1
-                    visual.Actual.Points.Add(p1);
-                    visual.Actual.Points.Add(p2);
-                    // Линия 2
-                    visual.Actual.Points.Add(p2);
-                    visual.Actual.Points.Add(p3);
-                    // Линия 3 (замыкаем обратно на первую вершину)
-                    visual.Actual.Points.Add(p3);
-                    visual.Actual.Points.Add(p1);
-                }
-
-                if (visual.Entity is Polyline3D polyline3D)
-                {
-                    visual.LastVisual.Points.Clear();
-
-                    foreach (var p in visual.Actual.Points)
-                        visual.LastVisual.Points.Add(p);
-
-                    visual.Actual.Points.Clear();
-
-                    var points = polyline3D.Vertexes
-                        .Select(v => new Point3D(v.X, v.Y, v.Z))
-                        .ToList();
-
-                    for (int i = 0; i < points.Count - 1; i++)
-                    {
-                        visual.Actual.Points.Add(points[i]);
-                        visual.Actual.Points.Add(points[i + 1]);
-                    }
-                }
-            }
-
-            _viewport?.UpdateLayout();
-        }
-    }
-
-    public partial class Viewer3D : LDWindow
-    {
-        private readonly IDrawer3D _drawer;
-
-        public Viewer3D(IDrawer3D drawer)
-        {
-            InitializeComponent();
-
-            _drawer = drawer;
-
-            drawer.Draw(Viewport);
-            Viewport.ZoomExtentsWhenLoaded = true;
-        }
-
-        private void CameraCenter_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            Viewport.ZoomExtents();
-        }
-
-        private void ChangeScale_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            _drawer.ChangeScale(0.2);
-        }
-
-        private void Build_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            _drawer.Build();
         }
     }
 }

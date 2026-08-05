@@ -13,253 +13,251 @@ namespace GeoAppWpf.Controls
 {
     public partial class GeoTableControl : UserControl
     {
-        private DXFDrawer _drawer;
-
         public GeoTableControl()
         {
             InitializeComponent();
         }
 
-        #region Document Property
-        public ObservableCollection<GeoTreeNode> Documents
-        {
-            get => (ObservableCollection<GeoTreeNode>)GetValue(DocumentsProperty);
-            set => SetValue(DocumentsProperty, value);
-        }
+        //#region Document Property
+        //public ObservableCollection<GeoTreeNode> Documents
+        //{
+        //    get => (ObservableCollection<GeoTreeNode>)GetValue(DocumentsProperty);
+        //    set => SetValue(DocumentsProperty, value);
+        //}
 
-        public static readonly DependencyProperty DocumentsProperty =
-            DependencyProperty.Register(nameof(Documents), typeof(ObservableCollection<GeoTreeNode>),
-                typeof(GeoTableControl), new PropertyMetadata(null));
-        #endregion
+        //public static readonly DependencyProperty DocumentsProperty =
+        //    DependencyProperty.Register(nameof(Documents), typeof(ObservableCollection<GeoTreeNode>),
+        //        typeof(GeoTableControl), new PropertyMetadata(null));
+        //#endregion
 
-        #region Selected Node Property
-        public GeoTreeNode SelectedNode
-        {
-            get => (GeoTreeNode)GetValue(SelectedNodeProperty);
-            set => SetValue(SelectedNodeProperty, value);
-        }
+        //#region Selected Node Property
+        //public GeoTreeNode SelectedNode
+        //{
+        //    get => (GeoTreeNode)GetValue(SelectedNodeProperty);
+        //    set => SetValue(SelectedNodeProperty, value);
+        //}
 
-        public static readonly DependencyProperty SelectedNodeProperty =
-            DependencyProperty.Register(nameof(SelectedNode), typeof(GeoTreeNode),
-                typeof(GeoTableControl), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
-        #endregion
+        //public static readonly DependencyProperty SelectedNodeProperty =
+        //    DependencyProperty.Register(nameof(SelectedNode), typeof(GeoTreeNode),
+        //        typeof(GeoTableControl), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+        //#endregion
 
-        #region Display Items Property
-        public IEnumerable DisplayItems
-        {
-            get => (IEnumerable)GetValue(DisplayItemsProperty);
-            set => SetValue(DisplayItemsProperty, value);
-        }
+        //#region Display Items Property
+        //public IEnumerable DisplayItems
+        //{
+        //    get => (IEnumerable)GetValue(DisplayItemsProperty);
+        //    set => SetValue(DisplayItemsProperty, value);
+        //}
 
-        public static readonly DependencyProperty DisplayItemsProperty =
-            DependencyProperty.Register(nameof(DisplayItems), typeof(IEnumerable),
-                typeof(GeoTableControl), new PropertyMetadata(null));
-        #endregion
+        //public static readonly DependencyProperty DisplayItemsProperty =
+        //    DependencyProperty.Register(nameof(DisplayItems), typeof(IEnumerable),
+        //        typeof(GeoTableControl), new PropertyMetadata(null));
+        //#endregion
 
-        #region TreeViewEvents
+        //#region TreeViewEvents
 
-        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            if (e.NewValue is GeoTreeNode node)
-            {
-                SelectedNode = node;
-            }
-        }
+        //private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        //{
+        //    if (e.NewValue is GeoTreeNode node)
+        //    {
+        //        SelectedNode = node;
+        //    }
+        //}
 
-        private void GeoTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            var item = VisualHelper.FindParent<TreeViewItem>((DependencyObject)e.OriginalSource);
+        //private void GeoTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        //{
+        //    var item = VisualHelper.FindParent<TreeViewItem>((DependencyObject)e.OriginalSource);
 
-            if (item == null)
-                return;
+        //    if (item == null)
+        //        return;
 
-            if (item.DataContext is EntitiesNode)
-            {
-                item.IsSelected = true;
+        //    if (item.DataContext is EntitiesNode)
+        //    {
+        //        item.IsSelected = true;
 
-                var menu = new ContextMenu();
+        //        var menu = new ContextMenu();
 
-                var open3D = new MenuItem
-                {
-                    Header = "Открыть 3D просмотр"
-                };
-                open3D.Click += Open3D_Click;
-                menu.Items.Add(open3D);
+        //        var open3D = new MenuItem
+        //        {
+        //            Header = "Открыть 3D просмотр"
+        //        };
+        //        open3D.Click += Open3D_Click;
+        //        menu.Items.Add(open3D);
 
-                menu.PlacementTarget = item;
-                menu.IsOpen = true;
-            }
+        //        menu.PlacementTarget = item;
+        //        menu.IsOpen = true;
+        //    }
 
-            if (item.DataContext is DxfDocumentNode)
-            {
-                item.IsSelected = true;
+        //    if (item.DataContext is DxfDocumentNode)
+        //    {
+        //        item.IsSelected = true;
 
-                var menu = new ContextMenu();
+        //        var menu = new ContextMenu();
 
-                var open3D = new MenuItem
-                {
-                    Header = "Открыть 3D просмотр"
-                };
-                open3D.Click += Open3D_All_Click;
-
-
-                var save = new MenuItem
-                {
-                    Header = "Сохранить как"
-                };
+        //        var open3D = new MenuItem
+        //        {
+        //            Header = "Открыть 3D просмотр"
+        //        };
+        //        open3D.Click += Open3D_All_Click;
 
 
-                var saveDxf = new MenuItem
-                {
-                    Header = "DXF (AutoCAD)"
-                };
-                saveDxf.Click += SaveDxf_Click;
+        //        var save = new MenuItem
+        //        {
+        //            Header = "Сохранить как"
+        //        };
 
 
-                var saveDat = new MenuItem
-                {
-                    Header = "DAT (Micromine)"
-                };
-                saveDat.Click += SaveDat_Click;
+        //        var saveDxf = new MenuItem
+        //        {
+        //            Header = "DXF (AutoCAD)"
+        //        };
+        //        saveDxf.Click += SaveDxf_Click;
 
 
-                save.Items.Add(saveDxf);
-                save.Items.Add(saveDat);
+        //        var saveDat = new MenuItem
+        //        {
+        //            Header = "DAT (Micromine)"
+        //        };
+        //        saveDat.Click += SaveDat_Click;
 
 
-                menu.Items.Add(open3D);
-                menu.Items.Add(save);
-
-                menu.PlacementTarget = item;
-                menu.IsOpen = true;
-            }
-
-            e.Handled = true;
-        }
-
-        private void SaveDat_Click(object sender, RoutedEventArgs e)
-        {
-            if (GeoTree.SelectedItem is not DxfDocumentNode node)
-                return;
-
-            var dialog = new SaveFileDialog
-            {
-                Filter = "DAT files (*.dat)|*.dat",
-                DefaultExt = ".dat",
-                FileName = node.Name + ".dat"
-            };
-
-            if (_drawer != null)
-            {
-                if (dialog.ShowDialog() == true)
-                    node.Save(dialog.FileName, _drawer._visuals);
-            }
-        }
-
-        private void SaveDxf_Click(object sender, RoutedEventArgs e)
-        {
-            if (GeoTree.SelectedItem is not DxfDocumentNode node)
-                return;
-
-            var dialog = new SaveFileDialog
-            {
-                Filter = "DXF files (*.dxf)|*.dxf",
-                DefaultExt = ".dxf",
-                FileName = node.Name + ".dxf"
-            };
-
-            if (_drawer != null)
-            {
-                foreach (var en in _drawer._visuals)
-                {
-                    if (en.Entity is Face3D face)
-                    {
-                        node.Document.Entities.Add(face);
-                    }
-                }
-
-                if (dialog.ShowDialog() == true)
-                {
-                    node.Document.Save(dialog.FileName);
-                }
-            }
-        }
+        //        save.Items.Add(saveDxf);
+        //        save.Items.Add(saveDat);
 
 
-        private void Open3D_All_Click(object sender, RoutedEventArgs e)
-        {
-            if (GeoTree.SelectedItem is DxfDocumentNode doc)
-            {
-                var list = new List<EntityObject>();
+        //        menu.Items.Add(open3D);
+        //        menu.Items.Add(save);
 
-                foreach (var node in doc.Entities)
-                {
-                    if (node.Entity is Polyline3D pl)
-                        list.Add(node.Entity);
-                }
+        //        menu.PlacementTarget = item;
+        //        menu.IsOpen = true;
+        //    }
 
-                _drawer = new DXFDrawer(list);
+        //    e.Handled = true;
+        //}
 
-                var viewer = new Viewer3D(_drawer);
-                viewer.Show();
-            }
-        }
+        //private void SaveDat_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (GeoTree.SelectedItem is not DxfDocumentNode node)
+        //        return;
 
-        private void Open3D_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is MenuItem menuItem && menuItem.Parent is ContextMenu menu && menu.PlacementTarget is TreeViewItem item)
-            {
-                if (GeoTree.SelectedItem is EntitiesNode node)
-                {
-                    _drawer = new DXFDrawer([node.Entity]);
+        //    var dialog = new SaveFileDialog
+        //    {
+        //        Filter = "DAT files (*.dat)|*.dat",
+        //        DefaultExt = ".dat",
+        //        FileName = node.Name + ".dat"
+        //    };
 
-                    var viewer = new Viewer3D(_drawer);
-                    viewer.Show();
-                }
-            }
-        }
+        //    if (_drawer != null)
+        //    {
+        //        if (dialog.ShowDialog() == true)
+        //            node.Save(dialog.FileName, _drawer._visuals);
+        //    }
+        //}
 
-        #endregion
+        //private void SaveDxf_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (GeoTree.SelectedItem is not DxfDocumentNode node)
+        //        return;
 
-        #region DataGridEvents
+        //    var dialog = new SaveFileDialog
+        //    {
+        //        Filter = "DXF files (*.dxf)|*.dxf",
+        //        DefaultExt = ".dxf",
+        //        FileName = node.Name + ".dxf"
+        //    };
 
-        private void PropertiesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
+        //    if (_drawer != null)
+        //    {
+        //        foreach (var en in _drawer._visuals)
+        //        {
+        //            if (en.Entity is Face3D face)
+        //            {
+        //                node.Document.Entities.Add(face);
+        //            }
+        //        }
 
-        }
-
-        private void PropertiesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
-        {
-            var info = LocaleService.GetColumnInfo(e.PropertyName);
-
-            if (info == null)
-            {
-                e.Column.Header = e.PropertyName;
-                return;
-            }
-
-            if (!info.Visible)
-            {
-                e.Cancel = true;
-                return;
-            }
+        //        if (dialog.ShowDialog() == true)
+        //        {
+        //            node.Document.Save(dialog.FileName);
+        //        }
+        //    }
+        //}
 
 
-            if (info.CellTemplate != null)
-            {
-                var templateColumn = new DataGridTemplateColumn
-                {
-                    Header = info.Header,
-                    CellTemplate = (DataTemplate)FindResource("ColorTemplate")
-                };
+        //private void Open3D_All_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (GeoTree.SelectedItem is DxfDocumentNode doc)
+        //    {
+        //        var list = new List<EntityObject>();
 
-                e.Column = templateColumn;
-            }
-            else
-            {
-                e.Column.Header = info.Header;
-            }
-        }
-        #endregion
+        //        foreach (var node in doc.Entities)
+        //        {
+        //            if (node.Entity is Polyline3D pl)
+        //                list.Add(node.Entity);
+        //        }
+
+        //        _drawer = new DXFDrawer(list);
+
+        //        var viewer = new Viewer3D(_drawer);
+        //        viewer.Show();
+        //    }
+        //}
+
+        //private void Open3D_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (sender is MenuItem menuItem && menuItem.Parent is ContextMenu menu && menu.PlacementTarget is TreeViewItem item)
+        //    {
+        //        if (GeoTree.SelectedItem is EntitiesNode node)
+        //        {
+        //            _drawer = new DXFDrawer([node.Entity]);
+
+        //            var viewer = new Viewer3D(_drawer);
+        //            viewer.Show();
+        //        }
+        //    }
+        //}
+
+        //#endregion
+
+        //#region DataGridEvents
+
+        //private void PropertiesDataGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        //{
+
+        //}
+
+        //private void PropertiesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        //{
+        //    var info = LocaleService.GetColumnInfo(e.PropertyName);
+
+        //    if (info == null)
+        //    {
+        //        e.Column.Header = e.PropertyName;
+        //        return;
+        //    }
+
+        //    if (!info.Visible)
+        //    {
+        //        e.Cancel = true;
+        //        return;
+        //    }
+
+
+        //    if (info.CellTemplate != null)
+        //    {
+        //        var templateColumn = new DataGridTemplateColumn
+        //        {
+        //            Header = info.Header,
+        //            CellTemplate = (DataTemplate)FindResource("ColorTemplate")
+        //        };
+
+        //        e.Column = templateColumn;
+        //    }
+        //    else
+        //    {
+        //        e.Column.Header = info.Header;
+        //    }
+        //}
+        //#endregion
     }
 }

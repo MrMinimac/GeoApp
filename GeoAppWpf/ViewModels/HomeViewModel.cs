@@ -3,10 +3,13 @@ using GeoAppWpf.Models;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
+using netDxf.Entities;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.ViewModels
 {
@@ -39,7 +42,8 @@ namespace GeoAppWpf.ViewModels
 
         public ObservableCollection<GeoTreeNode> Documents { get; set; } = new();
 
-        public bool DocumentsAny {
+        public bool DocumentsAny
+        {
             get => _documentsAny;
             set
             {
@@ -48,7 +52,8 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
-        public GeoTreeNode? SelectedNode {
+        public GeoTreeNode? SelectedNode
+        {
             get => _selectedNode;
             set
             {
@@ -73,6 +78,55 @@ namespace GeoAppWpf.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        public IReadOnlyList<TreeMenuItem> DockPanelItems =>
+        [
+            new()
+            {
+                Header = "Камера",
+                Items =
+                [
+                    new()
+                    {
+                        Header = "Центр",
+                    },
+                ]
+            },
+            new()
+            {
+                Header = "Правка",
+                Items =
+                [
+                    new()
+                    {
+                        Header = "Снять последнее выделение",
+                        Command = UnselectLastCommand
+                    },
+                    new()
+                    {
+                        Header = "Снять все выделения",
+                        Command = UnselectAllCommand
+                    },
+                    new()
+                    {
+                        Header = "Выбрать все",
+                        Command = SelectAllCommand
+                    },
+                ]
+            },
+            new()
+            {
+                Header = "Редактирование",
+                Items =
+                [
+                    new()
+                    {
+                        Header = "Построить каркас",
+                        Command = BuildCarcasCommand,
+                    }
+                ]
+            }
+        ];
 
         #endregion
 
@@ -103,6 +157,94 @@ namespace GeoAppWpf.ViewModels
                     break;
             }
         });
+
+        public ICommand BuildCarcasCommand => new RelayCommand(() =>
+        {
+            var selectedVisuals = ViewportController.Visuals
+                .Where(x => x.IsSelected);
+
+            var selectedEntities = selectedVisuals
+                .Where(x => x.Entity is Polyline3D)
+                .Select(x => (Polyline3D)x.Entity)
+                .ToList();
+
+            // 1. Экстраполяция
+            var extrapolateEntities = Extrapolator.Extrapolate(selectedEntities, 25, 0.1);
+            var allContours = selectedEntities.Concat(extrapolateEntities).ToList();
+
+            if (allContours.Count < 2) return;
+
+            // 2. Генерируем каркас (сущности DXF, включая Face3D)
+            var faces = CarcasBuiler.Build(allContours)?.ToList();
+            if (faces == null || !faces.Any()) return;
+
+            // 3. Сохраняем в DXF документ
+            var dxfDoc = Documents
+                .OfType<DxfDocumentNode>()
+                .Select(x => x.Document)
+                .FirstOrDefault();
+
+            dxfDoc?.Entities.Add(faces);
+
+            // 4. Рисуем линии каркаса
+            foreach (var entity in faces)
+                ViewportController.Add(new DrawerObject(entity));
+
+            // 5. Рисуем каркас как объект
+            if (faces.Any())
+            {
+                GeometryModel3D solidModel = CarcasMeshBuilder.BuildFromFaces(
+                    faces,
+                    Colors.Orange, // Цвет
+                    opacity: 0.75  // Прозрачность
+                );
+
+                var modelVisual = new ModelVisual3D { Content = solidModel };
+                ViewportController.Add(new DrawerObject(modelVisual));
+            }
+
+            ViewportController.UnselectAll();
+        });
+
+        /*
+        public ICommand BuildCarcasCommand => new RelayCommand(() =>
+        {
+            var selectedVisuals = ViewportController.Visuals
+                .Where(x => x.IsSelected);
+
+            var selectedEntities = selectedVisuals
+                .Where(x => x.Entity is Polyline3D)
+                .Select(x => (Polyline3D)x.Entity)
+                .ToList();
+
+            var extrapolateEntities = Extrapolator.Extrapolate(selectedEntities, 25);
+
+            foreach (var extEn in extrapolateEntities)
+                selectedEntities.Add(extEn);
+
+            var carcasEntities = CarcasBuiler.Build(selectedEntities);
+
+            if (carcasEntities == null || carcasEntities.Count() == 0)
+                return;
+
+            var dxfDoc = Documents
+                .Where(x => x is DxfDocumentNode)
+                .Select(x => ((DxfDocumentNode)x).Document)
+                .First();
+
+            dxfDoc?.Entities.Add(carcasEntities);
+
+            foreach (var entity in carcasEntities)
+                ViewportController.Add(new DrawerObject(entity));
+
+            foreach (var visual in selectedVisuals)
+                visual.IsSelected = false;
+        });
+        */
+
+        public ICommand UnselectAllCommand => new RelayCommand(ViewportController.UnselectAll);
+        public ICommand UnselectLastCommand => new RelayCommand(ViewportController.UnselectLast);
+        public ICommand SelectAllCommand => new RelayCommand(ViewportController.SelectAll);
 
         #endregion
 

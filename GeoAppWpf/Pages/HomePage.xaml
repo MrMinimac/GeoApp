@@ -24,7 +24,6 @@
                     </Grid.ColumnDefinitions>
 
                     <controls:ObjectTreeControl
-                        Grid.Row="2"
                         Margin="3,3,0,3"
                         Documents="{Binding Documents}"
                         Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -48,7 +47,16 @@
                         CornerRadius="3.5"
                         Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}">
 
-                        <controls:Viewer3DControl ViewportController="{Binding ViewportController}" />
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <controls:DockPanelControl DockPanelItems="{Binding DockPanelItems}" />
+
+                            <controls:Viewer3DControl Grid.Row="1" ViewportController="{Binding ViewportController}" />
+                        </Grid>
 
                     </Border>
 

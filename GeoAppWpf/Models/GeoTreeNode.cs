@@ -5,17 +5,6 @@ using System.Windows.Input;
 
 namespace GeoAppWpf.Models
 {
-    public class TreeMenuItem
-    {
-        public string Header { get; init; }
-
-        public ICommand Command { get; init; }
-
-        public object? CommandParameter { get; init; }
-
-        public ObservableCollection<TreeMenuItem> Items { get; init; } = [];
-    }
-
     public abstract class GeoTreeNode : BaseViewModel
     {
 		private string _name;
