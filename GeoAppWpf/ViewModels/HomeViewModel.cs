@@ -98,9 +98,8 @@ namespace GeoAppWpf.ViewModels
                 return;
 
             if (node is EntitiesNode entityNode)
-            {
                 ViewportController.Add(new DrawerObject(entityNode.Entity));
-            }
+
             else if (node is DxfDocumentNode dxfNode)
             {
                 var entities = dxfNode.Document.Entities.All;
@@ -108,6 +107,7 @@ namespace GeoAppWpf.ViewModels
                 ViewportController.AddRange(objs);
             }
         }
+
         private void SaveAs(SaveRequest request)
         {
             switch (request.Node)
@@ -117,6 +117,7 @@ namespace GeoAppWpf.ViewModels
                     break;
             }
         }
+
         private void BuildCarcas()
         {
             var dxfDoc = Documents
@@ -183,8 +184,6 @@ namespace GeoAppWpf.ViewModels
                     };
                 }
             };
-
-
 
             _open3DCommand = new RelayCommand<GeoTreeNode>(Open3D);
             _saveAsCommand = new RelayCommand<SaveRequest>(SaveAs);

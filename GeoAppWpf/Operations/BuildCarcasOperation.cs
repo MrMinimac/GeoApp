@@ -68,7 +68,7 @@ namespace GeoAppWpf.Operations
         public void BuildCarcas()
         {
             if (_selectedVisuals.Count() == 0)
-                throw new Exception("Нет выделеных объектов.");
+                throw new Exception("Нет выделенных объектов.");
 
             var selectedEntities = _selectedVisuals
                 .Where(x => x.Entity is Polyline3D)

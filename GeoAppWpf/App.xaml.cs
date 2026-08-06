@@ -43,7 +43,7 @@ namespace GeoAppWpf
 
             services.AddSingleton<UndoManager>();
             services.AddSingleton<ACadService>();
-            services.AddSingleton<IExcelService, TestExcelService>();
+            services.AddSingleton<IExcelService, ExcelService>();
             services.AddSingleton<DXFService>();
             services.AddSingleton<IMessageBox, MessageBoxService>();
 
