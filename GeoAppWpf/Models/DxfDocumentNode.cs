@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Windows;
 
 namespace GeoAppWpf.Models
 {
@@ -16,7 +17,7 @@ namespace GeoAppWpf.Models
         public DxfDocument Document { get; }
         public ObservableCollection<DxfEntityView> EntityViews { get; } = new();
 
-        public override IReadOnlyList<TreeMenuItem> MenuItems => 
+        public override IReadOnlyList<TreeMenuItem> MenuItems =>
         [
             new()
             {
@@ -26,15 +27,15 @@ namespace GeoAppWpf.Models
             new()
             {
                 Header = "Сохранить как...",
-                Items = 
+                Items =
                 [
-                    new() 
+                    new()
                     {
                         Header = "DXF",
                         Command = CommandProvider.SaveAsCommand,
                         CommandParameter = new SaveRequest(this, SupportExtensions.DXF)
                     },
-                    new() 
+                    new()
                     {
                         Header = "DAT",
                         Command = CommandProvider.SaveAsCommand,
@@ -150,7 +151,14 @@ namespace GeoAppWpf.Models
 
             if (dialog.ShowDialog() == true)
             {
-                Document.Save(dialog.FileName);
+                try
+                {
+                    Document.Save(dialog.FileName);
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show(e.Message);
+                }
             }
         }
 

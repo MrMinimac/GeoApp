@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using HelixToolkit.Geometry;
+using HelixToolkit.Wpf;
+using netDxf.Entities;
 using System.Numerics;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using HelixToolkit.Geometry;
-using HelixToolkit.Wpf;
-using netDxf.Entities;
 
 namespace GeoAppWpf.Services
 {

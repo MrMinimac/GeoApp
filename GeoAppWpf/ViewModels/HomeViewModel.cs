@@ -4,9 +4,11 @@ using GeoAppWpf.Operations;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
+using netDxf.Entities;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels
@@ -81,6 +83,9 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand _unselectLastCommand;
         private readonly RelayCommand _selectAllCommand;
         private readonly RelayCommand _zoomExtentsCommand;
+        private readonly RelayCommand _hideObjectCommand;
+        private readonly RelayCommand _showAllObjectCommand;
+        private readonly RelayCommand _intermediateSectionsCommand;
 
         public ICommand Open3DCommand => _open3DCommand;
         public ICommand SaveAsCommand => _saveAsCommand;
@@ -91,6 +96,9 @@ namespace GeoAppWpf.ViewModels
         public ICommand UnselectLastCommand => _unselectLastCommand;
         public ICommand SelectAllCommand => _selectAllCommand;
         public ICommand ZoomExtentsCommand => _zoomExtentsCommand;
+        public ICommand HideObjectCommand => _hideObjectCommand;
+        public ICommand ShowAllObjectCommand => _showAllObjectCommand;
+        public ICommand IntermediateSectionsCommand => _intermediateSectionsCommand;
 
         private void Open3D(GeoTreeNode node)
         {
@@ -98,7 +106,9 @@ namespace GeoAppWpf.ViewModels
                 return;
 
             if (node is EntitiesNode entityNode)
+            {
                 ViewportController.Add(new DrawerObject(entityNode.Entity));
+            }
 
             else if (node is DxfDocumentNode dxfNode)
             {
@@ -140,6 +150,54 @@ namespace GeoAppWpf.ViewModels
             catch (Exception e)
             {
                 _messageBox.ShowError(e.Message);
+            }
+        }
+
+        private void IntermediateSections()
+        {
+            var dxfDoc = Documents
+                .OfType<DxfDocumentNode>()
+                .Select(x => x.Document)
+                .FirstOrDefault();
+
+            if (dxfDoc == null)
+            {
+                _messageBox.ShowError("DXF документ не открыт.");
+                return;
+            }
+
+            var objs = ViewportController.SelectedObjects;
+
+            var selectedCarcasses = objs
+                .Where(v => v.Tag is CarcasResult)
+                .Select(v => (CarcasResult)v.Tag)
+                .ToList();
+
+            if (selectedCarcasses.Count == 0)
+            {
+                Debug.WriteLine("Внешний каркас не нейден.");
+                return;
+            }
+
+            foreach (var carcas in selectedCarcasses)
+            {
+                for (int i = 0; i < carcas.XPositions.Count - 1; i++)
+                {
+                    // ровно между двумя исходными контурами
+                    double x =
+                        (carcas.XPositions[i] + carcas.XPositions[i + 1]) / 2.0;
+
+                    var section = carcas.GetMeshSection(x);
+
+                    if (section.Count < 3)
+                        continue;
+
+                    var polyline = new Polyline3D(section);
+
+                    ViewportController.Add(new DrawerObject(polyline));
+
+                    dxfDoc.Entities.Add(polyline);
+                }
             }
         }
 
@@ -194,6 +252,9 @@ namespace GeoAppWpf.ViewModels
             _unselectLastCommand = new RelayCommand(ViewportController.UnselectLast);
             _selectAllCommand = new RelayCommand(ViewportController.SelectAll);
             _zoomExtentsCommand = new RelayCommand(ViewportController.ZoomExtents);
+            _hideObjectCommand = new RelayCommand(ViewportController.HideSelectedObjects);
+            _showAllObjectCommand = new RelayCommand(ViewportController.ShowAllObjects);
+            _intermediateSectionsCommand = new RelayCommand(IntermediateSections);
 
             _undoManager.StateChanged += UndoManager_StateChanged;
 
@@ -276,7 +337,29 @@ namespace GeoAppWpf.ViewModels
                         {
                             Header = "Построить каркас",
                             Command = BuildCarcasCommand,
-                        }
+                        },
+                        new()
+                        {
+                            Header = "Интерполировать",
+                            Command = IntermediateSectionsCommand,
+                        },
+                    ],
+                },
+                new()
+                {
+                    Header = "Визуал",
+                    Items =
+                    [
+                        new()
+                        {
+                            Header = "Скрыть",
+                            Command = HideObjectCommand,
+                        },
+                        new()
+                        {
+                            Header = "Показать все",
+                            Command = ShowAllObjectCommand,
+                        },
                     ]
                 }
             ];

@@ -9,6 +9,17 @@ namespace LegendDesignWpf.Core.WinApi
         public static Color GetAccentLight() => Blend(GetRawAccentColor(), Colors.White, 0.7f);
         public static Color GetAccentDark() => Blend(GetRawAccentColor(), Colors.Black, 0.7f);
 
+        public static Color GetRandomColor()
+        {
+            var random = new Random();
+
+            double h = random.NextDouble() * 360;
+            double s = 0.7 + random.NextDouble() * 0.3; // 0.7 - 1.0
+            double v = 0.8 + random.NextDouble() * 0.2; // 0.8 - 1.0
+
+            return ColorFromHSV(h, s, v);
+        }
+
         private static Color Blend(Color baseColor, Color target, float intensity)
         {
             intensity = Math.Clamp(intensity, 0f, 1f);
@@ -40,6 +51,7 @@ namespace LegendDesignWpf.Core.WinApi
                 }
             }
 
+
         }
         private static Color ParseDWordColor(Int32 color)
         {
@@ -50,6 +62,33 @@ namespace LegendDesignWpf.Core.WinApi
                 r = (byte)((color >> 0) & 0xFF);
 
             return Color.FromArgb(a, r, g, b);
+        }
+
+        private static Color ColorFromHSV(double hue, double saturation, double value)
+        {
+            double c = value * saturation;
+            double x = c * (1 - Math.Abs((hue / 60) % 2 - 1));
+            double m = value - c;
+
+            double r = 0, g = 0, b = 0;
+
+            if (hue < 60)
+                (r, g, b) = (c, x, 0);
+            else if (hue < 120)
+                (r, g, b) = (x, c, 0);
+            else if (hue < 180)
+                (r, g, b) = (0, c, x);
+            else if (hue < 240)
+                (r, g, b) = (0, x, c);
+            else if (hue < 300)
+                (r, g, b) = (x, 0, c);
+            else
+                (r, g, b) = (c, 0, x);
+
+            return Color.FromRgb(
+                (byte)((r + m) * 255),
+                (byte)((g + m) * 255),
+                (byte)((b + m) * 255));
         }
     }
 }

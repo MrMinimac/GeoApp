@@ -15,7 +15,11 @@ namespace GeoAppWpf.Services
         private readonly ObservableCollection<DrawerObject> _visuals = new();
         public IReadOnlyCollection<DrawerObject> Visuals => _visuals;
 
-        private readonly ObservableCollection<DrawerObject> _selectedVisuals = new();
+
+        private readonly ObservableCollection<DrawerObject> _selectedObjects = new();
+        public IReadOnlyCollection<DrawerObject> SelectedObjects => _selectedObjects;
+
+        private readonly HashSet<DrawerObject> _hiddenObjects = new();
         private DrawerObject? _hoveredObject;
 
         public bool IsAttached => _viewport != null;
@@ -34,6 +38,39 @@ namespace GeoAppWpf.Services
         {
             _viewport?.ZoomExtents();
         }
+
+        #region Hide / Show
+
+        public void HideSelectedObjects()
+        {
+            if (_selectedObjects.Count == 0)
+                return;
+
+            foreach (var obj in _selectedObjects.ToList())
+            {
+                if (!obj.IsVisible)
+                    continue;
+
+                obj.IsVisible = false;
+                _hiddenObjects.Add(obj);
+
+                Unselect(obj);
+                Remove(obj);
+            }
+        }
+
+        public void ShowAllObjects()
+        {
+            foreach (var obj in _hiddenObjects)
+            {
+                obj.IsVisible = true;
+                Add(obj);
+            }
+
+            _hiddenObjects.Clear();
+        }
+
+        #endregion
 
         #region Select / Unselect
 
@@ -54,10 +91,10 @@ namespace GeoAppWpf.Services
 
         public void Select(DrawerObject obj)
         {
-            if (_selectedVisuals.Contains(obj))
+            if (_selectedObjects.Contains(obj))
                 return;
 
-            _selectedVisuals.Add(obj);
+            _selectedObjects.Add(obj);
             obj.IsSelected = true;
         }
 
@@ -76,21 +113,21 @@ namespace GeoAppWpf.Services
 
         public void Unselect(DrawerObject obj)
         {
-            _selectedVisuals.Remove(obj);
+            _selectedObjects.Remove(obj);
             obj.IsSelected = false;
         }
 
         public void UnselectLast()
         {
-            var obj = _selectedVisuals.LastOrDefault();
+            var obj = _selectedObjects.LastOrDefault();
             if (obj == null) return;
             Unselect(obj);
         }
 
         public void UnselectAll()
         {
-            while (_selectedVisuals.Count > 0)
-                Unselect(_selectedVisuals[^1]);
+            while (_selectedObjects.Count > 0)
+                Unselect(_selectedObjects[^1]);
         }
 
         public void ToggleSelection(Visual3D visual)
@@ -102,7 +139,7 @@ namespace GeoAppWpf.Services
 
         public void ToggleSelection(DrawerObject obj)
         {
-            if (_selectedVisuals.Contains(obj))
+            if (_selectedObjects.Contains(obj))
                 Unselect(obj);
             else
                 Select(obj);
@@ -170,6 +207,9 @@ namespace GeoAppWpf.Services
 
         private void AddInternal(DrawerObject obj)
         {
+            if (obj.Visual == null)
+                return;
+
             if (_visuals.Contains(obj) && _viewport.Children.Contains(obj.Visual))
                 return;
 
@@ -184,6 +224,9 @@ namespace GeoAppWpf.Services
 
         public void Remove(DrawerObject obj)
         {
+            if (obj.Visual == null)
+                return;
+
             if (_viewport == null)
                 throw new ArgumentNullException("Viewport");
 

@@ -7,9 +7,12 @@ namespace GeoAppWpf.Models
 {
     public class DrawerObject
     {
-        public Color Color { get; set; } = Colors.White;
+        public Color Color { get; set; }
+
         public EntityObject? Entity { get; private set; }
         public Visual3D Visual { get; set; }
+
+        public object? Tag { get; set; }
 
         public event Action<DrawerObject>? Changed;
 
@@ -23,6 +26,8 @@ namespace GeoAppWpf.Models
                 UpdateColor();
             }
         }
+
+        public bool IsVisible { get; set; } = true;
 
         private bool _isHovered;
         public bool IsHovered

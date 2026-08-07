@@ -1,4 +1,5 @@
 ﻿using GeoAppWpf.Models;
+using LegendDesignWpf.Core.WinApi;
 using netDxf;
 using netDxf.Entities;
 using System.Globalization;
@@ -27,6 +28,8 @@ namespace GeoAppWpf.Services
             // Получаем список уже разделенных полилиний
             var parsedLines = ParseLines(lines, contentStartIndex, columns);
 
+            var color = ColorHelper.GetRandomColor();
+
             foreach (var lineGroup in parsedLines)
             {
                 // Отсекаем одиночные точки (если нужны точки - создавай Point3D)
@@ -38,6 +41,7 @@ namespace GeoAppWpf.Services
                     .ToList();
 
                 var polyline = new Polyline3D(vertices);
+                polyline.Color = new AciColor(color.R, color.G, color.B);
 
                 // Берем JOIN из первой точки текущей линии для названия слоя
                 string layerJoinId = lineGroup[0].JoinId;

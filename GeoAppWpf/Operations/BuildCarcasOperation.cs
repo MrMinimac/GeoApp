@@ -1,11 +1,12 @@
 ﻿using GeoAppWpf.Interfaces;
 using GeoAppWpf.Models;
 using GeoAppWpf.Services;
-using HelixToolkit.Wpf;
 using netDxf;
 using netDxf.Entities;
+using System.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using static GeoAppWpf.Services.CarcasBuilderV2;
 
 namespace GeoAppWpf.Operations
 {
@@ -15,6 +16,8 @@ namespace GeoAppWpf.Operations
         private readonly ViewportController _viewport;
         private readonly List<EntityObject> _createdEntities = new();
         private readonly List<DrawerObject> _createdVisuals = new();
+        private readonly List<DrawerObject> _createdExtropolates = new();
+        private readonly List<EntityObject> _createdExtropolatesEntities = new();
         private readonly List<DrawerObject> _selectedVisuals;
         private DrawerObject? _modelObject;
 
@@ -33,10 +36,11 @@ namespace GeoAppWpf.Operations
         {
             // 1. Строим каркас, если команда выполняется первый раз.
             if (_createdEntities.Count == 0)
-                BuildCarcas();
+                BuildCarcasV2();
 
             // 2. Сохраняем в DXF документ
             _document?.Entities.Add(_createdEntities);
+            _document?.Entities.Add(_createdExtropolatesEntities);
 
             // 3. Добавляем линии каркаса на экран
             foreach (var visual in _createdVisuals)
@@ -44,6 +48,10 @@ namespace GeoAppWpf.Operations
 
             // 3. Добавляем визуал каркаса на экран
             _viewport.Add(_modelObject);
+
+            // 3. Добавляем экстрополяцию
+            foreach (var visual in _createdExtropolates)
+                _viewport.Add(visual);
 
             // 4. Снимаем выделения
             _viewport.UnselectAll();
@@ -53,6 +61,7 @@ namespace GeoAppWpf.Operations
         {
             // 1. Удаляем из документа сущности
             _document?.Entities.Remove(_createdEntities);
+            _document?.Entities.Remove(_createdExtropolatesEntities);
 
             // 2. Удаляем линии каркаса с экрана
             foreach (var visual in _createdVisuals)
@@ -60,6 +69,10 @@ namespace GeoAppWpf.Operations
 
             // 3. Удаляем визуал каркаса с экрана
             _viewport.Remove(_modelObject);
+
+            // 3. Удаляем экстрополяцию
+            foreach (var visual in _createdExtropolates)
+                _viewport.Remove(visual);
 
             // 5. Возвращаем выделения
             _viewport.SelectRange(_selectedVisuals);
@@ -97,15 +110,112 @@ namespace GeoAppWpf.Operations
 
             if (faces.Count != 0)
             {
-                var solidModel = CarcasMeshBuilder.BuildFromFaces(
-                    faces,
-                    Colors.Orange.ChangeAlpha(150)
-                );
+                var acicolor = selectedEntities[0]!.Color;
+                var color = Color.FromArgb(150, acicolor.R, acicolor.G, acicolor.B);
+                var solidModel = CarcasMeshBuilder.BuildFromFaces(faces, color);
 
                 var modelVisual = new ModelVisual3D { Content = solidModel };
                 _modelObject = new DrawerObject(modelVisual);
-                _modelObject.Color = Colors.Orange.ChangeAlpha(150);
+                _modelObject.Color = color;
             }
+        }
+
+        public void BuildCarcasV2()
+        {
+            if (_selectedVisuals.Count() == 0)
+                throw new Exception("Нет выделенных объектов.");
+
+            var selectedEntities = _selectedVisuals
+                .Where(x => x.Entity is Polyline3D)
+                .Select(x => (Polyline3D)x.Entity)
+                .ToList();
+
+            if (selectedEntities.Count() == 0)
+                throw new Exception("Выделенные объекты не подходят для построения каркаса.");
+
+            // 1. Ищем, есть ли в сцене внешний каркас (например, 0.15), в который мы вложены
+            var outerCarcas = FindBoundingOuterCarcas(selectedEntities);
+
+            // 2. Экстраполяция (создаем хвосты). Передаем outerCarcas, что бы экстрополяция учитывлв ее границы
+            var extrapolateEntities = Extrapolator.ExtrapolateV2(selectedEntities, 25, 0.1, outerCarcas).ToList();
+
+            var allContours = selectedEntities.Concat(extrapolateEntities).ToList();
+
+            if (allContours.Count < 2) return;
+
+            // 4. Генерируем каркас (теперь Build возвращает CarcasResult вместо просто List<Face3D>)
+            var carcasResult = CarcasBuilderV2.Build(allContours);
+            if (carcasResult == null || !carcasResult.MeshTriangles.Any())
+                throw new Exception("Не удалось построить каркас.");
+
+            _createdEntities.AddRange(carcasResult.MeshTriangles);
+            _createdExtropolatesEntities.AddRange(extrapolateEntities);
+
+            // 5. Создаем объекты для ViewPort
+            foreach (var face in carcasResult.MeshTriangles)
+                _createdVisuals.Add(new DrawerObject(face));
+
+            foreach (var exropolate in extrapolateEntities)
+                _createdExtropolates.Add(new DrawerObject(exropolate));
+
+            if (carcasResult.MeshTriangles.Count != 0)
+            {
+                var acicolor = selectedEntities[0]!.Color;
+                var color = Color.FromArgb(150, acicolor.R, acicolor.G, acicolor.B);
+                var solidModel = CarcasMeshBuilder.BuildFromFaces(carcasResult.MeshTriangles, color);
+
+                var modelVisual = new ModelVisual3D { Content = solidModel };
+                _modelObject = new DrawerObject(modelVisual);
+                _modelObject.Color = color;
+
+                // НОВОЕ: Сохраняем математику каркаса в Tag, чтобы следующий (внутренний) каркас мог ее найти
+                _modelObject.Tag = carcasResult;
+            }
+        }
+
+        /// <summary>
+        /// Ищет в Viewport уже построенный каркас, который пространственно охватывает наши контуры.
+        /// </summary>
+        private CarcasResult? FindBoundingOuterCarcas(List<Polyline3D> innerContours)
+        {
+            // Получаем все визуальные объекты, которые являются каркасами (у которых есть сохраненный CarcasResult)
+            var existingCarcasses = _viewport.Visuals
+                .Where(v => v.Tag is CarcasResult)
+                .Select(v => (CarcasResult)v.Tag)
+                .ToList();
+
+            if (existingCarcasses.Count == 0)
+            {
+                Debug.WriteLine("Внешний каркас не нейден.");
+                return null;
+            }
+
+            // Вычисляем примерный центр текущего выделения
+            var firstInner = innerContours.First();
+            double innerCenterX = firstInner.Vertexes.Average(v => v.X);
+            double innerCenterY = firstInner.Vertexes.Average(v => v.Y);
+            double innerCenterZ = firstInner.Vertexes.Average(v => v.Z);
+            var innerCenter = new Vector3(innerCenterX, innerCenterY, innerCenterZ);
+
+            // Ищем каркас, внутри которого находится наш центр (упрощенная проверка по BoundingBox)
+            foreach (var carcas in existingCarcasses)
+            {
+                // Здесь можно сделать точную проверку (через Raycast), но обычно достаточно проверить:
+                // 1. Попадает ли innerCenter в диапазон X внешнего каркаса
+                double minX = carcas.XPositions.Min();
+                double maxX = carcas.XPositions.Max();
+
+                if (innerCenterX >= minX && innerCenterX <= maxX)
+                {
+                    // Для надежности можно проверить 2D вхождение центральной точки в интерполированный контур,
+                    // но если каркасы строятся последовательно в одном рудном теле, достаточно вернуть первый подходящий по X
+                    Debug.WriteLine("Внешний каркас найден.");
+                    return carcas;
+                }
+            }
+
+            Debug.WriteLine("Внешний каркас не нейден.");
+            return null;
         }
     }
 }
