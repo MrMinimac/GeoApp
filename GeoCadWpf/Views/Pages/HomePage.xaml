@@ -1,0 +1,61 @@
+﻿<UserControl
+    x:Class="GeoCadWpf.Views.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:GeoCadWpf.Views.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:ld="clr-namespace:LegendDesignWpf.Controls;assembly=LegendDesignWpf"
+    xmlns:local="clr-namespace:GeoCadWpf.Views.Pages"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+
+    <ld:CustomPage HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
+        <ld:CustomPage.PageContent>
+            <Grid>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="25" />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Grid>
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ld:FlatButton
+                        Width="25"
+                        Height="25"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource SecondaryBrush}"
+                        Command="{Binding CreateCommand}"
+                        CornerRadius="4"
+                        HoverBrush="{DynamicResource AccentBrush}">
+                        <TextBlock
+                            Margin="0,0,0,6"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="20"
+                            Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                            Text="+" />
+                    </ld:FlatButton>
+
+                    <controls:TabsControl
+                        Grid.Column="1"
+                        CloseCommand="{Binding RemoveCommand}"
+                        ItemsSource="{Binding Workspaces}"
+                        SelectedItem="{Binding CurrentWorkspace, Mode=TwoWay}" />
+                </Grid>
+
+                <ContentControl Grid.Row="1" Content="{Binding CurrentWorkspace}" />
+
+            </Grid>
+        </ld:CustomPage.PageContent>
+    </ld:CustomPage>
+
+</UserControl>

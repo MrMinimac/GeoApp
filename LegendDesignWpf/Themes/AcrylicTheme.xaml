@@ -20,6 +20,7 @@
     <Color x:Key="ForegroundSecondaryPaint">#99FFFFFF</Color>
     <Color x:Key="ForegroundTertiaryPaint">#EEEEEE</Color>
 
+    <Color x:Key="InactiveStrokePaint">#4E4E4E</Color>
     <Color x:Key="InactivePaint">#70FFFFFF</Color>
     <Color x:Key="IconPaint">#C3C3C3</Color>
     <Color x:Key="HoverPaint">#70000000</Color>
@@ -46,6 +47,7 @@
     <SolidColorBrush x:Key="ForegroundSecondaryBrush" Color="{DynamicResource ForegroundSecondaryPaint}" />
     <SolidColorBrush x:Key="ForegroundTertiaryBrush" Color="{DynamicResource ForegroundTertiaryPaint}" />
 
+    <SolidColorBrush x:Key="InactiveStrokeBrush" Color="{StaticResource InactiveStrokePaint}" />
     <SolidColorBrush x:Key="InactiveBrush" Color="{DynamicResource InactivePaint}" />
     <SolidColorBrush x:Key="IconBrush" Color="{DynamicResource IconPaint}" />
     <SolidColorBrush x:Key="HoverBrush" Color="{DynamicResource HoverPaint}" />

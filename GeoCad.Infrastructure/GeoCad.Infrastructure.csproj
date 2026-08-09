@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="netDxf" Version="2023.11.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
+    <ProjectReference Include="..\LegendDesignWpf\LegendDesignWpf.csproj" />
+  </ItemGroup>
+
+</Project>

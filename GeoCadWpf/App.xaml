@@ -1,0 +1,38 @@
+﻿<Application
+    x:Class="GeoCadWpf.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ldconverters="clr-namespace:LegendDesignWpf.Converters;assembly=LegendDesignWpf"
+    xmlns:local="clr-namespace:GeoCadWpf">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/LegendDesignWpf;component/Themes/DarkTheme.xaml" />
+                <ResourceDictionary Source="/LegendDesignWpf;component/Themes/Generic.xaml" />
+                <ResourceDictionary Source="/MVVM/DataTemplate.xaml" />
+                <ResourceDictionary Source="/AppStyles/Generic.xaml" />
+                <ResourceDictionary Source="/AppStyles/TabStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/TextStyles.xaml" />
+                <ResourceDictionary Source="/AppStyles/GroupBoxStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/DataGridStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/TreeViewStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/DockPanelStyle.xaml" />
+                <ResourceDictionary Source="/AppStyles/ContextMenuStyle.xaml" />
+
+                <!--  Converters  -->
+                <ResourceDictionary>
+                    <ldconverters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+                    <ldconverters:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+                    <ldconverters:VolumeToSliderConverter x:Key="VolumeToSliderConverter" />
+                    <ldconverters:VolumeToPercentsConverter x:Key="VolumeToPercentsConverter" />
+                    <ldconverters:EnumEqualsConverter x:Key="EnumEqualsConverter" />
+                    <ldconverters:EnumEqualsMultiConverter x:Key="EnumEqualsMultiConverter" />
+                    <ldconverters:EqualityMultiConverter x:Key="EqualityMultiConverter" />
+                </ResourceDictionary>
+
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+</Application>

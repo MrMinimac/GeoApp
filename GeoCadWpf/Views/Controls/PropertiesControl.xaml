@@ -1,0 +1,74 @@
+﻿<UserControl
+    x:Class="GeoCadWpf.Views.Controls.PropertiesControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:ld="clr-namespace:LegendDesignWpf.Controls;assembly=LegendDesignWpf"
+    xmlns:local="clr-namespace:GeoCadWpf.Views.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+
+    <Grid>
+        <Border
+            Background="Transparent"
+            BorderBrush="{DynamicResource InactiveStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="4"
+            SnapsToDevicePixels="true">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Margin="7,3,0,4"
+                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                    Text="Свойства" />
+
+                <ld:CustomListBox
+                    Grid.Row="1"
+                    Margin="7,3,0,4"
+                    ItemsSource="{Binding PropertiesList, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <ld:CustomListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="5" />
+                                    <ColumnDefinition />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{DynamicResource ForegroundBrush}"
+                                    Text="{Binding Name, Mode=OneWay}" />
+
+                                <GridSplitter
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    Background="Transparent"
+                                    ResizeBehavior="PreviousAndNext"
+                                    ShowsPreview="False" />
+
+                                <TextBox
+                                    Grid.Column="2"
+                                    FontSize="12"
+                                    Foreground="{DynamicResource ForegroundBrush}"
+                                    IsReadOnly="{Binding IsReadOnly}"
+                                    Style="{StaticResource CleanTextBoxStyle}"
+                                    Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ld:CustomListBox.ItemTemplate>
+                </ld:CustomListBox>
+
+            </Grid>
+        </Border>
+    </Grid>
+
+</UserControl>
