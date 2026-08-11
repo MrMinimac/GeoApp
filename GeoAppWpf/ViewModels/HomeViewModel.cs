@@ -4,12 +4,16 @@ using GeoAppWpf.Operations;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
+using netDxf;
 using netDxf.Entities;
+using System.CodeDom;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.ViewModels
 {
@@ -174,9 +178,84 @@ namespace GeoAppWpf.ViewModels
 
             else if (node is DxfDocumentNode dxfNode)
             {
-                var entities = dxfNode.Document.Entities.All;
-                var objs = entities.Select(e => new DrawerObject(e));
-                ViewportController.AddRange(objs);
+                OpenDxfDocument(dxfNode);
+            }
+        }
+
+        private void OpenDxfDocument(DxfDocumentNode dxfNode)
+        {
+            var entities = dxfNode.Document.Entities.All;
+
+            var faces = entities
+                .OfType<Face3D>()
+                .ToList();
+
+            if (faces.Count == 0)
+            {
+                var objects = entities
+                    .Select(e => new DrawerObject(e))
+                    .ToList();
+
+                ViewportController.AddRange(objects);
+                return;
+            }
+
+            // Все остальные DXF-сущности показываем как обычно
+            var otherObjects = entities
+                .Where(e => e is not Face3D)
+                .Select(e => new DrawerObject(e))
+                .ToList();
+
+            ViewportController.AddRange(otherObjects);
+
+            // Face3D превращаем в каркасы
+            OpenFaceCarcases(faces);
+        }
+
+        private void OpenFaceCarcases(List<Face3D> faces)
+        {
+            var carcases = faces
+                .GroupBy(f => f.Layer?.Name ?? "0")
+                .Select(g =>
+                {
+                    var layerFaces = g.ToList();
+                    return new Carcas3D(layerFaces);
+                })
+                .ToList();
+
+            foreach (var carcas in carcases)
+            {
+                if (carcas.MeshTriangles.Count == 0)
+                    continue;
+
+                var firstFace = carcas.MeshTriangles[0];
+
+                // Сначала пробуем цвет самой грани
+                var acicolor = firstFace.Layer.Color;
+
+                var color = Color.FromArgb(
+                    150,
+                    acicolor.R,
+                    acicolor.G,
+                    acicolor.B);
+
+                var solidModel =
+                    CarcasMeshBuilder.BuildFromFaces(
+                        carcas.MeshTriangles,
+                        color);
+
+                var modelVisual = new ModelVisual3D
+                {
+                    Content = solidModel
+                };
+
+                var modelObject = new DrawerObject(modelVisual)
+                {
+                    Color = color,
+                    Tag = carcas
+                };
+
+                ViewportController.Add(modelObject);
             }
         }
 
@@ -256,8 +335,8 @@ namespace GeoAppWpf.ViewModels
             var objs = ViewportController.SelectedVisuals;
 
             var selectedCarcasses = objs
-                .Where(v => v.Tag is CarcasResult)
-                .Select(v => (CarcasResult)v.Tag)
+                .Where(v => v.Tag is Carcas3D)
+                .Select(v => (Carcas3D)v.Tag)
                 .ToList();
 
             if (selectedCarcasses.Count == 0)
@@ -271,10 +350,9 @@ namespace GeoAppWpf.ViewModels
                 for (int i = 0; i < carcas.XPositions.Count - 1; i++)
                 {
                     // ровно между двумя исходными контурами
-                    double x =
-                        (carcas.XPositions[i] + carcas.XPositions[i + 1]) / 2.0;
+                    double x = (carcas.XPositions[i] + carcas.XPositions[i + 1]) / 2.0;
 
-                    var section = carcas.GetMeshSection(x);
+                    var section = carcas.GetSection(x);
 
                     if (section.Count < 3)
                         continue;
