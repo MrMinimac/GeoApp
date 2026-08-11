@@ -2,10 +2,1082 @@
 using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
-using static GeoAppWpf.Services.CarcasBuilderV2;
 
 namespace GeoAppWpf.Services
 {
+    public class FittingContext
+    {
+        public List<Vector3> OuterBoundary { get; set; } = new();
+        public List<List<Vector3>> Obstacles { get; set; } = new(); // Соседи
+    }
+
+    public interface IContourFittingStrategy
+    {
+        Polyline3D Fit(Polyline3D contour, Polyline3D baseContour, FittingContext context);
+    }
+
+    public class MorphToFitStrategy : IContourFittingStrategy
+    {
+        public double Tolerance { get; set; } = 0.5; // Погрешность площади
+
+        public Polyline3D Fit(Polyline3D contour, Polyline3D baseContour, FittingContext context)
+        {
+            // Некорректный вход
+            if (contour == null || contour.Vertexes.Count < 3)
+                return contour;
+
+            if (context == null || context.OuterBoundary == null || context.OuterBoundary.Count < 3)
+                return contour;
+
+            double startX = contour.Vertexes[0].X;
+
+            // 1. Доступное пространство
+            PathsD availableSpace = BuildAvailableSpace(context);
+
+            if (availableSpace.Count == 0)
+                return contour;
+
+            // 2. Исходная площадь
+            PathsD subject = ToPathsD(contour.Vertexes);
+
+            double targetArea = Math.Abs(Clipper.Area(subject));
+
+            if (targetArea <= 0)
+                return contour;
+
+            // 3. Пересечение с доступной зоной
+            PathsD currentShape =
+                Clipper.Intersect(
+                    subject,
+                    availableSpace,
+                    FillRule.NonZero);
+
+            currentShape = KeepLargestPolygon(currentShape);
+
+            // Контур полностью вне внешнего каркаса
+            if (currentShape.Count == 0 || currentShape[0].Count < 3)
+                return contour;
+
+            double currentArea = Math.Abs(Clipper.Area(currentShape));
+
+            // 4. Уже помещается
+            if (currentArea >= targetArea - Tolerance)
+                return FromPathsD(currentShape, startX, contour);
+
+            // 5. Подгонка МАСШТАБОМ исходного контура от его центра —
+            // сохраняет форму (подобие), а не раздувает уже обрезанный остаток
+            PointD center = GetCentroid(subject[0]);
+
+            double areaRatio = targetArea / Math.Max(currentArea, 1e-9);
+            double minScale = 1.0;                                   // = currentShape/currentArea, уже посчитаны выше
+            double maxScale = Math.Max(1.0, Math.Sqrt(areaRatio)) * 2.0; // с запасом, но не «с потолка»
+
+            PathsD bestShape = currentShape;
+
+            for (int i = 0; i < 30; i++)
+            {
+                double midScale = (minScale + maxScale) / 2.0;
+
+                PathsD scaledSubject = ScaleFrom(subject, center, midScale);
+
+                PathsD constrainedShape =
+                    Clipper.Intersect(
+                        scaledSubject,
+                        availableSpace,
+                        FillRule.NonZero);
+
+                constrainedShape = KeepLargestPolygon(constrainedShape);
+
+                if (constrainedShape.Count == 0 || constrainedShape[0].Count < 3)
+                {
+                    maxScale = midScale; // перебор — контур целиком вылетел
+                    continue;
+                }
+
+                double testArea = Math.Abs(Clipper.Area(constrainedShape));
+
+                if (Math.Abs(testArea - targetArea) <= Tolerance)
+                {
+                    bestShape = constrainedShape;
+                    break;
+                }
+
+                if (testArea < targetArea)
+                {
+                    minScale = midScale;
+                    bestShape = constrainedShape; // на случай, если дальше будет хуже
+                }
+                else
+                {
+                    maxScale = midScale;
+                }
+            }
+
+            return FromPathsD(bestShape, startX, contour);
+        }
+
+        private static PointD GetCentroid(PathD path)
+        {
+            double sx = 0, sy = 0;
+            foreach (var p in path) { sx += p.x; sy += p.y; }
+            return new PointD(sx / path.Count, sy / path.Count);
+        }
+
+        private static PathsD ScaleFrom(PathsD paths, PointD center, double scale)
+        {
+            var result = new PathsD();
+            foreach (var path in paths)
+            {
+                var scaled = new PathD();
+                foreach (var p in path)
+                    scaled.Add(new PointD(
+                        center.x + (p.x - center.x) * scale,
+                        center.y + (p.y - center.y) * scale));
+                result.Add(scaled);
+            }
+            return result;
+        }
+
+        private PathsD BuildAvailableSpace(FittingContext context)
+        {
+            PathsD outer = ToPathsD(context.OuterBoundary);
+            if (context.Obstacles.Count == 0) return outer;
+
+            PathsD obstacles = new PathsD();
+            foreach (var obs in context.Obstacles)
+            {
+                obstacles.AddRange(ToPathsD(obs));
+            }
+
+            // Вычитаем из внешнего контура все препятствия
+            return Clipper.Difference(outer, obstacles, FillRule.NonZero);
+        }
+
+        private PathsD KeepLargestPolygon(PathsD paths)
+        {
+            if (paths == null || paths.Count == 0)
+                return new PathsD();
+
+            if (paths.Count == 1)
+                return paths[0].Count >= 3
+                    ? paths
+                    : new PathsD();
+
+            var largest = paths
+                .Where(p => p.Count >= 3)
+                .OrderByDescending(p => Math.Abs(Clipper.Area(new PathsD { p })))
+                .FirstOrDefault();
+
+            if (largest == null)
+                return new PathsD();
+
+            return new PathsD { largest };
+        }
+
+        private PathsD ToPathsD(IEnumerable<Vector3> points)
+        {
+            var path = new PathD();
+            foreach (var p in points) path.Add(new PointD(p.Y, p.Z)); // Работаем в YZ
+            return new PathsD { path };
+        }
+
+        private Polyline3D FromPathsD(PathsD paths, double startX, Polyline3D fallback)
+        {
+            if (paths == null ||
+                paths.Count == 0 ||
+                paths[0].Count < 3)
+            {
+                return fallback;
+            }
+
+            var result = new Polyline3D();
+
+            foreach (var p in paths[0])
+            {
+                result.Vertexes.Add(
+                    new Vector3(
+                        startX,
+                        p.x,
+                        p.y));
+            }
+
+            if (result.Vertexes.Count < 3)
+                return fallback;
+
+            return result;
+        }
+    }
+
+    public class Carcas3D
+    {
+        private List<List<Vector3>> _normalizedContours = new();
+        private List<double> _xPositions = new();
+        private List<Face3D> _meshTriangles = new();
+        private bool _isBuilt;
+
+        public Guid Id { get; } = Guid.NewGuid();
+        public Carcas3D? Parent { get; set; }
+        public List<Carcas3D> Children { get; } = new();
+        public IReadOnlyList<Polyline3D> InitialContours { get; }
+        public IReadOnlyList<IReadOnlyList<Vector3>> NormalizedContours => _normalizedContours;
+        public IReadOnlyList<double> XPositions => _xPositions;
+        public IReadOnlyList<Face3D> MeshTriangles => _meshTriangles;
+
+        public int TargetPointsCount { get; set; } = 15;
+        public Layer Layer { get; set; } = new Layer("0");
+
+        public bool IsBuilt => _isBuilt;
+
+
+        public Carcas3D(IEnumerable<Polyline3D> initialContours)
+        {
+            InitialContours = initialContours.ToList();
+        }
+
+        public Carcas3D(IEnumerable<Polyline3D> initialContours, Layer layer)
+        {
+            Layer = layer;
+            InitialContours = initialContours.ToList();
+        }
+
+        public Carcas3D(IEnumerable<Face3D> faces)
+        {
+            if (faces == null)
+                throw new ArgumentNullException(nameof(faces));
+
+            _meshTriangles = faces.ToList();
+
+            if (_meshTriangles.Count == 0)
+                throw new ArgumentException(
+                    "Каркас не содержит ни одной грани.",
+                    nameof(faces));
+
+            Layer = _meshTriangles[0].Layer;
+
+            // Каркас уже готов — строить его повторно не нужно.
+            _isBuilt = true;
+
+            // Для готового каркаса исходных контуров может не быть.
+            InitialContours = Array.Empty<Polyline3D>();
+
+            _xPositions = ExtractXPositions(_meshTriangles);
+        }
+
+        public Carcas3D Build()
+        {
+            var allContours = new List<List<Vector3>>();
+
+            foreach (var l in InitialContours)
+                allContours.Add(l.Vertexes.ToList());
+
+            if (allContours.Count < 2)
+                throw new InvalidOperationException(
+                    "Для построения каркаса необходимо минимум два контура.");
+
+            int badContourIndex = allContours.FindIndex(c => c.Count < 3);
+
+            if (badContourIndex >= 0)
+                throw new InvalidOperationException(
+                    $"Контур №{badContourIndex + 1} из {allContours.Count} содержит меньше 3 вершин " +
+                    "(похоже, не удалось вписать экстраполированный контур во внешний каркас) " +
+                    "— построение каркаса невозможно.");
+
+            allContours = allContours.OrderBy(contour => contour.Average(v => v.X)).ToList();
+
+            List<List<Vector3>> normalizedContours = new List<List<Vector3>>();
+
+            int targetPointsCount = Math.Max(TargetPointsCount, allContours.Max(c => c.Count));
+
+            // 2. Ресемплинг
+            foreach (var contour in allContours)
+            {
+                normalizedContours.Add(ResampleContour(contour, targetPointsCount));
+            }
+
+            // 3. Синхронизация
+            for (int i = 1; i < normalizedContours.Count; i++)
+            {
+                normalizedContours[i] = SynchronizeStart(normalizedContours[i - 1], normalizedContours[i]);
+            }
+
+            List<Face3D> meshTriangles = new List<Face3D>();
+
+            // 4. Построение боковых граней (между контурами)
+            for (int i = 0; i < normalizedContours.Count - 1; i++)
+            {
+                var contourA = normalizedContours[i];
+                var contourB = normalizedContours[i + 1];
+
+                for (int j = 0; j < targetPointsCount; j++)
+                {
+                    int nextJ = (j + 1) % targetPointsCount;
+
+                    var face1 = new Face3D(contourA[j], contourB[j], contourA[nextJ]);
+                    face1.Layer = Layer;
+
+                    var face2 = new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]);
+                    face2.Layer = Layer;
+
+                    meshTriangles.Add(face1);
+                    meshTriangles.Add(face2);
+                }
+            }
+
+            // 5. ТРИАНГУЛЯЦИЯ ТОРЦОВ
+            var startCap = TriangulateContourEarClipping(normalizedContours.First());
+            var endCap = TriangulateContourEarClipping(normalizedContours.Last());
+
+            meshTriangles.AddRange(startCap);
+            meshTriangles.AddRange(endCap);
+
+            // НОВОЕ: Собираем X-координаты центров для удобной интерполяции
+            List<double> xPositions = normalizedContours.Select(c => c.Average(v => v.X)).ToList();
+
+
+            _meshTriangles = meshTriangles;
+            _normalizedContours = normalizedContours;
+            _xPositions = xPositions;
+
+            _isBuilt = true;
+
+            return this;
+        }
+
+        public void AddChild(Carcas3D child)
+        {
+            child.Parent = this;
+            Children.Add(child);
+        }
+
+        public void RemoveChild(Carcas3D child)
+        {
+            Children.Remove(child);
+            child.Parent = null;
+        }
+
+        public List<List<Vector3>> GetAllSections(int countBetween)
+        {
+            var result = new List<List<Vector3>>();
+
+            if (XPositions.Count < 2)
+                return result;
+
+            for (int i = 0; i < XPositions.Count - 1; i++)
+            {
+                double x1 = XPositions[i];
+                double x2 = XPositions[i + 1];
+
+                for (int j = 1; j <= countBetween; j++)
+                {
+                    double t = (double)j / (countBetween + 1);
+                    double x = x1 + (x2 - x1) * t;
+
+                    var section = GetSection(x);
+
+                    if (section.Count >= 3)
+                        result.Add(section);
+                }
+            }
+
+            return result;
+        }
+
+        public List<Vector3> GetSection(double x)
+        {
+            if (!IsBuilt)
+                throw new InvalidOperationException(
+                    "Каркас еще не построен. Сначала вызовите Build().");
+
+            if (MeshTriangles.Count == 0)
+                return new List<Vector3>();
+
+            var segments = new List<(Vector3 A, Vector3 B)>();
+
+            foreach (var triangle in MeshTriangles)
+            {
+                var segment = IntersectTriangleWithXPlane(triangle, x);
+
+                if (segment.HasValue)
+                    segments.Add(segment.Value);
+            }
+
+            if (segments.Count == 0)
+                return new List<Vector3>();
+
+            return ConnectSegments(segments);
+        }
+
+        private static List<Vector3> ResampleContour(List<Vector3> original, int targetCount)
+        {
+            if (original.Count == 0) return new List<Vector3>();
+
+            // Если в исходном контуре точек уже больше или равно нужному количеству,
+            // просто возвращаем нужное количество (обрезаем лишнее)
+            if (original.Count >= targetCount)
+            {
+                return original.Take(targetCount).ToList();
+            }
+
+            // 1. Вычисляем длины всех сегментов и общую длину
+            double totalLength = 0;
+            List<double> segmentLengths = new List<double>();
+
+            for (int i = 0; i < original.Count; i++)
+            {
+                int next = (i + 1) % original.Count;
+                double dist = Vector3.Distance(original[i], original[next]);
+                segmentLengths.Add(dist);
+                totalLength += dist;
+            }
+
+            // 2. Рассчитываем, сколько дополнительных точек нужно добавить на каждый сегмент
+            int pointsToAdd = targetCount - original.Count; // Сколько точек не хватает до сотни
+            int[] pointsPerSegment = new int[original.Count];
+            double[] remainders = new double[original.Count];
+
+            for (int i = 0; i < original.Count; i++)
+            {
+                // Пропорционально распределяем точки в зависимости от длины сегмента
+                double exactPoints = (segmentLengths[i] / totalLength) * pointsToAdd;
+                pointsPerSegment[i] = (int)Math.Floor(exactPoints);
+                remainders[i] = exactPoints - pointsPerSegment[i];
+            }
+
+            // Распределяем "остатки", если из-за округления мы недобрали точек до targetCount
+            int currentAdded = pointsPerSegment.Sum();
+            int neededPoints = pointsToAdd - currentAdded;
+
+            var sortedIndices = remainders
+                .Select((val, idx) => new { Value = val, Index = idx })
+                .OrderByDescending(x => x.Value)
+                .ToList();
+
+            for (int i = 0; i < neededPoints; i++)
+            {
+                pointsPerSegment[sortedIndices[i].Index]++;
+            }
+
+            // 3. Строим новый контур, включая ИСХОДНЫЕ углы и ДОБАВЛЕННЫЕ точки
+            List<Vector3> resampled = new List<Vector3>();
+
+            for (int i = 0; i < original.Count; i++)
+            {
+                Vector3 p1 = original[i];
+                Vector3 p2 = original[(i + 1) % original.Count];
+
+                // ГАРАНТИРОВАННО добавляем оригинальный угол контура
+                resampled.Add(p1);
+
+                // Добавляем промежуточные точки на прямой линии текущего сегмента
+                int extraPoints = pointsPerSegment[i];
+                for (int j = 1; j <= extraPoints; j++)
+                {
+                    double t = (double)j / (extraPoints + 1); // Коэффициент интерполяции
+
+                    double x = p1.X + (p2.X - p1.X) * t;
+                    double y = p1.Y + (p2.Y - p1.Y) * t;
+                    double z = p1.Z + (p2.Z - p1.Z) * t;
+
+                    resampled.Add(new Vector3(x, y, z));
+                }
+            }
+
+            return resampled;
+        }
+
+        private List<Face3D> TriangulateContourEarClipping(List<Vector3> contour)
+        {
+            List<Face3D> faces = new List<Face3D>();
+            if (contour.Count < 3) return faces;
+
+            // 1. ОПРЕДЕЛЯЕМ ПЛОСКОСТЬ КОНТУРА (ищем оси с наибольшим разбросом координат)
+            double minX = contour.Min(p => p.X), maxX = contour.Max(p => p.X);
+            double minY = contour.Min(p => p.Y), maxY = contour.Max(p => p.Y);
+            double minZ = contour.Min(p => p.Z), maxZ = contour.Max(p => p.Z);
+
+            double dx = maxX - minX;
+            double dy = maxY - minY;
+            double dz = maxZ - minZ;
+
+            // Локальные функции для динамического выбора 2D-координат (U и V)
+            Func<Vector3, double> getU;
+            Func<Vector3, double> getV;
+
+            if (dx <= dy && dx <= dz)
+            {
+                getU = p => p.Y; getV = p => p.Z; // Игнорируем X (плоскость YZ)
+            }
+            else if (dy <= dx && dy <= dz)
+            {
+                getU = p => p.X; getV = p => p.Z; // Игнорируем Y (плоскость XZ)
+            }
+            else
+            {
+                getU = p => p.X; getV = p => p.Y; // Игнорируем Z (плоскость XY)
+            }
+
+            // Встроенная локальная функция проверки точки в треугольнике (работает с U и V)
+            bool IsPointInTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+            {
+                double pU = getU(p), pV = getV(p);
+                double aU = getU(a), aV = getV(a);
+                double bU = getU(b), bV = getV(b);
+                double cU = getU(c), cV = getV(c);
+
+                double det = (bV - cV) * (aU - cU) + (cU - bU) * (aV - cV);
+                if (Math.Abs(det) < 1e-9) return false;
+
+                double alpha = ((bV - cV) * (pU - cU) + (cU - bU) * (pV - cV)) / det;
+                double beta = ((cV - aV) * (pU - cU) + (aU - cU) * (pV - cV)) / det;
+                double gamma = 1.0 - alpha - beta;
+
+                // Небольшой допуск (-1e-9) спасает от багов с плавающей запятой на гранях
+                return alpha >= -1e-9 && beta >= -1e-9 && gamma >= -1e-9;
+            }
+
+            // НОВОЕ: расстояние между двумя точками в той же 2D-проекции (U,V).
+            // Нужно для масштабно-независимой (относительной) проверки угла в вершине.
+            double Distance2D(Vector3 p1, Vector3 p2)
+            {
+                double du = getU(p2) - getU(p1);
+                double dv = getV(p2) - getV(p1);
+                return Math.Sqrt(du * du + dv * dv);
+            }
+
+            // НОВОЕ: расстояние от точки до отрезка (в той же 2D-проекции U,V).
+            // Нужно, чтобы отлавливать вершины, которые лежат ВПЛОТНУЮ к диагонали уха,
+            // но формально не попадают "строго внутрь" треугольника из-за погрешности.
+            double DistancePointToSegment2D(Vector3 p, Vector3 segA, Vector3 segB)
+            {
+                double pU = getU(p), pV = getV(p);
+                double aU = getU(segA), aV = getV(segA);
+                double bU = getU(segB), bV = getV(segB);
+
+                double abU = bU - aU, abV = bV - aV;
+                double lenSq = abU * abU + abV * abV;
+                if (lenSq < 1e-18) return Vector3.Distance(p, segA);
+
+                double t = ((pU - aU) * abU + (pV - aV) * abV) / lenSq;
+                t = Math.Max(0.0, Math.Min(1.0, t));
+
+                double projU = aU + t * abU;
+                double projV = aV + t * abV;
+
+                double du = pU - projU, dv = pV - projV;
+                return Math.Sqrt(du * du + dv * dv);
+            }
+
+            List<int> V = Enumerable.Range(0, contour.Count).ToList();
+
+            // 2. ВЫЧИСЛЯЕМ ПЛОЩАДЬ ДЛЯ ПРОВЕРКИ НАПРАВЛЕНИЯ (в 2D проекции)
+            double area = 0;
+            for (int i = 0; i < V.Count; i++)
+            {
+                var p1 = contour[V[i]];
+                var p2 = contour[V[(i + 1) % V.Count]];
+                area += (getU(p2) - getU(p1)) * (getV(p2) + getV(p1));
+            }
+
+            // Если area > 0, контур по часовой стрелке. Разворачиваем, чтобы сделать против часовой (CCW).
+            if (area > 0) V.Reverse();
+
+            int count = V.Count;
+
+            // НОВОЕ: минимальный "коридор безопасности" вдоль диагонали уха.
+            // Берём как долю от средней длины стороны контура, чтобы не завязываться на абсолютные единицы.
+            // Если у вас есть характерный масштаб (например, шаг ресемплинга) — можно подставить его напрямую.
+            double avgEdgeLen = 0;
+            for (int i = 0; i < count; i++)
+                avgEdgeLen += Vector3.Distance(contour[V[i]], contour[V[(i + 1) % count]]);
+            avgEdgeLen /= count;
+            double clearance = avgEdgeLen * 0.01; // 1% от средней стороны — подберите под свои данные
+
+            // Ищет лучшее (по длине диагонали) валидное ухо среди текущих вершин V.
+            // requireClearance = true  -> строгий режим (запрет "срезов" рядом с зигзагом)
+            // requireClearance = false -> классический режим
+            // requireConvex    = false -> крайний fallback: не отбраковываем по углу вообще
+            //                             (иначе вершина, у которой излом идёт в основном
+            //                             по "отброшенной" при проекции оси, может НИКОГДА
+            //                             не пройти проверку на выпуклость и остаться дырой)
+            (int bestI, double bestDiagLenSq) FindBestEar(bool requireClearance, bool requireConvex)
+            {
+                int bestI = -1;
+                double bestDiagLenSq = double.MaxValue;
+
+                for (int i = 0; i < count; i++)
+                {
+                    int prevIdx = V[(i - 1 + count) % count];
+                    int currIdx = V[i];
+                    int nextIdx = V[(i + 1) % count];
+
+                    Vector3 a = contour[prevIdx];
+                    Vector3 b = contour[currIdx];
+                    Vector3 c = contour[nextIdx];
+
+                    if (requireConvex)
+                    {
+                        // Векторное произведение в выбранной плоскости
+                        double crossProduct = (getU(b) - getU(a)) * (getV(c) - getV(a)) - (getV(b) - getV(a)) * (getU(c) - getU(a));
+
+                        // ВАЖНО: нормируем на длины сторон (получаем аналог sin угла при b).
+                        // Абсолютный допуск (1e-6) ошибался на длинных/растянутых контурах —
+                        // реально выпуклый, но "мелкий" в этой проекции угол мог считаться коллинеарным.
+                        double abLen = Distance2D(a, b);
+                        double bcLen = Distance2D(b, c);
+                        double denom = abLen * bcLen;
+                        double normalizedCross = denom > 1e-15 ? crossProduct / denom : 0;
+
+                        // Если угол вогнутый ИЛИ точки коллинеарны (лежат на прямой) - пропускаем
+                        if (normalizedCross <= 1e-9) continue;
+                    }
+
+                    bool blocked = false;
+                    for (int j = 0; j < count; j++)
+                    {
+                        int testIdx = V[j];
+                        if (testIdx == prevIdx || testIdx == currIdx || testIdx == nextIdx) continue;
+
+                        // 1) классическая проверка "точка строго внутри треугольника"
+                        if (IsPointInTriangle(contour[testIdx], a, b, c))
+                        {
+                            blocked = true;
+                            break;
+                        }
+
+                        // 2) НОВОЕ: точка слишком близко к диагонали a-c —
+                        // запрещаем "срезать" мимо почти коллинеарных / зигзагующих вершин
+                        if (requireClearance && DistancePointToSegment2D(contour[testIdx], a, c) < clearance)
+                        {
+                            blocked = true;
+                            break;
+                        }
+                    }
+
+                    if (!blocked)
+                    {
+                        double diagLenSq = (getU(a) - getU(c)) * (getU(a) - getU(c)) + (getV(a) - getV(c)) * (getV(a) - getV(c));
+                        if (diagLenSq < bestDiagLenSq)
+                        {
+                            bestDiagLenSq = diagLenSq;
+                            bestI = i;
+                        }
+                    }
+                }
+
+                return (bestI, bestDiagLenSq);
+            }
+
+            // 3. ОТСЕЧЕНИЕ УШЕЙ (лучшее ухо по длине диагонали, а не первое попавшееся)
+            // Триер идёт от самого "аккуратного" варианта к гарантированному fallback-у.
+            // ВАЖНО: цикл больше никогда не выходит, не покрыв все вершины треугольниками —
+            // именно молчаливый выход раньше и оставлял дыры на углах.
+            while (count > 2)
+            {
+                var (bestI, _) = FindBestEar(requireClearance: true, requireConvex: true);
+
+                if (bestI < 0)
+                {
+                    // Ни одно ухо не прошло усиленную проверку коридора — пробуем без неё
+                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: true);
+                }
+
+                if (bestI < 0)
+                {
+                    // Даже классическая проверка выпуклости не находит ухо (обычно значит,
+                    // что в этой 2D-проекции угол выродился) — снимаем требование выпуклости
+                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: false);
+                }
+
+                if (bestI < 0)
+                {
+                    // Совсем крайний случай (в норме сюда доходить не должны) —
+                    // берём первую оставшуюся вершину принудительно, лишь бы не оставить дыру
+                    bestI = 0;
+                }
+
+                int prevIdx = V[(bestI - 1 + count) % count];
+                int currIdx = V[bestI];
+                int nextIdx = V[(bestI + 1) % count];
+
+                var face = new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]);
+                face.Layer = Layer;
+
+                faces.Add(face);
+                V.RemoveAt(bestI);
+                count--;
+            }
+
+            return faces;
+        }
+
+        private static List<Vector3> SynchronizeStart(List<Vector3> referenceContour, List<Vector3> targetContour)
+        {
+            // 1. Ищем лучший сдвиг для прямого направления
+            var (forwardSync, forwardDist) = FindBestAlignment(referenceContour, targetContour);
+
+            // 2. Ищем лучший сдвиг для обратного направления (если контур нарисован в другую сторону)
+            var reversedTarget = new List<Vector3>(targetContour);
+            reversedTarget.Reverse();
+            var (reversedSync, reversedDist) = FindBestAlignment(referenceContour, reversedTarget);
+
+            // Выбираем вариант с минимальной суммарной длиной соединений
+            if (reversedDist < forwardDist)
+            {
+                return reversedSync;
+            }
+
+            return forwardSync;
+        }
+
+        private static (List<Vector3> AlignedContour, double MinDistance) FindBestAlignment(List<Vector3> referenceContour, List<Vector3> targetContour)
+        {
+            double minTotalDistance = double.MaxValue;
+            int bestShift = 0;
+            int count = targetContour.Count;
+
+            // Перебираем ВСЕ возможные стартовые точки (индексы сдвига)
+            for (int shift = 0; shift < count; shift++)
+            {
+                double currentTotalDistance = 0;
+
+                for (int i = 0; i < count; i++)
+                {
+                    int targetIndex = (i + shift) % count;
+                    currentTotalDistance += Vector3.Distance(referenceContour[i], targetContour[targetIndex]);
+
+                    // Оптимизация: если уже набежало больше, чем найденный минимум, дальше не считаем
+                    if (currentTotalDistance >= minTotalDistance)
+                    {
+                        break;
+                    }
+                }
+
+                // Если нашли более короткий каркас — запоминаем
+                if (currentTotalDistance < minTotalDistance)
+                {
+                    minTotalDistance = currentTotalDistance;
+                    bestShift = shift;
+                }
+            }
+
+            // Перестраиваем массив с найденным лучшим сдвигом
+            var synchronized = new List<Vector3>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int index = (i + bestShift) % count;
+                synchronized.Add(targetContour[index]);
+            }
+
+            return (synchronized, minTotalDistance);
+        }
+
+        private static (Vector3 A, Vector3 B)? IntersectTriangleWithXPlane(Face3D triangle, double x)
+        {
+            var vertices = new[]
+            {
+                triangle.FirstVertex,
+                triangle.SecondVertex,
+                triangle.ThirdVertex
+            };
+
+            var points = new List<Vector3>();
+
+            // Проверяем каждое ребро треугольника
+            for (int i = 0; i < 3; i++)
+            {
+                var p1 = vertices[i];
+                var p2 = vertices[(i + 1) % 3];
+
+                // если ребро пересекает плоскость X
+                if ((p1.X <= x && p2.X >= x) ||
+                    (p2.X <= x && p1.X >= x))
+                {
+                    double dx = p2.X - p1.X;
+
+                    if (Math.Abs(dx) < 1e-9)
+                        continue;
+
+                    double t = (x - p1.X) / dx;
+
+                    // точка на ребре
+                    var point = new Vector3(
+                        p1.X + (p2.X - p1.X) * t,
+                        p1.Y + (p2.Y - p1.Y) * t,
+                        p1.Z + (p2.Z - p1.Z) * t
+                    );
+
+                    points.Add(point);
+                }
+            }
+
+
+            // треугольник может дать только отрезок
+            if (points.Count == 2)
+            {
+                return (points[0], points[1]);
+            }
+
+            return null;
+        }
+
+        private static List<Vector3> ConnectSegments(List<(Vector3 A, Vector3 B)> segments)
+        {
+            var result = new List<Vector3>();
+
+            if (segments.Count == 0)
+                return result;
+
+
+            var first = segments[0];
+
+            result.Add(first.A);
+            result.Add(first.B);
+
+
+            segments.RemoveAt(0);
+
+
+            while (segments.Count > 0)
+            {
+                var last = result.Last();
+
+                int index = segments.FindIndex(s =>
+                    Vector3.Distance(last, s.A) < 0.001 ||
+                    Vector3.Distance(last, s.B) < 0.001);
+
+
+                if (index < 0)
+                    break;
+
+
+                var next = segments[index];
+
+                segments.RemoveAt(index);
+
+
+                if (Vector3.Distance(last, next.A) < 0.001)
+                {
+                    result.Add(next.B);
+                }
+                else
+                {
+                    result.Add(next.A);
+                }
+            }
+
+
+            // замыкаем контур
+            if (result.Count > 2 &&
+                Vector3.Distance(result[0], result[^1]) > 0.001)
+            {
+                result.Add(result[0]);
+            }
+
+
+            return result;
+        }
+
+        private static List<double> ExtractXPositions(List<Face3D> faces)
+        {
+            var xs = faces
+                .SelectMany(f => new[]
+                {
+                    f.FirstVertex.X,
+                    f.SecondVertex.X,
+                    f.ThirdVertex.X
+                })
+                .OrderBy(x => x)
+                .ToList();
+
+            if (xs.Count == 0)
+                return new List<double>();
+
+            const double tolerance = 0.001;
+
+            var result = new List<double>();
+            double currentSum = xs[0];
+            int currentCount = 1;
+
+            for (int i = 1; i < xs.Count; i++)
+            {
+                if (Math.Abs(xs[i] - xs[i - 1]) <= tolerance)
+                {
+                    currentSum += xs[i];
+                    currentCount++;
+                }
+                else
+                {
+                    result.Add(currentSum / currentCount);
+
+                    currentSum = xs[i];
+                    currentCount = 1;
+                }
+            }
+
+            result.Add(currentSum / currentCount);
+
+            return result;
+        }
+    }
+
+    public class Extrapolator
+    {
+        private readonly IContourFittingStrategy _fittingStrategy;
+        private readonly Carcas3D? _outerCarcas;
+        private readonly Carcas3D? _currentChildCarcas;
+        private Polyline3D? _firstExtrapolatedCountour;
+        private Polyline3D? _lastExtrapolatedCountour;
+
+        public IReadOnlyList<Polyline3D> InitialContours { get; }
+        public Polyline3D? FirstExtrapolatedCountour => _firstExtrapolatedCountour;
+        public Polyline3D? LastExtrapolatedCountour => _lastExtrapolatedCountour;
+        public double Scale { get; set; } = 0.2;
+        public double Distance { get; set; } = 0; // <= 0 = Auto, > 0 = Static
+
+
+        public Extrapolator(IEnumerable<Polyline3D> polylines, IContourFittingStrategy fittingStrategy)
+        {
+            InitialContours = polylines.ToList();
+            _fittingStrategy = fittingStrategy;
+        }
+
+        public Extrapolator(IEnumerable<Polyline3D> polylines, IContourFittingStrategy fittingStrategy, Carcas3D outerCarcas, Carcas3D? currentChildCarcas = null)
+        {
+            InitialContours = polylines.ToList();
+            _fittingStrategy = fittingStrategy;
+            _outerCarcas = outerCarcas;
+            _currentChildCarcas = currentChildCarcas;
+        }
+
+        public IEnumerable<Polyline3D> Extrapolate()
+        {
+            var sortedIntialsContours = PolylineOperations.Sort(InitialContours).ToList();
+            if (sortedIntialsContours.Count == 0) return sortedIntialsContours;
+
+            var centers = PolylineOperations.GetCenters(sortedIntialsContours);
+            var firstContourClone = (Polyline3D)sortedIntialsContours.First().Clone();
+            var lastContourClone = (Polyline3D)sortedIntialsContours.Last().Clone();
+
+            double distExtrapolateFirst = Distance;
+            double distExtrapolateLast = Distance;
+
+            Vector3 firstDirection = new Vector3(-1, 0, 0);
+            Vector3 lastDirection = new Vector3(1, 0, 0);
+
+            if (sortedIntialsContours.Count >= 2 && Distance <= 0)
+            {
+                var c1 = centers[sortedIntialsContours[0]];
+                var c2 = centers[sortedIntialsContours[1]];
+                var cPreLast = centers[sortedIntialsContours[^2]];
+                var cLast = centers[sortedIntialsContours[^1]];
+
+                double dFirst = Vector3.Distance(c1, c2);
+                double dLast = Vector3.Distance(cLast, cPreLast);
+
+                distExtrapolateFirst = dFirst / 2.0;
+                distExtrapolateLast = dLast / 2.0;
+
+                if (dFirst > 0.0001)
+                {
+                    firstDirection = c1 - c2;
+                    firstDirection.Normalize();
+                }
+
+                if (dLast > 0.0001)
+                {
+                    lastDirection = cLast - cPreLast;
+                    lastDirection.Normalize();
+                }
+            }
+
+            // 1. Перемещаем крайние копии наружу
+            PolylineOperations.MovePolyline(firstContourClone, firstDirection * distExtrapolateFirst);
+            PolylineOperations.MovePolyline(lastContourClone, lastDirection * distExtrapolateLast);
+
+            // 2. Первичное уменьшение (базовый масштаб)
+            PolylineOperations.ChangeScale(firstContourClone, Scale);
+            PolylineOperations.ChangeScale(lastContourClone, Scale);
+
+            // 3. Подгонка под внешний каркас
+            FitInsideOuterCarcas(firstContourClone, sortedIntialsContours.First());
+            FitInsideOuterCarcas(lastContourClone, sortedIntialsContours.Last());
+
+            return [firstContourClone, lastContourClone];
+        }
+
+        private void FitInsideOuterCarcas(Polyline3D extrapolated, Polyline3D baseContour)
+        {
+            if (_outerCarcas == null) return;
+
+            // Получаем внешнюю границу для сечения по оси X
+            var outerSection = _outerCarcas.GetSection(extrapolated.Vertexes.First().X);
+            if (outerSection.Count < 3) return;
+
+            // Собираем контекст
+            var context = new FittingContext { OuterBoundary = outerSection };
+
+            // Ищем соседей (других детей того же внешнего каркаса)
+            if (_currentChildCarcas != null)
+            {
+                var siblings = _currentChildCarcas != null
+                    ? _outerCarcas.Children.Where(c => c.Id != _currentChildCarcas.Id)
+                    : _outerCarcas.Children;
+
+                foreach (var sibling in siblings)
+                {
+                    var siblingSection = sibling.GetSection(extrapolated.Vertexes.First().X);
+                    if (siblingSection.Count > 2)
+                    {
+                        context.Obstacles.Add(siblingSection);
+                    }
+                }
+            }
+
+            var newPolyline = _fittingStrategy.Fit(extrapolated, baseContour, context);
+            var fittedVertexes = newPolyline.Vertexes.ToList();
+
+            extrapolated.Vertexes.Clear();
+            extrapolated.Vertexes.AddRange(fittedVertexes);
+        }
+
+        private static List<Vector3>? ShiftToMaintainRelativePosition(Polyline3D tail, Polyline3D baseContour, Carcas3D outerCarcas)
+        {
+            var baseCenter = PolylineOperations.GetCenter(baseContour);
+            var tailCenter = PolylineOperations.GetCenter(tail);
+
+            var baseOuterBoundary = outerCarcas.GetSection(baseCenter.X);
+            var tailOuterBoundary = outerCarcas.GetSection(tailCenter.X);
+
+            if (baseOuterBoundary.Count < 3 || tailOuterBoundary.Count < 3)
+                return null;
+
+            var baseOuterCenter = PolylineOperations.GetCenter(baseOuterBoundary);
+            var tailOuterCenter = PolylineOperations.GetCenter(tailOuterBoundary);
+
+            Vector3 relativeOffset = baseCenter - baseOuterCenter;
+            relativeOffset.X = 0;
+
+            double baseHeight = baseOuterBoundary.Max(v => v.Z) - baseOuterBoundary.Min(v => v.Z);
+            double tailHeight = tailOuterBoundary.Max(v => v.Z) - tailOuterBoundary.Min(v => v.Z);
+            double baseWidth = baseOuterBoundary.Max(v => v.Y) - baseOuterBoundary.Min(v => v.Y);
+            double tailWidth = tailOuterBoundary.Max(v => v.Y) - tailOuterBoundary.Min(v => v.Y);
+
+            double scaleY = baseWidth > 0.001 ? tailWidth / baseWidth : 1.0;
+            double scaleZ = baseHeight > 0.001 ? tailHeight / baseHeight : 1.0;
+
+            relativeOffset.Y *= Math.Max(0, scaleY);
+            relativeOffset.Z *= Math.Max(0, scaleZ);
+
+            Vector3 targetTailCenter = tailOuterCenter + relativeOffset;
+            targetTailCenter.X = tailCenter.X;
+
+            Vector3 shiftOffset = targetTailCenter - tailCenter;
+            PolylineOperations.MovePolyline(tail, shiftOffset);
+
+            return tailOuterBoundary;
+        }
+    }
+
     public class PolylineOperations
     {
         public static IEnumerable<Polyline3D> Sort(IEnumerable<Polyline3D> polylines)
@@ -42,16 +1114,20 @@ namespace GeoAppWpf.Services
 
         public static Vector3 GetCenter(Polyline3D polyline)
         {
-            var vertexes = polyline.Vertexes;
-            if (vertexes == null || !vertexes.Any())
-                return new Vector3(0, 0, 0);
+            List<Vector3> points = polyline.Vertexes.Select(v => new Vector3(v.X, v.Y, v.Z)).ToList();
+            return GetCenter(points);
+        }
 
-            // Вычисляем среднее арифметическое всех точек полилинии
-            double x = vertexes.Average(v => v.X);
-            double y = vertexes.Average(v => v.Y);
-            double z = vertexes.Average(v => v.Z);
-
-            return new Vector3(x, y, z);
+        public static Vector3 GetCenter(List<Vector3> points)
+        {
+            double sumX = 0, sumY = 0, sumZ = 0;
+            foreach (var p in points)
+            {
+                sumX += p.X;
+                sumY += p.Y;
+                sumZ += p.Z;
+            }
+            return new Vector3(sumX / points.Count, sumY / points.Count, sumZ / points.Count);
         }
 
         public static void MovePolyline(Polyline3D polyline, Vector3 offset)
@@ -144,7 +1220,6 @@ namespace GeoAppWpf.Services
                 }
             }
 
-            // 5. Записываем изменения
             for (int i = 0; i < vertexes.Length; i++)
             {
                 polyline3D.Vertexes[i] = vertexes[i];
@@ -360,1510 +1435,6 @@ namespace GeoAppWpf.Services
             }
 
             return result;
-        }
-    }
-
-    public class Extrapolator
-    {
-        /// <summary>
-        /// Выполняет экстраполяцию крайних полилиний относительно существующего набора объектов.
-        ///
-        /// Метод предназначен для создания дополнительных крайних сечений за пределами
-        /// исходного диапазона полилиний. Для этого:
-        /// <list type="number">
-        /// <item>
-        /// Полилинии сортируются в пространственном порядке.
-        /// </item>
-        /// <item>
-        /// Определяются центры первого, второго, предпоследнего и последнего элементов.
-        /// </item>
-        /// <item>
-        /// Крайние полилинии клонируются и смещаются наружу по направлению продолжения ряда.
-        /// </item>
-        /// <item>
-        /// Новые полилинии уменьшаются в масштабе, чтобы обеспечить плавное уменьшение
-        /// при удалении от исходных данных.
-        /// </item>
-        /// </list>
-        ///
-        /// Если передан только один элемент или набор пустой, метод не выполняет
-        /// полноценную экстраполяцию и возвращает исходный результат.
-        /// </summary>
-        /// <param name="polylines">
-        /// Исходный набор трёхмерных полилиний, для которых необходимо создать
-        /// дополнительные крайние элементы.
-        /// </param>
-        /// <param name="defaultDistance">
-        /// Расстояние смещения по умолчанию, используемое если невозможно определить
-        /// направление и расстояние между соседними полилиниями.
-        /// </param>
-        /// <param name="scale">
-        /// Коэффициент уменьшения масштаба создаваемых крайних полилиний.
-        /// Значение 0.1 означает уменьшение размера на 10%.
-        /// </param>
-        /// <returns>
-        /// Коллекция из двух новых полилиний:
-        /// первая — продолжение в начале ряда,
-        /// вторая — продолжение в конце ряда.
-        /// </returns>
-        public static IEnumerable<Polyline3D> Extrapolate(IEnumerable<Polyline3D> polylines, double defaultDistance = 0, double scale = 0.2, CarcasResult? outerCarcas = null)
-        {
-            // Сортируем полилинии для определения начала и конца ряда
-            var list = PolylineOperations.Sort(polylines).ToList();
-
-            if (list.Count == 0)
-                return list;
-
-            // Получаем центры всех полилиний для анализа их взаимного положения
-            var centers = PolylineOperations.GetCenters(list);
-
-
-            // Создаем копии крайних полилиний.
-            // Исходные объекты не изменяются.
-            var first = (Polyline3D)list.First().Clone();
-            var last = (Polyline3D)list.Last().Clone();
-
-
-            // Расстояние смещения.
-            // По умолчанию используется заданное значение,
-            // но при наличии нескольких объектов рассчитывается автоматически.
-            double distExtrapolateFirst = defaultDistance;
-            double distExtrapolateLast = defaultDistance;
-
-
-            // Направления смещения по умолчанию.
-            // Используются только если невозможно вычислить реальное направление.
-            Vector3 firstDirection = new Vector3(-1, 0, 0);
-            Vector3 lastDirection = new Vector3(1, 0, 0);
-
-            if (list.Count >= 2 && defaultDistance == 0)
-            {
-                var c1 = centers[list[0]];
-                var c2 = centers[list[1]];
-
-                var cPreLast = centers[list[^2]];
-                var cLast = centers[list[^1]];
-
-
-                // Определяем расстояние между соседними центрами.
-                // Новые полилинии будут вынесены на половину этого расстояния.
-                double dFirst = Vector3.Distance(c1, c2);
-                double dLast = Vector3.Distance(cLast, cPreLast);
-
-
-                distExtrapolateFirst = dFirst / 2.0;
-                distExtrapolateLast = dLast / 2.0;
-
-
-                // Направление продолжения первого элемента.
-                // Вектор направлен от второго объекта к первому.
-                if (dFirst > 0.0001)
-                {
-                    firstDirection = c1 - c2;
-                    firstDirection.Normalize();
-                }
-
-
-                // Направление продолжения последнего элемента.
-                // Вектор направлен от предпоследнего объекта к последнему.
-                if (dLast > 0.0001)
-                {
-                    // lastDirection = cLast - cPreLast;
-                    // lastDirection.Normalize();
-                }
-            }
-
-            // Перемещаем крайние копии наружу относительно исходного ряда
-            PolylineOperations.MovePolyline(first, firstDirection * distExtrapolateFirst);
-            PolylineOperations.MovePolyline(last, lastDirection * distExtrapolateLast);
-
-
-            // Уменьшаем размеры крайних полилиний,
-            // чтобы они плавно переходили в исходную геометрию
-            PolylineOperations.ChangeScale(first, scale);
-            PolylineOperations.ChangeScale(last, scale);
-
-
-            // Возвращаем только созданные экстремальные элементы
-            return [first, last];
-        }
-
-        public static IEnumerable<Polyline3D> ExtrapolateV2(IEnumerable<Polyline3D> polylines, double defaultDistance = 0, double scale = 0.2, CarcasResult? outerCarcas = null)
-        {
-            var list = PolylineOperations.Sort(polylines).ToList();
-            if (list.Count == 0) return list;
-
-            var centers = PolylineOperations.GetCenters(list);
-            var first = (Polyline3D)list.First().Clone();
-            var last = (Polyline3D)list.Last().Clone();
-
-            double distExtrapolateFirst = defaultDistance;
-            double distExtrapolateLast = defaultDistance;
-
-            Vector3 firstDirection = new Vector3(-1, 0, 0);
-            Vector3 lastDirection = new Vector3(1, 0, 0);
-
-            if (list.Count >= 2 && defaultDistance == 0)
-            {
-                var c1 = centers[list[0]];
-                var c2 = centers[list[1]];
-                var cPreLast = centers[list[^2]];
-                var cLast = centers[list[^1]];
-
-                double dFirst = Vector3.Distance(c1, c2);
-                double dLast = Vector3.Distance(cLast, cPreLast);
-
-                distExtrapolateFirst = dFirst / 2.0;
-                distExtrapolateLast = dLast / 2.0;
-
-                if (dFirst > 0.0001)
-                {
-                    firstDirection = c1 - c2;
-                    firstDirection.Normalize();
-                }
-
-                if (dLast > 0.0001)
-                {
-                    lastDirection = cLast - cPreLast;
-                    lastDirection.Normalize();
-                }
-            }
-
-            // 1. Перемещаем крайние копии наружу
-            PolylineOperations.MovePolyline(first, firstDirection * distExtrapolateFirst);
-            PolylineOperations.MovePolyline(last, lastDirection * distExtrapolateLast);
-
-            // 2. Первичное уменьшение (базовый масштаб)
-            PolylineOperations.ChangeScale(first, scale);
-            PolylineOperations.ChangeScale(last, scale);
-
-            // 3. Подгонка под внешний каркас
-            if (outerCarcas != null)
-            {
-                // Сначала смещаем в правильную позицию
-                var firstBoundary = ShiftToMaintainRelativePosition(first, list.First(), outerCarcas);
-                var lastBoundary = ShiftToMaintainRelativePosition(last, list.Last(), outerCarcas);
-
-                // Затем итеративно сжимаем, пока не влезет полностью
-                if (firstBoundary != null) EnsureFitsInside(first, firstBoundary);
-                if (lastBoundary != null) EnsureFitsInside(last, lastBoundary);
-            }
-
-            return [first, last];
-        }
-
-        private static List<Vector3>? ShiftToMaintainRelativePosition(Polyline3D tail, Polyline3D baseContour, CarcasResult outerCarcas)
-        {
-            var baseCenter = PolylineOperations.GetCenter(baseContour);
-            var tailCenter = PolylineOperations.GetCenter(tail);
-
-            var baseOuterBoundary = NestedCarcasProcessor.BoundaryAt(outerCarcas.NormalizedContours, outerCarcas.XPositions, baseCenter.X);
-            var tailOuterBoundary = NestedCarcasProcessor.BoundaryAt(outerCarcas.NormalizedContours, outerCarcas.XPositions, tailCenter.X);
-
-            if (baseOuterBoundary.Count < 3 || tailOuterBoundary.Count < 3)
-                return null;
-
-            var baseOuterCenter = GetCenter(baseOuterBoundary);
-            var tailOuterCenter = GetCenter(tailOuterBoundary);
-
-            Vector3 relativeOffset = baseCenter - baseOuterCenter;
-            relativeOffset.X = 0;
-
-            double baseHeight = baseOuterBoundary.Max(v => v.Z) - baseOuterBoundary.Min(v => v.Z);
-            double tailHeight = tailOuterBoundary.Max(v => v.Z) - tailOuterBoundary.Min(v => v.Z);
-            double baseWidth = baseOuterBoundary.Max(v => v.Y) - baseOuterBoundary.Min(v => v.Y);
-            double tailWidth = tailOuterBoundary.Max(v => v.Y) - tailOuterBoundary.Min(v => v.Y);
-
-            double scaleY = baseWidth > 0.001 ? tailWidth / baseWidth : 1.0;
-            double scaleZ = baseHeight > 0.001 ? tailHeight / baseHeight : 1.0;
-
-            relativeOffset.Y *= Math.Max(0, scaleY);
-            relativeOffset.Z *= Math.Max(0, scaleZ);
-
-            Vector3 targetTailCenter = tailOuterCenter + relativeOffset;
-            targetTailCenter.X = tailCenter.X;
-
-            Vector3 shiftOffset = targetTailCenter - tailCenter;
-            PolylineOperations.MovePolyline(tail, shiftOffset);
-
-            return tailOuterBoundary; // Возвращаем границу для шага сжатия
-        }
-
-        /// <summary>
-        /// Итеративно сжимает контур, пока он не окажется строго внутри внешней границы.
-        /// </summary>
-        private static void EnsureFitsInside(Polyline3D tail, List<Vector3> outerBoundary)
-        {
-            int maxIterations = 50; // Защита от бесконечного цикла
-            double scaleFactor = 0.05; // Уменьшаем на 10% за каждую итерацию
-
-            //while (!IsFullyInside(tail.Vertexes, outerBoundary) && maxIterations > 0)
-            //{
-            //    PolylineOperations.ChangeScale2(tail, scaleFactor);
-            //    maxIterations--;
-            //}
-        }
-
-        /// <summary>
-        /// Проверяет, находится ли внутренний контур полностью внутри внешнего (в 2D проекции YZ).
-        /// </summary>
-        private static bool IsFullyInside(IEnumerable<Vector3> inner, List<Vector3> outer)
-        {
-            // Проецируем вершины на плоскость YZ (игнорируя X - ось простирания)
-            PathD subjPath = new PathD();
-            foreach (var p in inner) subjPath.Add(new PointD(p.Y, p.Z));
-
-            PathD clipPath = new PathD();
-            foreach (var p in outer) clipPath.Add(new PointD(p.Y, p.Z));
-
-            PathsD subject = new PathsD() { subjPath };
-            PathsD clip = new PathsD() { clipPath };
-
-            // Ищем РАЗНОСТЬ: Внутренний минус Внешний. 
-            // Если результат не пустой, значит часть внутреннего контура торчит снаружи.
-            PathsD difference = Clipper.Difference(subject, clip, Clipper2Lib.FillRule.NonZero);
-
-            if (difference.Count == 0)
-                return true; // Разности нет, контур полностью внутри
-
-            // Иногда клиппер может возвращать микро-артефакты (ошибки округления).
-            // Поэтому проверяем площадь: если торчит кусок больше 10 кв. см, считаем, что вылезли.
-            double areaOutside = difference.Sum(p => Math.Abs(Clipper.Area(p)));
-
-            return areaOutside < 0.001;
-        }
-
-        /// <summary>
-        /// Вспомогательный метод для нахождения геометрического центра списка вершин
-        /// </summary>
-        private static Vector3 GetCenter(List<Vector3> points)
-        {
-            double sumX = 0, sumY = 0, sumZ = 0;
-            foreach (var p in points)
-            {
-                sumX += p.X;
-                sumY += p.Y;
-                sumZ += p.Z;
-            }
-            return new Vector3(sumX / points.Count, sumY / points.Count, sumZ / points.Count);
-        }
-
-        /// <summary>
-        /// Смещает экстраполированный хвост к геометрическому центру внешнего каркаса на той же позиции.
-        /// </summary>
-        private static void ShiftToFitInside(Polyline3D tail, CarcasResult outerCarcas)
-        {
-            // 1. Получаем центр нашего экстраполированного хвоста
-            var tailCenter = PolylineOperations.GetCenter(tail);
-
-            // 2. Получаем срез внешнего каркаса на координате Х нашего хвоста
-            var outerBoundary = NestedCarcasProcessor.BoundaryAt(
-                outerCarcas.NormalizedContours,
-                outerCarcas.XPositions,
-                tailCenter.X);
-
-            if (outerBoundary == null || outerBoundary.Count == 0)
-                return;
-
-            // 3. Вычисляем геометрический центр внешнего среза
-            double sumX = 0, sumY = 0, sumZ = 0;
-            foreach (var v in outerBoundary)
-            {
-                sumX += v.X;
-                sumY += v.Y;
-                sumZ += v.Z;
-            }
-
-            Vector3 outerCenter = new Vector3(
-                sumX / outerBoundary.Count,
-                sumY / outerBoundary.Count,
-                sumZ / outerBoundary.Count);
-
-            // 4. Смещаем хвост к центру внешнего контура
-            Vector3 shiftOffset = outerCenter - tailCenter;
-
-            // ВАЖНО: Обнуляем смещение по оси простирания (X), 
-            // чтобы контур не "уехал" обратно к основным сечениям, 
-            // а смещался строго в плоскости (Y, Z).
-            shiftOffset.X = 0;
-
-            PolylineOperations.MovePolyline(tail, shiftOffset);
-        }
-    }
-
-    public class CarcasResult
-    {
-        public List<Face3D> MeshTriangles { get; set; } = new();
-
-        // исходные
-        public List<List<Vector3>> NormalizedContours { get; set; } = new();
-
-        // между исходными
-        public List<List<Vector3>> GetIntermediateSections(int countBetween)
-        {
-            var result = new List<List<Vector3>>();
-
-            for (int i = 0; i < NormalizedContours.Count - 1; i++)
-            {
-                var left = NormalizedContours[i];
-                var right = NormalizedContours[i + 1];
-
-                // добавляем промежуточные контуры
-                for (int j = 1; j <= countBetween; j++)
-                {
-                    double t = (double)j / (countBetween + 1);
-
-                    var section = new List<Vector3>();
-
-                    for (int k = 0; k < left.Count; k++)
-                    {
-                        section.Add(Lerp(
-                            left[k],
-                            right[k],
-                            t));
-                    }
-
-                    result.Add(section);
-                }
-            }
-
-            return result;
-        }
-
-        public List<double> XPositions { get; set; } = new();
-
-        private static Vector3 Lerp(Vector3 p1, Vector3 p2, double t) => new Vector3(
-            p1.X + (p2.X - p1.X) * t,
-            p1.Y + (p2.Y - p1.Y) * t,
-            p1.Z + (p2.Z - p1.Z) * t);
-
-        public List<Vector3> GetMeshSection(double x)
-        {
-            var segments = new List<(Vector3 A, Vector3 B)>();
-
-            foreach (var triangle in MeshTriangles)
-            {
-                var segment = IntersectTriangleWithXPlane(triangle, x);
-
-                if (segment != null)
-                {
-                    segments.Add(segment.Value);
-                }
-            }
-
-            return ConnectSegments(segments);
-        }
-
-        private static (Vector3 A, Vector3 B)? IntersectTriangleWithXPlane(Face3D triangle, double x)
-        {
-            var vertices = new[]
-            {
-                triangle.FirstVertex,
-                triangle.SecondVertex,
-                triangle.ThirdVertex
-            };
-
-            var points = new List<Vector3>();
-
-            // Проверяем каждое ребро треугольника
-            for (int i = 0; i < 3; i++)
-            {
-                var p1 = vertices[i];
-                var p2 = vertices[(i + 1) % 3];
-
-                // если ребро пересекает плоскость X
-                if ((p1.X <= x && p2.X >= x) ||
-                    (p2.X <= x && p1.X >= x))
-                {
-                    double dx = p2.X - p1.X;
-
-                    if (Math.Abs(dx) < 1e-9)
-                        continue;
-
-                    double t = (x - p1.X) / dx;
-
-                    // точка на ребре
-                    var point = new Vector3(
-                        p1.X + (p2.X - p1.X) * t,
-                        p1.Y + (p2.Y - p1.Y) * t,
-                        p1.Z + (p2.Z - p1.Z) * t
-                    );
-
-                    points.Add(point);
-                }
-            }
-
-
-            // треугольник может дать только отрезок
-            if (points.Count == 2)
-            {
-                return (points[0], points[1]);
-            }
-
-            return null;
-        }
-
-        private static List<Vector3> ConnectSegments(List<(Vector3 A, Vector3 B)> segments)
-        {
-            var result = new List<Vector3>();
-
-            if (segments.Count == 0)
-                return result;
-
-
-            var first = segments[0];
-
-            result.Add(first.A);
-            result.Add(first.B);
-
-
-            segments.RemoveAt(0);
-
-
-            while (segments.Count > 0)
-            {
-                var last = result.Last();
-
-                int index = segments.FindIndex(s =>
-                    Vector3.Distance(last, s.A) < 0.001 ||
-                    Vector3.Distance(last, s.B) < 0.001);
-
-
-                if (index < 0)
-                    break;
-
-
-                var next = segments[index];
-
-                segments.RemoveAt(index);
-
-
-                if (Vector3.Distance(last, next.A) < 0.001)
-                {
-                    result.Add(next.B);
-                }
-                else
-                {
-                    result.Add(next.A);
-                }
-            }
-
-
-            // замыкаем контур
-            if (result.Count > 2 &&
-                Vector3.Distance(result[0], result[^1]) > 0.001)
-            {
-                result.Add(result[0]);
-            }
-
-
-            return result;
-        }
-    }
-
-    public class CarcasBuilder
-    {
-        private static int _carcasId = 0;
-        private static Layer _curLayer;
-
-        public static List<Face3D>? Build(IEnumerable<Polyline3D> polylines)
-        {
-            _carcasId++;
-            string blockName = polylines.Count() < 4 ? "C2" : "C1";
-            _curLayer = new Layer($"{_carcasId}-{blockName}");
-
-            // 1. Собираем все контуры
-            List<List<Vector3>> allContours = new List<List<Vector3>>();
-
-            foreach (var l in polylines)
-            {
-                allContours.Add(l.Vertexes.ToList());
-            }
-
-            if (allContours.Count < 2) return null;
-
-            allContours = allContours.OrderBy(contour => contour.Average(v => v.X)).ToList();
-
-            int targetPointsCount = 15;
-            List<List<Vector3>> normalizedContours = new List<List<Vector3>>();
-
-            // 2. Ресемплинг
-            foreach (var contour in allContours)
-            {
-                normalizedContours.Add(ResampleContour(contour, targetPointsCount));
-            }
-
-            // 3. Синхронизация
-            for (int i = 1; i < normalizedContours.Count; i++)
-            {
-                normalizedContours[i] = SynchronizeStart(normalizedContours[i - 1], normalizedContours[i]);
-            }
-
-            List<Face3D> meshTriangles = new List<Face3D>();
-
-            // 4. Построение боковых граней (между контурами)
-            for (int i = 0; i < normalizedContours.Count - 1; i++)
-            {
-                var contourA = normalizedContours[i];
-                var contourB = normalizedContours[i + 1];
-
-                for (int j = 0; j < targetPointsCount; j++)
-                {
-                    int nextJ = (j + 1) % targetPointsCount;
-
-                    var face1 = new Face3D(contourA[j], contourB[j], contourA[nextJ]);
-                    face1.Layer = _curLayer;
-
-                    var face2 = new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]);
-                    face2.Layer = _curLayer;
-
-                    meshTriangles.Add(face1);
-                    meshTriangles.Add(face2);
-                }
-            }
-
-            // 5. ТРИАНГУЛЯЦИЯ ТОРЦОВ (закрытие первого и последнего контура)
-            var startCap = TriangulateContourEarClipping(normalizedContours.First());
-            var endCap = TriangulateContourEarClipping(normalizedContours.Last());
-
-            meshTriangles.AddRange(startCap);
-            meshTriangles.AddRange(endCap);
-
-            return meshTriangles;
-        }
-
-        private static List<Face3D> TriangulateContourEarClipping(List<Vector3> contour)
-        {
-            List<Face3D> faces = new List<Face3D>();
-            if (contour.Count < 3) return faces;
-
-            // 1. ОПРЕДЕЛЯЕМ ПЛОСКОСТЬ КОНТУРА (ищем оси с наибольшим разбросом координат)
-            double minX = contour.Min(p => p.X), maxX = contour.Max(p => p.X);
-            double minY = contour.Min(p => p.Y), maxY = contour.Max(p => p.Y);
-            double minZ = contour.Min(p => p.Z), maxZ = contour.Max(p => p.Z);
-
-            double dx = maxX - minX;
-            double dy = maxY - minY;
-            double dz = maxZ - minZ;
-
-            // Локальные функции для динамического выбора 2D-координат (U и V)
-            Func<Vector3, double> getU;
-            Func<Vector3, double> getV;
-
-            if (dx <= dy && dx <= dz)
-            {
-                getU = p => p.Y; getV = p => p.Z; // Игнорируем X (плоскость YZ)
-            }
-            else if (dy <= dx && dy <= dz)
-            {
-                getU = p => p.X; getV = p => p.Z; // Игнорируем Y (плоскость XZ)
-            }
-            else
-            {
-                getU = p => p.X; getV = p => p.Y; // Игнорируем Z (плоскость XY)
-            }
-
-            // Встроенная локальная функция проверки точки в треугольнике (работает с U и V)
-            bool IsPointInTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
-            {
-                double pU = getU(p), pV = getV(p);
-                double aU = getU(a), aV = getV(a);
-                double bU = getU(b), bV = getV(b);
-                double cU = getU(c), cV = getV(c);
-
-                double det = (bV - cV) * (aU - cU) + (cU - bU) * (aV - cV);
-                if (Math.Abs(det) < 1e-9) return false;
-
-                double alpha = ((bV - cV) * (pU - cU) + (cU - bU) * (pV - cV)) / det;
-                double beta = ((cV - aV) * (pU - cU) + (aU - cU) * (pV - cV)) / det;
-                double gamma = 1.0 - alpha - beta;
-
-                // Небольшой допуск (-1e-9) спасает от багов с плавающей запятой на гранях
-                return alpha >= -1e-9 && beta >= -1e-9 && gamma >= -1e-9;
-            }
-
-            // НОВОЕ: расстояние между двумя точками в той же 2D-проекции (U,V).
-            // Нужно для масштабно-независимой (относительной) проверки угла в вершине.
-            double Distance2D(Vector3 p1, Vector3 p2)
-            {
-                double du = getU(p2) - getU(p1);
-                double dv = getV(p2) - getV(p1);
-                return Math.Sqrt(du * du + dv * dv);
-            }
-
-            // НОВОЕ: расстояние от точки до отрезка (в той же 2D-проекции U,V).
-            // Нужно, чтобы отлавливать вершины, которые лежат ВПЛОТНУЮ к диагонали уха,
-            // но формально не попадают "строго внутрь" треугольника из-за погрешности.
-            double DistancePointToSegment2D(Vector3 p, Vector3 segA, Vector3 segB)
-            {
-                double pU = getU(p), pV = getV(p);
-                double aU = getU(segA), aV = getV(segA);
-                double bU = getU(segB), bV = getV(segB);
-
-                double abU = bU - aU, abV = bV - aV;
-                double lenSq = abU * abU + abV * abV;
-                if (lenSq < 1e-18) return Distance(p, segA);
-
-                double t = ((pU - aU) * abU + (pV - aV) * abV) / lenSq;
-                t = Math.Max(0.0, Math.Min(1.0, t));
-
-                double projU = aU + t * abU;
-                double projV = aV + t * abV;
-
-                double du = pU - projU, dv = pV - projV;
-                return Math.Sqrt(du * du + dv * dv);
-            }
-
-            List<int> V = Enumerable.Range(0, contour.Count).ToList();
-
-            // 2. ВЫЧИСЛЯЕМ ПЛОЩАДЬ ДЛЯ ПРОВЕРКИ НАПРАВЛЕНИЯ (в 2D проекции)
-            double area = 0;
-            for (int i = 0; i < V.Count; i++)
-            {
-                var p1 = contour[V[i]];
-                var p2 = contour[V[(i + 1) % V.Count]];
-                area += (getU(p2) - getU(p1)) * (getV(p2) + getV(p1));
-            }
-
-            // Если area > 0, контур по часовой стрелке. Разворачиваем, чтобы сделать против часовой (CCW).
-            if (area > 0) V.Reverse();
-
-            int count = V.Count;
-
-            // НОВОЕ: минимальный "коридор безопасности" вдоль диагонали уха.
-            // Берём как долю от средней длины стороны контура, чтобы не завязываться на абсолютные единицы.
-            // Если у вас есть характерный масштаб (например, шаг ресемплинга) — можно подставить его напрямую.
-            double avgEdgeLen = 0;
-            for (int i = 0; i < count; i++)
-                avgEdgeLen += Distance(contour[V[i]], contour[V[(i + 1) % count]]);
-            avgEdgeLen /= count;
-            double clearance = avgEdgeLen * 0.01; // 1% от средней стороны — подберите под свои данные
-
-            // Ищет лучшее (по длине диагонали) валидное ухо среди текущих вершин V.
-            // requireClearance = true  -> строгий режим (запрет "срезов" рядом с зигзагом)
-            // requireClearance = false -> классический режим
-            // requireConvex    = false -> крайний fallback: не отбраковываем по углу вообще
-            //                             (иначе вершина, у которой излом идёт в основном
-            //                             по "отброшенной" при проекции оси, может НИКОГДА
-            //                             не пройти проверку на выпуклость и остаться дырой)
-            (int bestI, double bestDiagLenSq) FindBestEar(bool requireClearance, bool requireConvex)
-            {
-                int bestI = -1;
-                double bestDiagLenSq = double.MaxValue;
-
-                for (int i = 0; i < count; i++)
-                {
-                    int prevIdx = V[(i - 1 + count) % count];
-                    int currIdx = V[i];
-                    int nextIdx = V[(i + 1) % count];
-
-                    Vector3 a = contour[prevIdx];
-                    Vector3 b = contour[currIdx];
-                    Vector3 c = contour[nextIdx];
-
-                    if (requireConvex)
-                    {
-                        // Векторное произведение в выбранной плоскости
-                        double crossProduct = (getU(b) - getU(a)) * (getV(c) - getV(a)) - (getV(b) - getV(a)) * (getU(c) - getU(a));
-
-                        // ВАЖНО: нормируем на длины сторон (получаем аналог sin угла при b).
-                        // Абсолютный допуск (1e-6) ошибался на длинных/растянутых контурах —
-                        // реально выпуклый, но "мелкий" в этой проекции угол мог считаться коллинеарным.
-                        double abLen = Distance2D(a, b);
-                        double bcLen = Distance2D(b, c);
-                        double denom = abLen * bcLen;
-                        double normalizedCross = denom > 1e-15 ? crossProduct / denom : 0;
-
-                        // Если угол вогнутый ИЛИ точки коллинеарны (лежат на прямой) - пропускаем
-                        if (normalizedCross <= 1e-9) continue;
-                    }
-
-                    bool blocked = false;
-                    for (int j = 0; j < count; j++)
-                    {
-                        int testIdx = V[j];
-                        if (testIdx == prevIdx || testIdx == currIdx || testIdx == nextIdx) continue;
-
-                        // 1) классическая проверка "точка строго внутри треугольника"
-                        if (IsPointInTriangle(contour[testIdx], a, b, c))
-                        {
-                            blocked = true;
-                            break;
-                        }
-
-                        // 2) НОВОЕ: точка слишком близко к диагонали a-c —
-                        // запрещаем "срезать" мимо почти коллинеарных / зигзагующих вершин
-                        if (requireClearance && DistancePointToSegment2D(contour[testIdx], a, c) < clearance)
-                        {
-                            blocked = true;
-                            break;
-                        }
-                    }
-
-                    if (!blocked)
-                    {
-                        double diagLenSq = (getU(a) - getU(c)) * (getU(a) - getU(c)) + (getV(a) - getV(c)) * (getV(a) - getV(c));
-                        if (diagLenSq < bestDiagLenSq)
-                        {
-                            bestDiagLenSq = diagLenSq;
-                            bestI = i;
-                        }
-                    }
-                }
-
-                return (bestI, bestDiagLenSq);
-            }
-
-            // 3. ОТСЕЧЕНИЕ УШЕЙ (лучшее ухо по длине диагонали, а не первое попавшееся)
-            // Триер идёт от самого "аккуратного" варианта к гарантированному fallback-у.
-            // ВАЖНО: цикл больше никогда не выходит, не покрыв все вершины треугольниками —
-            // именно молчаливый выход раньше и оставлял дыры на углах.
-            while (count > 2)
-            {
-                var (bestI, _) = FindBestEar(requireClearance: true, requireConvex: true);
-
-                if (bestI < 0)
-                {
-                    // Ни одно ухо не прошло усиленную проверку коридора — пробуем без неё
-                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: true);
-                }
-
-                if (bestI < 0)
-                {
-                    // Даже классическая проверка выпуклости не находит ухо (обычно значит,
-                    // что в этой 2D-проекции угол выродился) — снимаем требование выпуклости
-                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: false);
-                }
-
-                if (bestI < 0)
-                {
-                    // Совсем крайний случай (в норме сюда доходить не должны) —
-                    // берём первую оставшуюся вершину принудительно, лишь бы не оставить дыру
-                    bestI = 0;
-                }
-
-                int prevIdx = V[(bestI - 1 + count) % count];
-                int currIdx = V[bestI];
-                int nextIdx = V[(bestI + 1) % count];
-
-                var face = new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]);
-                face.Layer = _curLayer;
-
-                faces.Add(face);
-                V.RemoveAt(bestI);
-                count--;
-            }
-
-            return faces;
-        }
-
-        private static List<Vector3> ResampleContour(List<Vector3> original, int targetCount)
-        {
-            if (original.Count == 0) return new List<Vector3>();
-
-            // Если в исходном контуре точек уже больше или равно нужному количеству,
-            // просто возвращаем нужное количество (обрезаем лишнее)
-            if (original.Count >= targetCount)
-            {
-                return original.Take(targetCount).ToList();
-            }
-
-            // 1. Вычисляем длины всех сегментов и общую длину
-            double totalLength = 0;
-            List<double> segmentLengths = new List<double>();
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                int next = (i + 1) % original.Count;
-                double dist = Distance(original[i], original[next]);
-                segmentLengths.Add(dist);
-                totalLength += dist;
-            }
-
-            // 2. Рассчитываем, сколько дополнительных точек нужно добавить на каждый сегмент
-            int pointsToAdd = targetCount - original.Count; // Сколько точек не хватает до сотни
-            int[] pointsPerSegment = new int[original.Count];
-            double[] remainders = new double[original.Count];
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                // Пропорционально распределяем точки в зависимости от длины сегмента
-                double exactPoints = (segmentLengths[i] / totalLength) * pointsToAdd;
-                pointsPerSegment[i] = (int)Math.Floor(exactPoints);
-                remainders[i] = exactPoints - pointsPerSegment[i];
-            }
-
-            // Распределяем "остатки", если из-за округления мы недобрали точек до targetCount
-            int currentAdded = pointsPerSegment.Sum();
-            int neededPoints = pointsToAdd - currentAdded;
-
-            var sortedIndices = remainders
-                .Select((val, idx) => new { Value = val, Index = idx })
-                .OrderByDescending(x => x.Value)
-                .ToList();
-
-            for (int i = 0; i < neededPoints; i++)
-            {
-                pointsPerSegment[sortedIndices[i].Index]++;
-            }
-
-            // 3. Строим новый контур, включая ИСХОДНЫЕ углы и ДОБАВЛЕННЫЕ точки
-            List<Vector3> resampled = new List<Vector3>();
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                Vector3 p1 = original[i];
-                Vector3 p2 = original[(i + 1) % original.Count];
-
-                // ГАРАНТИРОВАННО добавляем оригинальный угол контура
-                resampled.Add(p1);
-
-                // Добавляем промежуточные точки на прямой линии текущего сегмента
-                int extraPoints = pointsPerSegment[i];
-                for (int j = 1; j <= extraPoints; j++)
-                {
-                    double t = (double)j / (extraPoints + 1); // Коэффициент интерполяции
-
-                    double x = p1.X + (p2.X - p1.X) * t;
-                    double y = p1.Y + (p2.Y - p1.Y) * t;
-                    double z = p1.Z + (p2.Z - p1.Z) * t;
-
-                    resampled.Add(new Vector3(x, y, z));
-                }
-            }
-
-            return resampled;
-        }
-
-        private static List<Vector3> SynchronizeStart(List<Vector3> referenceContour, List<Vector3> targetContour)
-        {
-            // 1. Ищем лучший сдвиг для прямого направления
-            var (forwardSync, forwardDist) = FindBestAlignment(referenceContour, targetContour);
-
-            // 2. Ищем лучший сдвиг для обратного направления (если контур нарисован в другую сторону)
-            var reversedTarget = new List<Vector3>(targetContour);
-            reversedTarget.Reverse();
-            var (reversedSync, reversedDist) = FindBestAlignment(referenceContour, reversedTarget);
-
-            // Выбираем вариант с минимальной суммарной длиной соединений
-            if (reversedDist < forwardDist)
-            {
-                return reversedSync;
-            }
-
-            return forwardSync;
-        }
-
-        private static (List<Vector3> AlignedContour, double MinDistance) FindBestAlignment(List<Vector3> referenceContour, List<Vector3> targetContour)
-        {
-            double minTotalDistance = double.MaxValue;
-            int bestShift = 0;
-            int count = targetContour.Count;
-
-            // Перебираем ВСЕ возможные стартовые точки (индексы сдвига)
-            for (int shift = 0; shift < count; shift++)
-            {
-                double currentTotalDistance = 0;
-
-                for (int i = 0; i < count; i++)
-                {
-                    int targetIndex = (i + shift) % count;
-                    currentTotalDistance += Distance(referenceContour[i], targetContour[targetIndex]);
-
-                    // Оптимизация: если уже набежало больше, чем найденный минимум, дальше не считаем
-                    if (currentTotalDistance >= minTotalDistance)
-                    {
-                        break;
-                    }
-                }
-
-                // Если нашли более короткий каркас — запоминаем
-                if (currentTotalDistance < minTotalDistance)
-                {
-                    minTotalDistance = currentTotalDistance;
-                    bestShift = shift;
-                }
-            }
-
-            // Перестраиваем массив с найденным лучшим сдвигом
-            var synchronized = new List<Vector3>(count);
-            for (int i = 0; i < count; i++)
-            {
-                int index = (i + bestShift) % count;
-                synchronized.Add(targetContour[index]);
-            }
-
-            return (synchronized, minTotalDistance);
-        }
-
-        private static double Distance(Vector3 a, Vector3 b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-            double dz = a.Z - b.Z;
-            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        }
-    }
-
-    public class CarcasBuilderV2
-    {
-        private static int _carcasId = 0;
-        private static Layer _curLayer;
-
-        public static CarcasResult? Build(IEnumerable<Polyline3D> polylines)
-        {
-            _carcasId++;
-            string blockName = polylines.Count() < 4 ? "C2" : "C1";
-            _curLayer = new Layer($"{_carcasId}-{blockName}");
-
-            // 1. Собираем все контуры
-            List<List<Vector3>> allContours = new List<List<Vector3>>();
-
-            foreach (var l in polylines)
-            {
-                allContours.Add(l.Vertexes.ToList());
-            }
-
-            if (allContours.Count < 2) return null;
-
-            allContours = allContours.OrderBy(contour => contour.Average(v => v.X)).ToList();
-
-            int targetPointsCount = 15;
-            List<List<Vector3>> normalizedContours = new List<List<Vector3>>();
-
-            // 2. Ресемплинг
-            foreach (var contour in allContours)
-            {
-                normalizedContours.Add(ResampleContour(contour, targetPointsCount));
-            }
-
-            // 3. Синхронизация
-            for (int i = 1; i < normalizedContours.Count; i++)
-            {
-                normalizedContours[i] = SynchronizeStart(normalizedContours[i - 1], normalizedContours[i]);
-            }
-
-            List<Face3D> meshTriangles = new List<Face3D>();
-
-            // 4. Построение боковых граней (между контурами)
-            for (int i = 0; i < normalizedContours.Count - 1; i++)
-            {
-                var contourA = normalizedContours[i];
-                var contourB = normalizedContours[i + 1];
-
-                for (int j = 0; j < targetPointsCount; j++)
-                {
-                    int nextJ = (j + 1) % targetPointsCount;
-
-                    var face1 = new Face3D(contourA[j], contourB[j], contourA[nextJ]);
-                    face1.Layer = _curLayer;
-
-                    var face2 = new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]);
-                    face2.Layer = _curLayer;
-
-                    meshTriangles.Add(face1);
-                    meshTriangles.Add(face2);
-                }
-            }
-
-            // 5. ТРИАНГУЛЯЦИЯ ТОРЦОВ
-            var startCap = TriangulateContourEarClipping(normalizedContours.First());
-            var endCap = TriangulateContourEarClipping(normalizedContours.Last());
-
-            meshTriangles.AddRange(startCap);
-            meshTriangles.AddRange(endCap);
-
-            // НОВОЕ: Собираем X-координаты центров для удобной интерполяции
-            List<double> xPositions = normalizedContours.Select(c => c.Average(v => v.X)).ToList();
-
-            return new CarcasResult
-            {
-                MeshTriangles = meshTriangles,
-                NormalizedContours = normalizedContours,
-                XPositions = xPositions
-            };
-        }
-
-        private static List<Face3D> TriangulateContourEarClipping(List<Vector3> contour)
-        {
-            List<Face3D> faces = new List<Face3D>();
-            if (contour.Count < 3) return faces;
-
-            // 1. ОПРЕДЕЛЯЕМ ПЛОСКОСТЬ КОНТУРА (ищем оси с наибольшим разбросом координат)
-            double minX = contour.Min(p => p.X), maxX = contour.Max(p => p.X);
-            double minY = contour.Min(p => p.Y), maxY = contour.Max(p => p.Y);
-            double minZ = contour.Min(p => p.Z), maxZ = contour.Max(p => p.Z);
-
-            double dx = maxX - minX;
-            double dy = maxY - minY;
-            double dz = maxZ - minZ;
-
-            // Локальные функции для динамического выбора 2D-координат (U и V)
-            Func<Vector3, double> getU;
-            Func<Vector3, double> getV;
-
-            if (dx <= dy && dx <= dz)
-            {
-                getU = p => p.Y; getV = p => p.Z; // Игнорируем X (плоскость YZ)
-            }
-            else if (dy <= dx && dy <= dz)
-            {
-                getU = p => p.X; getV = p => p.Z; // Игнорируем Y (плоскость XZ)
-            }
-            else
-            {
-                getU = p => p.X; getV = p => p.Y; // Игнорируем Z (плоскость XY)
-            }
-
-            // Встроенная локальная функция проверки точки в треугольнике (работает с U и V)
-            bool IsPointInTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
-            {
-                double pU = getU(p), pV = getV(p);
-                double aU = getU(a), aV = getV(a);
-                double bU = getU(b), bV = getV(b);
-                double cU = getU(c), cV = getV(c);
-
-                double det = (bV - cV) * (aU - cU) + (cU - bU) * (aV - cV);
-                if (Math.Abs(det) < 1e-9) return false;
-
-                double alpha = ((bV - cV) * (pU - cU) + (cU - bU) * (pV - cV)) / det;
-                double beta = ((cV - aV) * (pU - cU) + (aU - cU) * (pV - cV)) / det;
-                double gamma = 1.0 - alpha - beta;
-
-                // Небольшой допуск (-1e-9) спасает от багов с плавающей запятой на гранях
-                return alpha >= -1e-9 && beta >= -1e-9 && gamma >= -1e-9;
-            }
-
-            // НОВОЕ: расстояние между двумя точками в той же 2D-проекции (U,V).
-            // Нужно для масштабно-независимой (относительной) проверки угла в вершине.
-            double Distance2D(Vector3 p1, Vector3 p2)
-            {
-                double du = getU(p2) - getU(p1);
-                double dv = getV(p2) - getV(p1);
-                return Math.Sqrt(du * du + dv * dv);
-            }
-
-            // НОВОЕ: расстояние от точки до отрезка (в той же 2D-проекции U,V).
-            // Нужно, чтобы отлавливать вершины, которые лежат ВПЛОТНУЮ к диагонали уха,
-            // но формально не попадают "строго внутрь" треугольника из-за погрешности.
-            double DistancePointToSegment2D(Vector3 p, Vector3 segA, Vector3 segB)
-            {
-                double pU = getU(p), pV = getV(p);
-                double aU = getU(segA), aV = getV(segA);
-                double bU = getU(segB), bV = getV(segB);
-
-                double abU = bU - aU, abV = bV - aV;
-                double lenSq = abU * abU + abV * abV;
-                if (lenSq < 1e-18) return Distance(p, segA);
-
-                double t = ((pU - aU) * abU + (pV - aV) * abV) / lenSq;
-                t = Math.Max(0.0, Math.Min(1.0, t));
-
-                double projU = aU + t * abU;
-                double projV = aV + t * abV;
-
-                double du = pU - projU, dv = pV - projV;
-                return Math.Sqrt(du * du + dv * dv);
-            }
-
-            List<int> V = Enumerable.Range(0, contour.Count).ToList();
-
-            // 2. ВЫЧИСЛЯЕМ ПЛОЩАДЬ ДЛЯ ПРОВЕРКИ НАПРАВЛЕНИЯ (в 2D проекции)
-            double area = 0;
-            for (int i = 0; i < V.Count; i++)
-            {
-                var p1 = contour[V[i]];
-                var p2 = contour[V[(i + 1) % V.Count]];
-                area += (getU(p2) - getU(p1)) * (getV(p2) + getV(p1));
-            }
-
-            // Если area > 0, контур по часовой стрелке. Разворачиваем, чтобы сделать против часовой (CCW).
-            if (area > 0) V.Reverse();
-
-            int count = V.Count;
-
-            // НОВОЕ: минимальный "коридор безопасности" вдоль диагонали уха.
-            // Берём как долю от средней длины стороны контура, чтобы не завязываться на абсолютные единицы.
-            // Если у вас есть характерный масштаб (например, шаг ресемплинга) — можно подставить его напрямую.
-            double avgEdgeLen = 0;
-            for (int i = 0; i < count; i++)
-                avgEdgeLen += Distance(contour[V[i]], contour[V[(i + 1) % count]]);
-            avgEdgeLen /= count;
-            double clearance = avgEdgeLen * 0.01; // 1% от средней стороны — подберите под свои данные
-
-            // Ищет лучшее (по длине диагонали) валидное ухо среди текущих вершин V.
-            // requireClearance = true  -> строгий режим (запрет "срезов" рядом с зигзагом)
-            // requireClearance = false -> классический режим
-            // requireConvex    = false -> крайний fallback: не отбраковываем по углу вообще
-            //                             (иначе вершина, у которой излом идёт в основном
-            //                             по "отброшенной" при проекции оси, может НИКОГДА
-            //                             не пройти проверку на выпуклость и остаться дырой)
-            (int bestI, double bestDiagLenSq) FindBestEar(bool requireClearance, bool requireConvex)
-            {
-                int bestI = -1;
-                double bestDiagLenSq = double.MaxValue;
-
-                for (int i = 0; i < count; i++)
-                {
-                    int prevIdx = V[(i - 1 + count) % count];
-                    int currIdx = V[i];
-                    int nextIdx = V[(i + 1) % count];
-
-                    Vector3 a = contour[prevIdx];
-                    Vector3 b = contour[currIdx];
-                    Vector3 c = contour[nextIdx];
-
-                    if (requireConvex)
-                    {
-                        // Векторное произведение в выбранной плоскости
-                        double crossProduct = (getU(b) - getU(a)) * (getV(c) - getV(a)) - (getV(b) - getV(a)) * (getU(c) - getU(a));
-
-                        // ВАЖНО: нормируем на длины сторон (получаем аналог sin угла при b).
-                        // Абсолютный допуск (1e-6) ошибался на длинных/растянутых контурах —
-                        // реально выпуклый, но "мелкий" в этой проекции угол мог считаться коллинеарным.
-                        double abLen = Distance2D(a, b);
-                        double bcLen = Distance2D(b, c);
-                        double denom = abLen * bcLen;
-                        double normalizedCross = denom > 1e-15 ? crossProduct / denom : 0;
-
-                        // Если угол вогнутый ИЛИ точки коллинеарны (лежат на прямой) - пропускаем
-                        if (normalizedCross <= 1e-9) continue;
-                    }
-
-                    bool blocked = false;
-                    for (int j = 0; j < count; j++)
-                    {
-                        int testIdx = V[j];
-                        if (testIdx == prevIdx || testIdx == currIdx || testIdx == nextIdx) continue;
-
-                        // 1) классическая проверка "точка строго внутри треугольника"
-                        if (IsPointInTriangle(contour[testIdx], a, b, c))
-                        {
-                            blocked = true;
-                            break;
-                        }
-
-                        // 2) НОВОЕ: точка слишком близко к диагонали a-c —
-                        // запрещаем "срезать" мимо почти коллинеарных / зигзагующих вершин
-                        if (requireClearance && DistancePointToSegment2D(contour[testIdx], a, c) < clearance)
-                        {
-                            blocked = true;
-                            break;
-                        }
-                    }
-
-                    if (!blocked)
-                    {
-                        double diagLenSq = (getU(a) - getU(c)) * (getU(a) - getU(c)) + (getV(a) - getV(c)) * (getV(a) - getV(c));
-                        if (diagLenSq < bestDiagLenSq)
-                        {
-                            bestDiagLenSq = diagLenSq;
-                            bestI = i;
-                        }
-                    }
-                }
-
-                return (bestI, bestDiagLenSq);
-            }
-
-            // 3. ОТСЕЧЕНИЕ УШЕЙ (лучшее ухо по длине диагонали, а не первое попавшееся)
-            // Триер идёт от самого "аккуратного" варианта к гарантированному fallback-у.
-            // ВАЖНО: цикл больше никогда не выходит, не покрыв все вершины треугольниками —
-            // именно молчаливый выход раньше и оставлял дыры на углах.
-            while (count > 2)
-            {
-                var (bestI, _) = FindBestEar(requireClearance: true, requireConvex: true);
-
-                if (bestI < 0)
-                {
-                    // Ни одно ухо не прошло усиленную проверку коридора — пробуем без неё
-                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: true);
-                }
-
-                if (bestI < 0)
-                {
-                    // Даже классическая проверка выпуклости не находит ухо (обычно значит,
-                    // что в этой 2D-проекции угол выродился) — снимаем требование выпуклости
-                    (bestI, _) = FindBestEar(requireClearance: false, requireConvex: false);
-                }
-
-                if (bestI < 0)
-                {
-                    // Совсем крайний случай (в норме сюда доходить не должны) —
-                    // берём первую оставшуюся вершину принудительно, лишь бы не оставить дыру
-                    bestI = 0;
-                }
-
-                int prevIdx = V[(bestI - 1 + count) % count];
-                int currIdx = V[bestI];
-                int nextIdx = V[(bestI + 1) % count];
-
-                var face = new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]);
-                face.Layer = _curLayer;
-
-                faces.Add(face);
-                V.RemoveAt(bestI);
-                count--;
-            }
-
-            return faces;
-        }
-
-        private static List<Vector3> ResampleContour(List<Vector3> original, int targetCount)
-        {
-            if (original.Count == 0) return new List<Vector3>();
-
-            // Если в исходном контуре точек уже больше или равно нужному количеству,
-            // просто возвращаем нужное количество (обрезаем лишнее)
-            if (original.Count >= targetCount)
-            {
-                return original.Take(targetCount).ToList();
-            }
-
-            // 1. Вычисляем длины всех сегментов и общую длину
-            double totalLength = 0;
-            List<double> segmentLengths = new List<double>();
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                int next = (i + 1) % original.Count;
-                double dist = Distance(original[i], original[next]);
-                segmentLengths.Add(dist);
-                totalLength += dist;
-            }
-
-            // 2. Рассчитываем, сколько дополнительных точек нужно добавить на каждый сегмент
-            int pointsToAdd = targetCount - original.Count; // Сколько точек не хватает до сотни
-            int[] pointsPerSegment = new int[original.Count];
-            double[] remainders = new double[original.Count];
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                // Пропорционально распределяем точки в зависимости от длины сегмента
-                double exactPoints = (segmentLengths[i] / totalLength) * pointsToAdd;
-                pointsPerSegment[i] = (int)Math.Floor(exactPoints);
-                remainders[i] = exactPoints - pointsPerSegment[i];
-            }
-
-            // Распределяем "остатки", если из-за округления мы недобрали точек до targetCount
-            int currentAdded = pointsPerSegment.Sum();
-            int neededPoints = pointsToAdd - currentAdded;
-
-            var sortedIndices = remainders
-                .Select((val, idx) => new { Value = val, Index = idx })
-                .OrderByDescending(x => x.Value)
-                .ToList();
-
-            for (int i = 0; i < neededPoints; i++)
-            {
-                pointsPerSegment[sortedIndices[i].Index]++;
-            }
-
-            // 3. Строим новый контур, включая ИСХОДНЫЕ углы и ДОБАВЛЕННЫЕ точки
-            List<Vector3> resampled = new List<Vector3>();
-
-            for (int i = 0; i < original.Count; i++)
-            {
-                Vector3 p1 = original[i];
-                Vector3 p2 = original[(i + 1) % original.Count];
-
-                // ГАРАНТИРОВАННО добавляем оригинальный угол контура
-                resampled.Add(p1);
-
-                // Добавляем промежуточные точки на прямой линии текущего сегмента
-                int extraPoints = pointsPerSegment[i];
-                for (int j = 1; j <= extraPoints; j++)
-                {
-                    double t = (double)j / (extraPoints + 1); // Коэффициент интерполяции
-
-                    double x = p1.X + (p2.X - p1.X) * t;
-                    double y = p1.Y + (p2.Y - p1.Y) * t;
-                    double z = p1.Z + (p2.Z - p1.Z) * t;
-
-                    resampled.Add(new Vector3(x, y, z));
-                }
-            }
-
-            return resampled;
-        }
-
-        private static List<Vector3> SynchronizeStart(List<Vector3> referenceContour, List<Vector3> targetContour)
-        {
-            // 1. Ищем лучший сдвиг для прямого направления
-            var (forwardSync, forwardDist) = FindBestAlignment(referenceContour, targetContour);
-
-            // 2. Ищем лучший сдвиг для обратного направления (если контур нарисован в другую сторону)
-            var reversedTarget = new List<Vector3>(targetContour);
-            reversedTarget.Reverse();
-            var (reversedSync, reversedDist) = FindBestAlignment(referenceContour, reversedTarget);
-
-            // Выбираем вариант с минимальной суммарной длиной соединений
-            if (reversedDist < forwardDist)
-            {
-                return reversedSync;
-            }
-
-            return forwardSync;
-        }
-
-        private static (List<Vector3> AlignedContour, double MinDistance) FindBestAlignment(List<Vector3> referenceContour, List<Vector3> targetContour)
-        {
-            double minTotalDistance = double.MaxValue;
-            int bestShift = 0;
-            int count = targetContour.Count;
-
-            // Перебираем ВСЕ возможные стартовые точки (индексы сдвига)
-            for (int shift = 0; shift < count; shift++)
-            {
-                double currentTotalDistance = 0;
-
-                for (int i = 0; i < count; i++)
-                {
-                    int targetIndex = (i + shift) % count;
-                    currentTotalDistance += Distance(referenceContour[i], targetContour[targetIndex]);
-
-                    // Оптимизация: если уже набежало больше, чем найденный минимум, дальше не считаем
-                    if (currentTotalDistance >= minTotalDistance)
-                    {
-                        break;
-                    }
-                }
-
-                // Если нашли более короткий каркас — запоминаем
-                if (currentTotalDistance < minTotalDistance)
-                {
-                    minTotalDistance = currentTotalDistance;
-                    bestShift = shift;
-                }
-            }
-
-            // Перестраиваем массив с найденным лучшим сдвигом
-            var synchronized = new List<Vector3>(count);
-            for (int i = 0; i < count; i++)
-            {
-                int index = (i + bestShift) % count;
-                synchronized.Add(targetContour[index]);
-            }
-
-            return (synchronized, minTotalDistance);
-        }
-
-        public class NestedCarcasProcessor
-        {
-            /// <summary>
-            /// Интерполирует границу внешнего каркаса на заданной координате X.
-            /// </summary>
-            public static List<Vector3> BoundaryAt(List<List<Vector3>> normalizedContours, List<double> xs, double targetX)
-            {
-                if (normalizedContours == null || normalizedContours.Count == 0)
-                    return new List<Vector3>();
-
-                // Находим ближайшие индексы для интерполяции
-                int i = Math.Clamp(xs.FindLastIndex(x => x <= targetX), 0, xs.Count - 2);
-                if (i < 0) i = 0; // Защита на случай, если targetX меньше самого первого сечения
-
-                double range = xs[i + 1] - xs[i];
-                double t = range > 0.0001 ? Math.Clamp((targetX - xs[i]) / range, 0, 1) : 0;
-
-                var contourA = normalizedContours[i];
-                var contourB = normalizedContours[i + 1];
-                var result = new List<Vector3>(contourA.Count);
-
-                for (int k = 0; k < contourA.Count; k++)
-                {
-                    var pA = contourA[k];
-                    var pB = contourB[k];
-
-                    // Ручная интерполяция вектора
-                    double x = pA.X + (pB.X - pA.X) * t;
-                    double y = pA.Y + (pB.Y - pA.Y) * t;
-                    double z = pA.Z + (pB.Z - pA.Z) * t;
-
-                    result.Add(new Vector3(x, y, z));
-                }
-
-                return result;
-            }
-
-            /// <summary>
-            /// Подрезает внутренний контур по границам внешнего (интерполированного) контура.
-            /// </summary>
-            public static List<Vector3> ClipInnerContour(List<Vector3> innerContour, List<Vector3> outerBoundary)
-            {
-                if (innerContour.Count < 3 || outerBoundary.Count < 3) return innerContour;
-
-                // 1. Динамически выбираем плоскость проекции (как в EarClipping)
-                double minX = outerBoundary.Min(p => p.X), maxX = outerBoundary.Max(p => p.X);
-                double minY = outerBoundary.Min(p => p.Y), maxY = outerBoundary.Max(p => p.Y);
-                double minZ = outerBoundary.Min(p => p.Z), maxZ = outerBoundary.Max(p => p.Z);
-
-                double dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
-
-                Func<Vector3, PointD> to2D;
-                Func<PointD, double, Vector3> to3D;
-
-                if (dx <= dy && dx <= dz) // Игнорируем X (плоскость YZ)
-                {
-                    to2D = p => new PointD(p.Y, p.Z);
-                    to3D = (pt, ignoredX) => new Vector3(ignoredX, pt.x, pt.y);
-                }
-                else if (dy <= dx && dy <= dz) // Игнорируем Y (плоскость XZ)
-                {
-                    to2D = p => new PointD(p.X, p.Z);
-                    to3D = (pt, ignoredY) => new Vector3(pt.x, ignoredY, pt.y);
-                }
-                else // Игнорируем Z (плоскость XY)
-                {
-                    to2D = p => new PointD(p.X, p.Y);
-                    to3D = (pt, ignoredZ) => new Vector3(pt.x, pt.y, ignoredZ);
-                }
-
-                // 2. Конвертируем в формат Clipper2
-                PathsD subject = new PathsD();
-                PathD subjPath = new PathD();
-                foreach (var p in innerContour) subjPath.Add(to2D(p));
-                subject.Add(subjPath);
-
-                PathsD clip = new PathsD();
-                PathD clipPath = new PathD();
-                foreach (var p in outerBoundary) clipPath.Add(to2D(p));
-                clip.Add(clipPath);
-
-                // 3. Выполняем пересечение
-                PathsD solution = Clipper.Intersect(subject, clip, Clipper2Lib.FillRule.NonZero);
-
-                if (solution.Count == 0)
-                    return innerContour; // Если пересечения нет (ошибка вложенности), возвращаем как есть
-
-                // Берем самый крупный полигон (на случай, если рудное тело разбилось на куски)
-                var largestPolygon = solution.OrderByDescending(p => Clipper.Area(p)).First();
-
-                // 4. Восстанавливаем в 3D
-                var result = new List<Vector3>();
-                double ignoredAxisValue = GetIgnoredAxisValue(innerContour, dx, dy, dz);
-
-                foreach (var pt in largestPolygon)
-                {
-                    result.Add(to3D(pt, ignoredAxisValue));
-                }
-
-                return result;
-            }
-
-            private static double GetIgnoredAxisValue(List<Vector3> contour, double dx, double dy, double dz)
-            {
-                if (dx <= dy && dx <= dz) return contour.Average(p => p.X);
-                if (dy <= dx && dy <= dz) return contour.Average(p => p.Y);
-                return contour.Average(p => p.Z);
-            }
-        }
-
-        private static double Distance(Vector3 a, Vector3 b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-            double dz = a.Z - b.Z;
-            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
         }
     }
 }

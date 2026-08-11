@@ -37,6 +37,9 @@ namespace GeoAppWpf.Controls
 
         private void AddItemsInDockPanel()
         {
+            if (DockPanelItems == null)
+                return;
+
             DockPanel.Items.Clear();
 
             foreach (var items in DockPanelItems)
