@@ -11,7 +11,7 @@ namespace GeoAppWpf.Operations
 {
     public static class CarcasLayerNameController
     {
-        public static int Counter = 29;
+        public static int Counter = 1;
 
         public static string GetNewName(string category)
         {
@@ -151,7 +151,7 @@ namespace GeoAppWpf.Operations
                 var extrapolator = new Extrapolator(selectedEntities, new MorphToFitStrategy(), _parentOuterCarcas)
                 {
                     Scale = 0.2,
-                    Distance = 5
+                    Distance = 25
                 };
 
                 extrapolateEntities = extrapolator.Extrapolate().ToList();
