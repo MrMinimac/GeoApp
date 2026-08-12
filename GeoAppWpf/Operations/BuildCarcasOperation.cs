@@ -4,7 +4,6 @@ using GeoAppWpf.Services;
 using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
-using System.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
@@ -12,7 +11,7 @@ namespace GeoAppWpf.Operations
 {
     public static class CarcasLayerNameController
     {
-        public static int Counter = 1;
+        public static int Counter = 29;
 
         public static string GetNewName(string category)
         {
@@ -152,7 +151,7 @@ namespace GeoAppWpf.Operations
                 var extrapolator = new Extrapolator(selectedEntities, new MorphToFitStrategy(), _parentOuterCarcas)
                 {
                     Scale = 0.2,
-                    Distance = 25
+                    Distance = 5
                 };
 
                 extrapolateEntities = extrapolator.Extrapolate().ToList();

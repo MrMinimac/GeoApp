@@ -977,17 +977,22 @@ namespace GeoAppWpf.Services
                 distExtrapolateFirst = dFirst / 2.0;
                 distExtrapolateLast = dLast / 2.0;
 
-                if (dFirst > 0.0001)
-                {
-                    firstDirection = c1 - c2;
-                    firstDirection.Normalize();
-                }
+                //if (dFirst > 0.0001)
+                //{
+                //    firstDirection = c1 - c2;
+                //    firstDirection.Normalize();
+                //}
 
-                if (dLast > 0.0001)
-                {
-                    lastDirection = cLast - cPreLast;
-                    lastDirection.Normalize();
-                }
+                //if (dLast > 0.0001)
+                //{
+                //    lastDirection = cLast - cPreLast;
+                //    lastDirection.Normalize();
+                //}
+            }
+            else if (sortedIntialsContours.Count == 1 && Distance <= 0)
+            {
+                distExtrapolateFirst = 2.5;
+                distExtrapolateLast = 2.5;
             }
 
             // 1. Перемещаем крайние копии наружу
