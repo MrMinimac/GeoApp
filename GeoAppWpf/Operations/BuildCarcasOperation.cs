@@ -46,8 +46,9 @@ namespace GeoAppWpf.Operations
 
         private bool _extrapolate;
         private bool _isInitialized;           // Флаг первичного выполнения
+        private double _distance;           // Флаг первичного выполнения
 
-        public BuildCarcasOperation(DxfDocument document, ViewportController viewport, bool extrapolate)
+        public BuildCarcasOperation(DxfDocument document, ViewportController viewport, bool extrapolate, double distance)
         {
             _document = document;
             _viewport = viewport;
@@ -56,6 +57,8 @@ namespace GeoAppWpf.Operations
             _selectedVisuals = _viewport.Visuals
                 .Where(x => x.IsSelected)
                 .ToList();
+
+            _distance = distance;
         }
 
         public void Execute()
@@ -151,7 +154,7 @@ namespace GeoAppWpf.Operations
                 var extrapolator = new Extrapolator(selectedEntities, new MorphToFitStrategy(), _parentOuterCarcas)
                 {
                     Scale = 0.2,
-                    Distance = 25
+                    Distance = _distance
                 };
 
                 extrapolateEntities = extrapolator.Extrapolate().ToList();
@@ -161,7 +164,7 @@ namespace GeoAppWpf.Operations
             if (allContours.Count < 2) return;
 
             // 3. Строим каркас
-            var category = allContours.Count <= 3 ? "C2" : "С1";
+            var category = allContours.Count <= 3 ? "C2" : "C1";
             var layer = new Layer(CarcasLayerNameController.GetNewName(category));
             _createdCarcas = new Carcas3D(allContours, layer).Build();
 
@@ -232,10 +235,13 @@ namespace GeoAppWpf.Operations
         private readonly List<DrawerObject> _createdVisuals = new();
         private readonly List<DrawerObject> _selectedVisuals;
 
-        public ExtrapolateOperation(DxfDocument document, ViewportController viewport)
+        private double _distance;
+
+        public ExtrapolateOperation(DxfDocument document, ViewportController viewport, double distance)
         {
             _document = document;
             _viewport = viewport;
+            _distance = distance;
 
             var selectedVisuals = _viewport.Visuals
                 .Where(x => x.IsSelected);
@@ -289,7 +295,7 @@ namespace GeoAppWpf.Operations
             var extrapolator = new Extrapolator(selectedEntities, new MorphToFitStrategy())
             {
                 Scale = 0.2,
-                Distance = 25,
+                Distance = _distance,
             };
 
             var extrapolateEntities = extrapolator.Extrapolate().ToList();

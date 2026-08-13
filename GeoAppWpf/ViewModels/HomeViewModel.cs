@@ -11,6 +11,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -269,6 +270,8 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
+        double _lastDistance = 0;
+
         private void BuildCarcas(bool extrapolate)
         {
             var dxfDoc = Documents
@@ -282,7 +285,21 @@ namespace GeoAppWpf.ViewModels
                 return;
             }
 
-            var operation = new BuildCarcasOperation(dxfDoc, ViewportController, extrapolate);
+            string input = "";
+            double distance = _lastDistance;
+
+            if (extrapolate)
+            {
+                input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
+                input = input.Replace(".", ",");
+                if (double.TryParse(input, out double result))
+                {
+                    distance = result;
+                    _lastDistance = result;
+                }
+            }
+
+            var operation = new BuildCarcasOperation(dxfDoc, ViewportController, extrapolate, distance);
 
             try
             {
@@ -293,6 +310,7 @@ namespace GeoAppWpf.ViewModels
                 _messageBox.ShowError(e.Message);
             }
         }
+
 
         private void Extrapolate()
         {
@@ -307,15 +325,21 @@ namespace GeoAppWpf.ViewModels
                 return;
             }
 
-            var operation = new ExtrapolateOperation(dxfDoc, ViewportController);
+            var input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
+            input = input.Replace(".", ",");
 
-            try
+            if (input != null && double.TryParse(input, out double result))
             {
-                _undoManager.Execute(operation);
-            }
-            catch (Exception e)
-            {
-                _messageBox.ShowError(e.Message);
+                var operation = new ExtrapolateOperation(dxfDoc, ViewportController, result);
+
+                try
+                {
+                    _undoManager.Execute(operation);
+                }
+                catch (Exception e)
+                {
+                    _messageBox.ShowError(e.Message);
+                }
             }
         }
 
