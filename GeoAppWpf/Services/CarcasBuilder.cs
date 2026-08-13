@@ -2,7 +2,6 @@
 using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
-using System.Windows;
 
 namespace GeoAppWpf.Services
 {
@@ -264,36 +263,84 @@ namespace GeoAppWpf.Services
             _xPositions = ExtractXPositions(_meshTriangles);
         }
 
-        public Carcas3D(
-            IEnumerable<Polyline3D> initialContours,
-            IEnumerable<Face3D> faces,
-            IEnumerable<double> xPositions,
-            IEnumerable<List<Vector3>> normolizedContours)
-        {
-            if (faces == null)
-                throw new ArgumentNullException(nameof(faces));
-
-            _meshTriangles = faces.ToList();
-
-            if (_meshTriangles.Count == 0)
-                throw new ArgumentException(
-                    "Каркас не содержит ни одной грани.",
-                    nameof(faces));
-
-            Layer = _meshTriangles[0].Layer;
-
-            // Для готового каркаса исходных контуров может не быть.
-            InitialContours = initialContours.ToList();
-            _normalizedContours = normolizedContours.ToList();
-
-            _xPositions = xPositions.ToList();
-
-            _isBuilt = true;
-        }
-
         public Carcas3D Build()
         {
-            return CarcasBuilder.Build(InitialContours, TargetPointsCount, Layer);
+            var allContours = new List<List<Vector3>>();
+
+            foreach (var l in InitialContours)
+                allContours.Add(l.Vertexes.ToList());
+
+            if (allContours.Count < 2)
+                throw new InvalidOperationException(
+                    "Для построения каркаса необходимо минимум два контура.");
+
+            int badContourIndex = allContours.FindIndex(c => c.Count < 3);
+
+            if (badContourIndex >= 0)
+                throw new InvalidOperationException(
+                    $"Контур №{badContourIndex + 1} из {allContours.Count} содержит меньше 3 вершин " +
+                    "(похоже, не удалось вписать экстраполированный контур во внешний каркас) " +
+                    "— построение каркаса невозможно.");
+
+            allContours = allContours.OrderBy(contour => contour.Average(v => v.X)).ToList();
+
+            List<List<Vector3>> normalizedContours = new List<List<Vector3>>();
+
+            int targetPointsCount = Math.Max(TargetPointsCount, allContours.Max(c => c.Count));
+
+            // 2. Ресемплинг
+            foreach (var contour in allContours)
+            {
+                normalizedContours.Add(ResampleContour(contour, targetPointsCount));
+            }
+
+            // 3. Синхронизация
+            for (int i = 1; i < normalizedContours.Count; i++)
+            {
+                normalizedContours[i] = SynchronizeStart(normalizedContours[i - 1], normalizedContours[i]);
+            }
+
+            List<Face3D> meshTriangles = new List<Face3D>();
+
+            // 4. Построение боковых граней (между контурами)
+            for (int i = 0; i < normalizedContours.Count - 1; i++)
+            {
+                var contourA = normalizedContours[i];
+                var contourB = normalizedContours[i + 1];
+
+                for (int j = 0; j < targetPointsCount; j++)
+                {
+                    int nextJ = (j + 1) % targetPointsCount;
+
+                    var face1 = new Face3D(contourA[j], contourB[j], contourA[nextJ]);
+                    face1.Layer = Layer;
+
+                    var face2 = new Face3D(contourB[j], contourB[nextJ], contourA[nextJ]);
+                    face2.Layer = Layer;
+
+                    meshTriangles.Add(face1);
+                    meshTriangles.Add(face2);
+                }
+            }
+
+            // 5. ТРИАНГУЛЯЦИЯ ТОРЦОВ
+            var startCap = TriangulateContourEarClipping(normalizedContours.First());
+            var endCap = TriangulateContourEarClipping(normalizedContours.Last());
+
+            meshTriangles.AddRange(startCap);
+            meshTriangles.AddRange(endCap);
+
+            // НОВОЕ: Собираем X-координаты центров для удобной интерполяции
+            List<double> xPositions = normalizedContours.Select(c => c.Average(v => v.X)).ToList();
+
+
+            _meshTriangles = meshTriangles;
+            _normalizedContours = normalizedContours;
+            _xPositions = xPositions;
+
+            _isBuilt = true;
+
+            return this;
         }
 
         public void AddChild(Carcas3D child)
@@ -360,671 +407,85 @@ namespace GeoAppWpf.Services
             return ConnectSegments(segments);
         }
 
-        private static (Vector3 A, Vector3 B)? IntersectTriangleWithXPlane(Face3D triangle, double x)
+        private static List<Vector3> ResampleContour(List<Vector3> original, int targetCount)
         {
-            var vertices = new[]
+            if (original.Count == 0) return new List<Vector3>();
+
+            // Если в исходном контуре точек уже больше или равно нужному количеству,
+            // просто возвращаем нужное количество (обрезаем лишнее)
+            if (original.Count >= targetCount)
             {
-                triangle.FirstVertex,
-                triangle.SecondVertex,
-                triangle.ThirdVertex
-            };
-
-            var points = new List<Vector3>();
-
-            // Проверяем каждое ребро треугольника
-            for (int i = 0; i < 3; i++)
-            {
-                var p1 = vertices[i];
-                var p2 = vertices[(i + 1) % 3];
-
-                // если ребро пересекает плоскость X
-                if ((p1.X <= x && p2.X >= x) ||
-                    (p2.X <= x && p1.X >= x))
-                {
-                    double dx = p2.X - p1.X;
-
-                    if (Math.Abs(dx) < 1e-9)
-                        continue;
-
-                    double t = (x - p1.X) / dx;
-
-                    // точка на ребре
-                    var point = new Vector3(
-                        p1.X + (p2.X - p1.X) * t,
-                        p1.Y + (p2.Y - p1.Y) * t,
-                        p1.Z + (p2.Z - p1.Z) * t
-                    );
-
-                    points.Add(point);
-                }
+                return original.Take(targetCount).ToList();
             }
 
+            // 1. Вычисляем длины всех сегментов и общую длину
+            double totalLength = 0;
+            List<double> segmentLengths = new List<double>();
 
-            // треугольник может дать только отрезок
-            if (points.Count == 2)
+            for (int i = 0; i < original.Count; i++)
             {
-                return (points[0], points[1]);
+                int next = (i + 1) % original.Count;
+                double dist = Vector3.Distance(original[i], original[next]);
+                segmentLengths.Add(dist);
+                totalLength += dist;
             }
 
-            return null;
-        }
+            // 2. Рассчитываем, сколько дополнительных точек нужно добавить на каждый сегмент
+            int pointsToAdd = targetCount - original.Count; // Сколько точек не хватает до сотни
+            int[] pointsPerSegment = new int[original.Count];
+            double[] remainders = new double[original.Count];
 
-        private static List<Vector3> ConnectSegments(List<(Vector3 A, Vector3 B)> segments)
-        {
-            var result = new List<Vector3>();
-
-            if (segments.Count == 0)
-                return result;
-
-
-            var first = segments[0];
-
-            result.Add(first.A);
-            result.Add(first.B);
-
-
-            segments.RemoveAt(0);
-
-
-            while (segments.Count > 0)
+            for (int i = 0; i < original.Count; i++)
             {
-                var last = result.Last();
-
-                int index = segments.FindIndex(s =>
-                    Vector3.Distance(last, s.A) < 0.001 ||
-                    Vector3.Distance(last, s.B) < 0.001);
-
-
-                if (index < 0)
-                    break;
-
-
-                var next = segments[index];
-
-                segments.RemoveAt(index);
-
-
-                if (Vector3.Distance(last, next.A) < 0.001)
-                {
-                    result.Add(next.B);
-                }
-                else
-                {
-                    result.Add(next.A);
-                }
+                // Пропорционально распределяем точки в зависимости от длины сегмента
+                double exactPoints = (segmentLengths[i] / totalLength) * pointsToAdd;
+                pointsPerSegment[i] = (int)Math.Floor(exactPoints);
+                remainders[i] = exactPoints - pointsPerSegment[i];
             }
 
+            // Распределяем "остатки", если из-за округления мы недобрали точек до targetCount
+            int currentAdded = pointsPerSegment.Sum();
+            int neededPoints = pointsToAdd - currentAdded;
 
-            // замыкаем контур
-            if (result.Count > 2 &&
-                Vector3.Distance(result[0], result[^1]) > 0.001)
-            {
-                result.Add(result[0]);
-            }
-
-
-            return result;
-        }
-
-        private static List<double> ExtractXPositions(List<Face3D> faces)
-        {
-            var xs = faces
-                .SelectMany(f => new[]
-                {
-                    f.FirstVertex.X,
-                    f.SecondVertex.X,
-                    f.ThirdVertex.X
-                })
-                .OrderBy(x => x)
+            var sortedIndices = remainders
+                .Select((val, idx) => new { Value = val, Index = idx })
+                .OrderByDescending(x => x.Value)
                 .ToList();
 
-            if (xs.Count == 0)
-                return new List<double>();
-
-            const double tolerance = 0.001;
-
-            var result = new List<double>();
-            double currentSum = xs[0];
-            int currentCount = 1;
-
-            for (int i = 1; i < xs.Count; i++)
+            for (int i = 0; i < neededPoints; i++)
             {
-                if (Math.Abs(xs[i] - xs[i - 1]) <= tolerance)
-                {
-                    currentSum += xs[i];
-                    currentCount++;
-                }
-                else
-                {
-                    result.Add(currentSum / currentCount);
+                pointsPerSegment[sortedIndices[i].Index]++;
+            }
 
-                    currentSum = xs[i];
-                    currentCount = 1;
+            // 3. Строим новый контур, включая ИСХОДНЫЕ углы и ДОБАВЛЕННЫЕ точки
+            List<Vector3> resampled = new List<Vector3>();
+
+            for (int i = 0; i < original.Count; i++)
+            {
+                Vector3 p1 = original[i];
+                Vector3 p2 = original[(i + 1) % original.Count];
+
+                // ГАРАНТИРОВАННО добавляем оригинальный угол контура
+                resampled.Add(p1);
+
+                // Добавляем промежуточные точки на прямой линии текущего сегмента
+                int extraPoints = pointsPerSegment[i];
+                for (int j = 1; j <= extraPoints; j++)
+                {
+                    double t = (double)j / (extraPoints + 1); // Коэффициент интерполяции
+
+                    double x = p1.X + (p2.X - p1.X) * t;
+                    double y = p1.Y + (p2.Y - p1.Y) * t;
+                    double z = p1.Z + (p2.Z - p1.Z) * t;
+
+                    resampled.Add(new Vector3(x, y, z));
                 }
             }
 
-            result.Add(currentSum / currentCount);
-
-            return result;
-        }
-    }
-
-    public class CarcasBuilder
-    {
-        private class ContourEdge
-        {
-            public int StartIndex { get; set; }
-            public int EndIndex { get; set; }
-
-            public Vector3 Start { get; set; }
-            public Vector3 End { get; set; }
-
-            public double StartT { get; set; }
-            public double EndT { get; set; }
-
-            public double Length { get; set; }
+            return resampled;
         }
 
-        public static Carcas3D Build(IEnumerable<Polyline3D> initialContours, int tagerPointsCount, Layer layer)
-        {
-            var sourceContours = initialContours.ToList();
-
-            if (sourceContours.Count < 2)
-                throw new InvalidOperationException(
-                    "Для построения каркаса необходимо минимум два контура.");
-
-            var allContours = sourceContours
-                .Select(l => l.Vertexes.ToList())
-                .ToList();
-
-            int badContourIndex =
-                allContours.FindIndex(c => c.Count < 3);
-
-            if (badContourIndex >= 0)
-            {
-                throw new InvalidOperationException(
-                    $"Контур №{badContourIndex + 1} из {allContours.Count} содержит меньше 3 вершин " +
-                    "— построение каркаса невозможно.");
-            }
-
-            // Контуры идут вдоль X
-            allContours = allContours
-                .OrderBy(contour => contour.Average(v => v.X))
-                .ToList();
-
-            var normalizedSourceContours =
-                new List<List<Vector3>>();
-
-            for (int i = 0; i < allContours.Count; i++)
-            {
-                var normalized =
-                    NormalizeContourTopology(
-                        allContours[i],
-                        i);
-
-                normalizedSourceContours.Add(normalized);
-            }
-
-
-            int targetPointsCount = Math.Max(
-                tagerPointsCount,
-                3);
-
-            var normalizedContours =
-                ResampleContoursByPerimeter(
-                    normalizedSourceContours,
-                    targetPointsCount);
-
-
-            var meshTriangles =
-                new List<Face3D>();
-
-            for (int i = 0;
-                 i < normalizedContours.Count - 1;
-                 i++)
-            {
-                var contourA =
-                    normalizedContours[i];
-
-                var contourB =
-                    normalizedContours[i + 1];
-
-                for (int j = 0;
-                     j < targetPointsCount;
-                     j++)
-                {
-                    int nextJ =
-                        (j + 1) % targetPointsCount;
-
-                    var face1 =
-                        new Face3D(
-                            contourA[j],
-                            contourB[j],
-                            contourA[nextJ]);
-
-                    face1.Layer = layer;
-
-                    var face2 =
-                        new Face3D(
-                            contourB[j],
-                            contourB[nextJ],
-                            contourA[nextJ]);
-
-                    face2.Layer = layer;
-
-                    meshTriangles.Add(face1);
-                    meshTriangles.Add(face2);
-                }
-            }
-
-
-            var startCap =
-                TriangulateContourEarClipping(
-                    normalizedContours.First(),
-                    layer);
-
-            var endCap =
-                TriangulateContourEarClipping(
-                    normalizedContours.Last(),
-                    layer);
-
-            meshTriangles.AddRange(startCap);
-            meshTriangles.AddRange(endCap);
-
-
-            var xPositions =
-                normalizedContours
-                    .Select(c => c.Average(v => v.X))
-                    .ToList();
-
-
-            return new Carcas3D(
-                sourceContours,
-                meshTriangles,
-                xPositions,
-                normalizedContours);
-        }
-
-        private static List<List<Vector3>> ResampleContoursByPerimeter(List<List<Vector3>> contours, int targetPointsCount)
-        {
-            var result =
-                new List<List<Vector3>>();
-
-            if (contours == null || contours.Count == 0)
-                return result;
-
-            if (targetPointsCount < 3)
-                throw new ArgumentException(
-                    "Количество точек должно быть не меньше 3.",
-                    nameof(targetPointsCount));
-
-
-            foreach (var contour in contours)
-            {
-                if (contour == null || contour.Count < 3)
-                {
-                    throw new InvalidOperationException(
-                        "Контур содержит менее 3 точек.");
-                }
-
-
-                var edgeLengths =
-                    new double[contour.Count];
-
-                double totalLength = 0.0;
-
-                for (int i = 0;
-                     i < contour.Count;
-                     i++)
-                {
-                    int next =
-                        (i + 1) % contour.Count;
-
-                    double length =
-                        Vector3.Distance(
-                            contour[i],
-                            contour[next]);
-
-                    edgeLengths[i] = length;
-
-                    totalLength += length;
-                }
-
-
-                if (totalLength < 1e-12)
-                {
-                    throw new InvalidOperationException(
-                        "Контур имеет нулевую длину.");
-                }
-
-                var cumulative =
-                    new double[contour.Count + 1];
-
-                cumulative[0] = 0.0;
-
-                for (int i = 0;
-                     i < contour.Count;
-                     i++)
-                {
-                    cumulative[i + 1] =
-                        cumulative[i] +
-                        edgeLengths[i];
-                }
-
-
-                var resampled =
-                    new List<Vector3>(
-                        targetPointsCount);
-
-
-                for (int pointIndex = 0;
-                     pointIndex < targetPointsCount;
-                     pointIndex++)
-                {
-                    // [0 .. totalLength)
-                    double distance =
-                        totalLength *
-                        pointIndex /
-                        targetPointsCount;
-
-
-                    int edgeIndex = 0;
-
-                    while (edgeIndex < contour.Count - 1 &&
-                           cumulative[edgeIndex + 1] <= distance)
-                    {
-                        edgeIndex++;
-                    }
-
-
-                    double edgeStart =
-                        cumulative[edgeIndex];
-
-                    double edgeLength =
-                        edgeLengths[edgeIndex];
-
-
-                    double t;
-
-                    if (edgeLength < 1e-12)
-                    {
-                        t = 0.0;
-                    }
-                    else
-                    {
-                        t =
-                            (distance - edgeStart) /
-                            edgeLength;
-                    }
-
-
-                    int startIndex =
-                        edgeIndex;
-
-                    int endIndex =
-                        (edgeIndex + 1) %
-                        contour.Count;
-
-
-                    Vector3 start =
-                        contour[startIndex];
-
-                    Vector3 end =
-                        contour[endIndex];
-
-
-                    var point =
-                        new Vector3(
-                            start.X +
-                            (end.X - start.X) * t,
-
-                            start.Y +
-                            (end.Y - start.Y) * t,
-
-                            start.Z +
-                            (end.Z - start.Z) * t);
-
-
-                    resampled.Add(point);
-                }
-
-
-                result.Add(resampled);
-            }
-
-            return result;
-        }
-
-        private static List<Vector3> NormalizeContourTopology(List<Vector3> original, int contourIndex)
-        {
-            if (original == null || original.Count < 3)
-            {
-                throw new InvalidOperationException(
-                    $"Контур №{contourIndex + 1} содержит недостаточно точек.");
-            }
-
-            var contour = new List<Vector3>(original);
-
-            // Убираем повтор последней точки, если полилиния замкнута
-            // явным дублированием первой точки.
-            if (Vector3.Distance(
-                    contour.First(),
-                    contour.Last()) < 1e-9)
-            {
-                contour.RemoveAt(contour.Count - 1);
-            }
-
-            if (contour.Count < 3)
-            {
-                throw new InvalidOperationException(
-                    $"После удаления дублирующей точки контур №{contourIndex + 1} " +
-                    $"содержит менее 3 вершин.");
-            }
-
-            // ---------------------------------------------------------
-            // Определяем плоскость контура.
-            // Для обычного каркаса по X это будет YZ.
-            // ---------------------------------------------------------
-
-            var projection = GetContourProjection(contour);
-
-            // ---------------------------------------------------------
-            // Делаем одинаковое направление обхода.
-            // Используем обычную signed area.
-            // ---------------------------------------------------------
-
-            double area = 0.0;
-
-            for (int i = 0; i < contour.Count; i++)
-            {
-                var a = contour[i];
-                var b = contour[(i + 1) % contour.Count];
-
-                area +=
-                    projection.U(b) * projection.V(a) -
-                    projection.U(a) * projection.V(b);
-            }
-
-            // CCW
-            if (area < 0)
-            {
-                contour.Reverse();
-            }
-
-            // После Reverse индексы углов изменились,
-            // поэтому ищем их заново.
-            var corners = FindCornerIndices(contour);
-
-            if (corners.Count < 3)
-            {
-                throw new InvalidOperationException(
-                    $"Контур №{contourIndex + 1}: не удалось определить минимум 3 угла.");
-            }
-
-            // ---------------------------------------------------------
-            // Находим стабильный стартовый угол:
-            // сначала самая низкая точка (V),
-            // затем левая (U).
-            //
-            // Для секции YZ это:
-            // сначала минимальный Z,
-            // при равенстве — минимальный Y.
-            // ---------------------------------------------------------
-
-            int anchorIndex = corners
-                .OrderBy(i => projection.V(contour[i]))
-                .ThenBy(i => projection.U(contour[i]))
-                .First();
-
-            // ---------------------------------------------------------
-            // Поворачиваем список так, чтобы anchor оказался в [0].
-            // ---------------------------------------------------------
-
-            var normalized = new List<Vector3>(contour.Count);
-
-            for (int i = 0; i < contour.Count; i++)
-            {
-                normalized.Add(
-                    contour[(anchorIndex + i) % contour.Count]);
-            }
-
-            // ---------------------------------------------------------
-            // ВАЖНО:
-            // После поворота первый элемент должен быть реальным углом.
-            // ---------------------------------------------------------
-
-            var normalizedCorners = FindCornerIndices(normalized);
-
-            if (!normalizedCorners.Contains(0))
-            {
-                throw new InvalidOperationException(
-                    $"Контур №{contourIndex + 1}: внутренняя ошибка нормализации — " +
-                    $"начальная точка не является углом.");
-            }
-
-            return normalized;
-        }
-
-        private static List<int> FindCornerIndices(List<Vector3> contour, double cornerAngleThresholdDegrees = 2.0)
-        {
-            var corners = new List<int>();
-
-            if (contour.Count < 3)
-                return corners;
-
-            var projection = GetContourProjection(contour);
-
-            double thresholdRad =
-                cornerAngleThresholdDegrees * Math.PI / 180.0;
-
-            // Средняя длина ребра нужна для относительного
-            // исключения практически совпадающих точек.
-            double avgEdgeLength = 0.0;
-
-            for (int i = 0; i < contour.Count; i++)
-            {
-                avgEdgeLength += Vector3.Distance(
-                    contour[i],
-                    contour[(i + 1) % contour.Count]);
-            }
-
-            avgEdgeLength /= contour.Count;
-
-            double minEdgeLength =
-                Math.Max(avgEdgeLength * 1e-6, 1e-9);
-
-            for (int i = 0; i < contour.Count; i++)
-            {
-                int prevIndex =
-                    (i - 1 + contour.Count) % contour.Count;
-
-                int nextIndex =
-                    (i + 1) % contour.Count;
-
-                Vector3 prev = contour[prevIndex];
-                Vector3 curr = contour[i];
-                Vector3 next = contour[nextIndex];
-
-                double aU = projection.U(prev) - projection.U(curr);
-                double aV = projection.V(prev) - projection.V(curr);
-
-                double bU = projection.U(next) - projection.U(curr);
-                double bV = projection.V(next) - projection.V(curr);
-
-                double lenA =
-                    Math.Sqrt(aU * aU + aV * aV);
-
-                double lenB =
-                    Math.Sqrt(bU * bU + bV * bV);
-
-                // Практически совпадающая вершина.
-                if (lenA < minEdgeLength || lenB < minEdgeLength)
-                    continue;
-
-                double dot =
-                    aU * bU +
-                    aV * bV;
-
-                double cos =
-                    dot / (lenA * lenB);
-
-                cos = Math.Max(-1.0, Math.Min(1.0, cos));
-
-                double angle =
-                    Math.Acos(cos);
-
-                // Для прямой линии угол = 180 градусов.
-                //
-                // Поэтому:
-                // deviation = 0   -> прямая
-                // deviation = 90  -> угол 90°
-                double deviation =
-                    Math.Abs(Math.PI - angle);
-
-                if (deviation >= thresholdRad)
-                {
-                    corners.Add(i);
-                }
-            }
-
-            return corners;
-        }
-
-        private static (Func<Vector3, double> U, Func<Vector3, double> V) GetContourProjection(List<Vector3> contour)
-        {
-            double minX = contour.Min(p => p.X);
-            double maxX = contour.Max(p => p.X);
-
-            double minY = contour.Min(p => p.Y);
-            double maxY = contour.Max(p => p.Y);
-
-            double minZ = contour.Min(p => p.Z);
-            double maxZ = contour.Max(p => p.Z);
-
-            double dx = maxX - minX;
-            double dy = maxY - minY;
-            double dz = maxZ - minZ;
-
-            if (dx <= dy && dx <= dz)
-            {
-                return (
-                    p => p.Y,
-                    p => p.Z);
-            }
-
-            if (dy <= dx && dy <= dz)
-            {
-                return (
-                    p => p.X,
-                    p => p.Z);
-            }
-
-            return (
-                p => p.X,
-                p => p.Y);
-        }
-
-        private static List<Face3D> TriangulateContourEarClipping(List<Vector3> contour, Layer layer)
+        private List<Face3D> TriangulateContourEarClipping(List<Vector3> contour)
         {
             List<Face3D> faces = new List<Face3D>();
             if (contour.Count < 3) return faces;
@@ -1239,7 +700,7 @@ namespace GeoAppWpf.Services
                 int nextIdx = V[(bestI + 1) % count];
 
                 var face = new Face3D(contour[prevIdx], contour[currIdx], contour[nextIdx]);
-                face.Layer = layer;
+                face.Layer = Layer;
 
                 faces.Add(face);
                 V.RemoveAt(bestI);
@@ -1247,6 +708,215 @@ namespace GeoAppWpf.Services
             }
 
             return faces;
+        }
+
+        private static List<Vector3> SynchronizeStart(List<Vector3> referenceContour, List<Vector3> targetContour)
+        {
+            // 1. Ищем лучший сдвиг для прямого направления
+            var (forwardSync, forwardDist) = FindBestAlignment(referenceContour, targetContour);
+
+            // 2. Ищем лучший сдвиг для обратного направления (если контур нарисован в другую сторону)
+            var reversedTarget = new List<Vector3>(targetContour);
+            reversedTarget.Reverse();
+            var (reversedSync, reversedDist) = FindBestAlignment(referenceContour, reversedTarget);
+
+            // Выбираем вариант с минимальной суммарной длиной соединений
+            if (reversedDist < forwardDist)
+            {
+                return reversedSync;
+            }
+
+            return forwardSync;
+        }
+
+        private static (List<Vector3> AlignedContour, double MinDistance) FindBestAlignment(List<Vector3> referenceContour, List<Vector3> targetContour)
+        {
+            double minTotalDistance = double.MaxValue;
+            int bestShift = 0;
+            int count = targetContour.Count;
+
+            // Перебираем ВСЕ возможные стартовые точки (индексы сдвига)
+            for (int shift = 0; shift < count; shift++)
+            {
+                double currentTotalDistance = 0;
+
+                for (int i = 0; i < count; i++)
+                {
+                    int targetIndex = (i + shift) % count;
+                    currentTotalDistance += Vector3.Distance(referenceContour[i], targetContour[targetIndex]);
+
+                    // Оптимизация: если уже набежало больше, чем найденный минимум, дальше не считаем
+                    if (currentTotalDistance >= minTotalDistance)
+                    {
+                        break;
+                    }
+                }
+
+                // Если нашли более короткий каркас — запоминаем
+                if (currentTotalDistance < minTotalDistance)
+                {
+                    minTotalDistance = currentTotalDistance;
+                    bestShift = shift;
+                }
+            }
+
+            // Перестраиваем массив с найденным лучшим сдвигом
+            var synchronized = new List<Vector3>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int index = (i + bestShift) % count;
+                synchronized.Add(targetContour[index]);
+            }
+
+            return (synchronized, minTotalDistance);
+        }
+
+        private static (Vector3 A, Vector3 B)? IntersectTriangleWithXPlane(Face3D triangle, double x)
+        {
+            var vertices = new[]
+            {
+                triangle.FirstVertex,
+                triangle.SecondVertex,
+                triangle.ThirdVertex
+            };
+
+            var points = new List<Vector3>();
+
+            // Проверяем каждое ребро треугольника
+            for (int i = 0; i < 3; i++)
+            {
+                var p1 = vertices[i];
+                var p2 = vertices[(i + 1) % 3];
+
+                // если ребро пересекает плоскость X
+                if ((p1.X <= x && p2.X >= x) ||
+                    (p2.X <= x && p1.X >= x))
+                {
+                    double dx = p2.X - p1.X;
+
+                    if (Math.Abs(dx) < 1e-9)
+                        continue;
+
+                    double t = (x - p1.X) / dx;
+
+                    // точка на ребре
+                    var point = new Vector3(
+                        p1.X + (p2.X - p1.X) * t,
+                        p1.Y + (p2.Y - p1.Y) * t,
+                        p1.Z + (p2.Z - p1.Z) * t
+                    );
+
+                    points.Add(point);
+                }
+            }
+
+
+            // треугольник может дать только отрезок
+            if (points.Count == 2)
+            {
+                return (points[0], points[1]);
+            }
+
+            return null;
+        }
+
+        private static List<Vector3> ConnectSegments(List<(Vector3 A, Vector3 B)> segments)
+        {
+            var result = new List<Vector3>();
+
+            if (segments.Count == 0)
+                return result;
+
+
+            var first = segments[0];
+
+            result.Add(first.A);
+            result.Add(first.B);
+
+
+            segments.RemoveAt(0);
+
+
+            while (segments.Count > 0)
+            {
+                var last = result.Last();
+
+                int index = segments.FindIndex(s =>
+                    Vector3.Distance(last, s.A) < 0.001 ||
+                    Vector3.Distance(last, s.B) < 0.001);
+
+
+                if (index < 0)
+                    break;
+
+
+                var next = segments[index];
+
+                segments.RemoveAt(index);
+
+
+                if (Vector3.Distance(last, next.A) < 0.001)
+                {
+                    result.Add(next.B);
+                }
+                else
+                {
+                    result.Add(next.A);
+                }
+            }
+
+
+            // замыкаем контур
+            if (result.Count > 2 &&
+                Vector3.Distance(result[0], result[^1]) > 0.001)
+            {
+                result.Add(result[0]);
+            }
+
+
+            return result;
+        }
+
+        private static List<double> ExtractXPositions(List<Face3D> faces)
+        {
+            var xs = faces
+                .SelectMany(f => new[]
+                {
+                    f.FirstVertex.X,
+                    f.SecondVertex.X,
+                    f.ThirdVertex.X
+                })
+                .OrderBy(x => x)
+                .ToList();
+
+            if (xs.Count == 0)
+                return new List<double>();
+
+            const double tolerance = 0.001;
+
+            var result = new List<double>();
+            double currentSum = xs[0];
+            int currentCount = 1;
+
+            for (int i = 1; i < xs.Count; i++)
+            {
+                if (Math.Abs(xs[i] - xs[i - 1]) <= tolerance)
+                {
+                    currentSum += xs[i];
+                    currentCount++;
+                }
+                else
+                {
+                    result.Add(currentSum / currentCount);
+
+                    currentSum = xs[i];
+                    currentCount = 1;
+                }
+            }
+
+            result.Add(currentSum / currentCount);
+
+            return result;
         }
     }
 
