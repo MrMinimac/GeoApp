@@ -933,7 +933,8 @@ namespace GeoAppWpf.Services
         public Polyline3D? LastExtrapolatedCountour => _lastExtrapolatedCountour;
         public double Scale { get; set; } = 0.2;
         public double Distance { get; set; } = 0; // <= 0 = Auto, > 0 = Static
-
+        public bool UseStrictXAxis { get; set; } = true;
+        public Layer Layer = new Layer("Extrapolated");
 
         public Extrapolator(IEnumerable<Polyline3D> polylines, IContourFittingStrategy fittingStrategy)
         {
@@ -958,13 +959,15 @@ namespace GeoAppWpf.Services
             var firstContourClone = (Polyline3D)sortedIntialsContours.First().Clone();
             var lastContourClone = (Polyline3D)sortedIntialsContours.Last().Clone();
 
-            double distExtrapolateFirst = Distance;
-            double distExtrapolateLast = Distance;
+            // Значения по умолчанию для 1 контура или переданного Distance
+            double distExtrapolateFirst = Distance > 0 ? Distance : 2.5;
+            double distExtrapolateLast = Distance > 0 ? Distance : 2.5;
 
             Vector3 firstDirection = new Vector3(-1, 0, 0);
             Vector3 lastDirection = new Vector3(1, 0, 0);
 
-            if (sortedIntialsContours.Count >= 2 && Distance <= 0)
+            // Расчет НАПРАВЛЕНИЯ выполняем всегда, когда контуров 2 и более
+            if (sortedIntialsContours.Count >= 2)
             {
                 var c1 = centers[sortedIntialsContours[0]];
                 var c2 = centers[sortedIntialsContours[1]];
@@ -974,19 +977,42 @@ namespace GeoAppWpf.Services
                 double dFirst = Vector3.Distance(c1, c2);
                 double dLast = Vector3.Distance(cLast, cPreLast);
 
-                distExtrapolateFirst = dFirst / 2.0;
-                distExtrapolateLast = dLast / 2.0;
+                // Дистанцию считаем автоматически ТОЛЬКО если Distance <= 0
+                if (Distance <= 0)
+                {
+                    distExtrapolateFirst = dFirst / 2.0;
+                    distExtrapolateLast = dLast / 2.0;
+                }
 
+                // --- Расчет направлений (работает ВСЕГДА независимо от Distance) ---
                 if (dFirst > 0.0001)
                 {
-                    firstDirection = c1 - c2;
-                    firstDirection.Normalize();
+                    if (UseStrictXAxis)
+                    {
+                        float signX = Math.Sign(c1.X - c2.X);
+                        if (signX == 0) signX = -1; // Защита
+                        firstDirection = new Vector3(signX, 0, 0);
+                    }
+                    else
+                    {
+                        firstDirection = c1 - c2;
+                        firstDirection.Normalize();
+                    }
                 }
 
                 if (dLast > 0.0001)
                 {
-                    lastDirection = cLast - cPreLast;
-                    lastDirection.Normalize();
+                    if (UseStrictXAxis)
+                    {
+                        float signX = Math.Sign(cLast.X - cPreLast.X);
+                        if (signX == 0) signX = 1; // Защита
+                        lastDirection = new Vector3(signX, 0, 0);
+                    }
+                    else
+                    {
+                        lastDirection = cLast - cPreLast;
+                        lastDirection.Normalize();
+                    }
                 }
             }
 
@@ -1001,6 +1027,9 @@ namespace GeoAppWpf.Services
             // 3. Подгонка под внешний каркас
             FitInsideOuterCarcas(firstContourClone, sortedIntialsContours.First());
             FitInsideOuterCarcas(lastContourClone, sortedIntialsContours.Last());
+
+            firstContourClone.Layer = Layer;
+            lastContourClone.Layer = Layer;
 
             return [firstContourClone, lastContourClone];
         }
@@ -1038,43 +1067,6 @@ namespace GeoAppWpf.Services
 
             extrapolated.Vertexes.Clear();
             extrapolated.Vertexes.AddRange(fittedVertexes);
-        }
-
-        private static List<Vector3>? ShiftToMaintainRelativePosition(Polyline3D tail, Polyline3D baseContour, Carcas3D outerCarcas)
-        {
-            var baseCenter = PolylineOperations.GetCenter(baseContour);
-            var tailCenter = PolylineOperations.GetCenter(tail);
-
-            var baseOuterBoundary = outerCarcas.GetSection(baseCenter.X);
-            var tailOuterBoundary = outerCarcas.GetSection(tailCenter.X);
-
-            if (baseOuterBoundary.Count < 3 || tailOuterBoundary.Count < 3)
-                return null;
-
-            var baseOuterCenter = PolylineOperations.GetCenter(baseOuterBoundary);
-            var tailOuterCenter = PolylineOperations.GetCenter(tailOuterBoundary);
-
-            Vector3 relativeOffset = baseCenter - baseOuterCenter;
-            relativeOffset.X = 0;
-
-            double baseHeight = baseOuterBoundary.Max(v => v.Z) - baseOuterBoundary.Min(v => v.Z);
-            double tailHeight = tailOuterBoundary.Max(v => v.Z) - tailOuterBoundary.Min(v => v.Z);
-            double baseWidth = baseOuterBoundary.Max(v => v.Y) - baseOuterBoundary.Min(v => v.Y);
-            double tailWidth = tailOuterBoundary.Max(v => v.Y) - tailOuterBoundary.Min(v => v.Y);
-
-            double scaleY = baseWidth > 0.001 ? tailWidth / baseWidth : 1.0;
-            double scaleZ = baseHeight > 0.001 ? tailHeight / baseHeight : 1.0;
-
-            relativeOffset.Y *= Math.Max(0, scaleY);
-            relativeOffset.Z *= Math.Max(0, scaleZ);
-
-            Vector3 targetTailCenter = tailOuterCenter + relativeOffset;
-            targetTailCenter.X = tailCenter.X;
-
-            Vector3 shiftOffset = targetTailCenter - tailCenter;
-            PolylineOperations.MovePolyline(tail, shiftOffset);
-
-            return tailOuterBoundary;
         }
     }
 

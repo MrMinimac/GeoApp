@@ -6,11 +6,13 @@ using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using netDxf;
 using netDxf.Entities;
+using netDxf.Tables;
 using System.CodeDom;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -269,6 +271,8 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
+        double _lastDistance = 0;
+
         private void BuildCarcas(bool extrapolate)
         {
             var dxfDoc = Documents
@@ -282,7 +286,25 @@ namespace GeoAppWpf.ViewModels
                 return;
             }
 
-            var operation = new BuildCarcasOperation(dxfDoc, ViewportController, extrapolate);
+            string input = "";
+            double distance = _lastDistance;
+
+            if (extrapolate)
+            {
+                input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
+
+                if (input == null)
+                    return;
+
+                input = input.Replace(".", ",");
+                if (double.TryParse(input, out double result))
+                {
+                    distance = result;
+                    _lastDistance = result;
+                }
+            }
+
+            var operation = new BuildCarcasOperation(dxfDoc, ViewportController, extrapolate, distance);
 
             try
             {
@@ -293,6 +315,7 @@ namespace GeoAppWpf.ViewModels
                 _messageBox.ShowError(e.Message);
             }
         }
+
 
         private void Extrapolate()
         {
@@ -307,15 +330,25 @@ namespace GeoAppWpf.ViewModels
                 return;
             }
 
-            var operation = new ExtrapolateOperation(dxfDoc, ViewportController);
+            var input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
 
-            try
+            if (input == null)
+                return;
+
+            input = input.Replace(".", ",");
+
+            if (double.TryParse(input, out double result))
             {
-                _undoManager.Execute(operation);
-            }
-            catch (Exception e)
-            {
-                _messageBox.ShowError(e.Message);
+                var operation = new ExtrapolateOperation(dxfDoc, ViewportController, result);
+
+                try
+                {
+                    _undoManager.Execute(operation);
+                }
+                catch (Exception e)
+                {
+                    _messageBox.ShowError(e.Message);
+                }
             }
         }
 
@@ -349,7 +382,6 @@ namespace GeoAppWpf.ViewModels
             {
                 for (int i = 0; i < carcas.XPositions.Count - 1; i++)
                 {
-                    // ровно между двумя исходными контурами
                     double x = (carcas.XPositions[i] + carcas.XPositions[i + 1]) / 2.0;
 
                     var section = carcas.GetSection(x);
@@ -358,6 +390,14 @@ namespace GeoAppWpf.ViewModels
                         continue;
 
                     var polyline = new Polyline3D(section);
+
+                    var layer = dxfDoc.Layers.Where(x => x.Name == "Interpolated").FirstOrDefault();
+
+                    if (layer == null)
+                        layer = new Layer("Interpolated");
+
+                    layer.Color = AciColor.Green;
+                    polyline.Layer = layer;
 
                     ViewportController.Add(new DrawerObject(polyline));
 

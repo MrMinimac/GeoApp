@@ -27,16 +27,21 @@ namespace GeoAppWpf.Services
         {
             try
             {
-                OpenFileDialog dialog = new OpenFileDialog();
+                OpenFileDialog dialog = new OpenFileDialog
+                {
+                    Multiselect = true
+                };
 
                 dialog.Filter = "DXF files (*.dxf)|*.dxf";
 
                 if (dialog.ShowDialog() == true)
                 {
-                    string filePath = dialog.FileName;
-                    var doc = DxfDocument.Load(filePath);
-                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
-                    Document = doc;
+                    foreach (string filePath in dialog.FileNames)
+                    {
+                        var doc = DxfDocument.Load(filePath);
+                        doc.Name = Path.GetFileNameWithoutExtension(filePath);
+                        Document = doc;
+                    }
                 }
             }
             catch (Exception ex)
@@ -49,18 +54,22 @@ namespace GeoAppWpf.Services
         {
             try
             {
-                OpenFileDialog dialog = new OpenFileDialog();
+                OpenFileDialog dialog = new OpenFileDialog
+                {
+                    Multiselect = true
+                };
 
                 dialog.Filter = "DAT files (*.dat)|*.dat";
 
                 if (dialog.ShowDialog() == true)
                 {
-                    string filePath = dialog.FileName;
-
-                    var datReader = new MacromineDatReader();
-                    var doc = datReader.ReadToDxf(filePath);
-                    doc.Name = Path.GetFileNameWithoutExtension(filePath);
-                    Document = doc;
+                    foreach (string filePath in dialog.FileNames)
+                    {
+                        var datReader = new MacromineDatReader();
+                        var doc = datReader.ReadToDxf(filePath);
+                        doc.Name = Path.GetFileNameWithoutExtension(filePath);
+                        Document = doc;
+                    }
                 }
             }
             catch (Exception ex)

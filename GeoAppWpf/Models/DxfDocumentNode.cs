@@ -1,6 +1,5 @@
 ﻿using GeoAppWpf.Enums;
 using GeoAppWpf.Interfaces;
-using GeoAppWpf.ViewModels;
 using Microsoft.Win32;
 using netDxf;
 using netDxf.Entities;
