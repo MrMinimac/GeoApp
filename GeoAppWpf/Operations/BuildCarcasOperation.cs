@@ -11,10 +11,22 @@ namespace GeoAppWpf.Operations
 {
     public static class CarcasLayerNameController
     {
+        private static bool initialized;
+
         public static int Counter = 1;
 
         public static string GetNewName(string category)
         {
+            if (!initialized)
+            {
+                var input = InputDialog.Show("Введите номер каркаса", defaultValue: "1");
+
+                if (input != null && int.TryParse(input, out int result))
+                    Counter = result;
+
+                initialized = true;
+            }
+
             return $"{Counter}-{category}";
         }
 

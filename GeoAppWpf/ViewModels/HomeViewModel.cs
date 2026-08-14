@@ -6,6 +6,7 @@ using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using netDxf;
 using netDxf.Entities;
+using netDxf.Tables;
 using System.CodeDom;
 using System.Collections;
 using System.Collections.ObjectModel;
@@ -291,6 +292,10 @@ namespace GeoAppWpf.ViewModels
             if (extrapolate)
             {
                 input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
+
+                if (input == null)
+                    return;
+
                 input = input.Replace(".", ",");
                 if (double.TryParse(input, out double result))
                 {
@@ -326,9 +331,13 @@ namespace GeoAppWpf.ViewModels
             }
 
             var input = InputDialog.Show("Введите дистанцию:", "", $"{_lastDistance}");
+
+            if (input == null)
+                return;
+
             input = input.Replace(".", ",");
 
-            if (input != null && double.TryParse(input, out double result))
+            if (double.TryParse(input, out double result))
             {
                 var operation = new ExtrapolateOperation(dxfDoc, ViewportController, result);
 
@@ -373,7 +382,6 @@ namespace GeoAppWpf.ViewModels
             {
                 for (int i = 0; i < carcas.XPositions.Count - 1; i++)
                 {
-                    // ровно между двумя исходными контурами
                     double x = (carcas.XPositions[i] + carcas.XPositions[i + 1]) / 2.0;
 
                     var section = carcas.GetSection(x);
@@ -382,6 +390,14 @@ namespace GeoAppWpf.ViewModels
                         continue;
 
                     var polyline = new Polyline3D(section);
+
+                    var layer = dxfDoc.Layers.Where(x => x.Name == "Interpolated").FirstOrDefault();
+
+                    if (layer == null)
+                        layer = new Layer("Interpolated");
+
+                    layer.Color = AciColor.Green;
+                    polyline.Layer = layer;
 
                     ViewportController.Add(new DrawerObject(polyline));
 

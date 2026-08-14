@@ -934,7 +934,7 @@ namespace GeoAppWpf.Services
         public double Scale { get; set; } = 0.2;
         public double Distance { get; set; } = 0; // <= 0 = Auto, > 0 = Static
         public bool UseStrictXAxis { get; set; } = true;
-
+        public Layer Layer = new Layer("Extrapolated");
 
         public Extrapolator(IEnumerable<Polyline3D> polylines, IContourFittingStrategy fittingStrategy)
         {
@@ -1028,6 +1028,9 @@ namespace GeoAppWpf.Services
             FitInsideOuterCarcas(firstContourClone, sortedIntialsContours.First());
             FitInsideOuterCarcas(lastContourClone, sortedIntialsContours.Last());
 
+            firstContourClone.Layer = Layer;
+            lastContourClone.Layer = Layer;
+
             return [firstContourClone, lastContourClone];
         }
 
@@ -1064,43 +1067,6 @@ namespace GeoAppWpf.Services
 
             extrapolated.Vertexes.Clear();
             extrapolated.Vertexes.AddRange(fittedVertexes);
-        }
-
-        private static List<Vector3>? ShiftToMaintainRelativePosition(Polyline3D tail, Polyline3D baseContour, Carcas3D outerCarcas)
-        {
-            var baseCenter = PolylineOperations.GetCenter(baseContour);
-            var tailCenter = PolylineOperations.GetCenter(tail);
-
-            var baseOuterBoundary = outerCarcas.GetSection(baseCenter.X);
-            var tailOuterBoundary = outerCarcas.GetSection(tailCenter.X);
-
-            if (baseOuterBoundary.Count < 3 || tailOuterBoundary.Count < 3)
-                return null;
-
-            var baseOuterCenter = PolylineOperations.GetCenter(baseOuterBoundary);
-            var tailOuterCenter = PolylineOperations.GetCenter(tailOuterBoundary);
-
-            Vector3 relativeOffset = baseCenter - baseOuterCenter;
-            relativeOffset.X = 0;
-
-            double baseHeight = baseOuterBoundary.Max(v => v.Z) - baseOuterBoundary.Min(v => v.Z);
-            double tailHeight = tailOuterBoundary.Max(v => v.Z) - tailOuterBoundary.Min(v => v.Z);
-            double baseWidth = baseOuterBoundary.Max(v => v.Y) - baseOuterBoundary.Min(v => v.Y);
-            double tailWidth = tailOuterBoundary.Max(v => v.Y) - tailOuterBoundary.Min(v => v.Y);
-
-            double scaleY = baseWidth > 0.001 ? tailWidth / baseWidth : 1.0;
-            double scaleZ = baseHeight > 0.001 ? tailHeight / baseHeight : 1.0;
-
-            relativeOffset.Y *= Math.Max(0, scaleY);
-            relativeOffset.Z *= Math.Max(0, scaleZ);
-
-            Vector3 targetTailCenter = tailOuterCenter + relativeOffset;
-            targetTailCenter.X = tailCenter.X;
-
-            Vector3 shiftOffset = targetTailCenter - tailCenter;
-            PolylineOperations.MovePolyline(tail, shiftOffset);
-
-            return tailOuterBoundary;
         }
     }
 
