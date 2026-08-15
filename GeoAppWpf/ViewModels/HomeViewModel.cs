@@ -7,12 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
-using System.CodeDom;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
-using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -93,6 +91,7 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand _showAllObjectCommand;
         private readonly RelayCommand _intermediateSectionsCommand;
         private readonly RelayCommand _extrapolateCommand;
+        private readonly RelayCommand _sortAndRenameCarcasesCommand;
 
         public ICommand Open3DCommand => _open3DCommand;
         public ICommand SaveAsCommand => _saveAsCommand;
@@ -107,6 +106,7 @@ namespace GeoAppWpf.ViewModels
         public ICommand ShowAllObjectCommand => _showAllObjectCommand;
         public ICommand IntermediateSectionsCommand => _intermediateSectionsCommand;
         public ICommand ExtrapolateCommand => _extrapolateCommand;
+        public ICommand SortAndRenameCarcasesCommand => _sortAndRenameCarcasesCommand;
 
         public HomeViewModel(IServiceProvider serviceProvider)
         {
@@ -161,12 +161,12 @@ namespace GeoAppWpf.ViewModels
             _showAllObjectCommand = new RelayCommand(ViewportController.ShowAllObjects);
             _intermediateSectionsCommand = new RelayCommand(IntermediateSections);
             _extrapolateCommand = new RelayCommand(Extrapolate);
+            _sortAndRenameCarcasesCommand = new RelayCommand(SortAndRenameCarcases);
 
             _undoManager.StateChanged += UndoManager_StateChanged;
 
             _dockPanelItems = BuildDockPanelItems();
         }
-
 
         private void Open3D(GeoTreeNode node)
         {
@@ -272,6 +272,31 @@ namespace GeoAppWpf.ViewModels
         }
 
         double _lastDistance = 0;
+
+        private void SortAndRenameCarcases(object? obj)
+        {
+            var dxfDoc = Documents
+               .OfType<DxfDocumentNode>()
+               .Select(x => x.Document)
+               .FirstOrDefault();
+
+            if (dxfDoc == null)
+            {
+                _messageBox.ShowError("DXF документ не открыт.");
+                return;
+            }
+
+            var operation = new SortAndRenameLayersOperation(dxfDoc);
+
+            try
+            {
+                _undoManager.Execute(operation);
+            }
+            catch (Exception e)
+            {
+                _messageBox.ShowError(e.Message);
+            }
+        }
 
         private void BuildCarcas(bool extrapolate)
         {
@@ -518,6 +543,18 @@ namespace GeoAppWpf.ViewModels
                         {
                             Header = "Показать все",
                             Command = ShowAllObjectCommand,
+                        },
+                    ]
+                },
+                new()
+                {
+                    Header = "Операции",
+                    Items =
+                    [
+                        new()
+                        {
+                            Header = "Сортировать и переименовать каркасы",
+                            Command = SortAndRenameCarcasesCommand,
                         },
                     ]
                 }
