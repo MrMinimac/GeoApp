@@ -1,9 +1,9 @@
-﻿using CommunityToolkit.Mvvm.Input;
-using GeoAppWpf.Models;
+﻿using GeoAppWpf.Models;
 using HelixToolkit.Wpf;
 using netDxf.Entities;
 using System.Collections.ObjectModel;
-using System.Windows.Input;
+using System.Diagnostics;
+using System.Windows;
 using System.Windows.Media.Media3D;
 
 namespace GeoAppWpf.Services
@@ -51,16 +51,19 @@ namespace GeoAppWpf.Services
                 return;
 
             foreach (var obj in _selectedVisuals.ToList())
-            {
-                if (!obj.IsVisible)
-                    continue;
+                HideObject(obj);
+        }
 
-                obj.IsVisible = false;
-                _hiddenVisuals.Add(obj);
+        public void HideObject(DrawerObject obj)
+        {
+            if (!obj.IsVisible)
+                return;
 
-                Unselect(obj);
-                Remove(obj);
-            }
+            obj.IsVisible = false;
+            _hiddenVisuals.Add(obj);
+
+            Unselect(obj);
+            Remove(obj);
         }
 
         public void ShowAllObjects()
@@ -100,6 +103,16 @@ namespace GeoAppWpf.Services
 
             _selectedVisuals.Add(obj);
             obj.IsSelected = true;
+
+            if (obj.Data is MacromineSample macrosample)
+            {
+                MessageBox.Show($"Имя: {macrosample.Code}");
+            }
+
+            if (obj.Tag is Carcas3D carcas3D)
+            {
+                MessageBox.Show($"Имя: {carcas3D.Layer.Name}");
+            }
         }
 
         public void SelectAll()
@@ -220,7 +233,9 @@ namespace GeoAppWpf.Services
             obj.Changed += Update;
 
             if (!_visuals.Contains(obj))
+            {
                 _visuals.Add(obj);
+            }
 
             if (!_viewport.Children.Contains(obj.Visual))
                 _viewport.Children.Add(obj.Visual);
@@ -272,6 +287,12 @@ namespace GeoAppWpf.Services
             {
                 actual.Points.Add(points[i]);
                 actual.Points.Add(points[i + 1]);
+            }
+
+            if (obj.Data is MacromineSample macrosample)
+            {
+                if (!macrosample.IsVisible)
+                    HideObject(obj);
             }
         }
 

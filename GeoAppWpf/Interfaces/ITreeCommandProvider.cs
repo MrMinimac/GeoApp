@@ -6,5 +6,6 @@ namespace GeoAppWpf.Interfaces
     {
         ICommand Open3DCommand { get; }
         ICommand SaveAsCommand { get; }
+        ICommand RenameCompositesCommand { get; }
     }
 }

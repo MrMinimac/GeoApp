@@ -8,6 +8,7 @@ namespace GeoAppWpf.Services
     internal class DXFService
     {
         public event Action<DxfDocument>? DocumentChanged;
+        public event Action<DxfDocument, MacromineDatResult>? DatDocumentChanged;
 
         private DxfDocument? _document;
         public DxfDocument? Document
@@ -56,19 +57,28 @@ namespace GeoAppWpf.Services
             {
                 OpenFileDialog dialog = new OpenFileDialog
                 {
-                    Multiselect = true
+                    Multiselect = true,
+                    Filter = "DAT files (*.dat)|*.dat"
                 };
-
-                dialog.Filter = "DAT files (*.dat)|*.dat";
 
                 if (dialog.ShowDialog() == true)
                 {
                     foreach (string filePath in dialog.FileNames)
                     {
-                        var datReader = new MacromineDatReader();
-                        var doc = datReader.ReadToDxf(filePath);
-                        doc.Name = Path.GetFileNameWithoutExtension(filePath);
-                        Document = doc;
+                        var reader = new MacromineDatReader();
+
+                        var result = reader.Read(filePath);
+
+                        if (result.Dxf == null)
+                            continue;
+
+                        result.Dxf.Name =
+                            Path.GetFileNameWithoutExtension(filePath);
+
+                        // Передаем и DXF, и данные DAT
+                        DatDocumentChanged?.Invoke(
+                            result.Dxf,
+                            result);
                     }
                 }
             }

@@ -11,6 +11,7 @@ namespace GeoAppWpf.Models
 
         public EntityObject? Entity { get; private set; }
         public Visual3D Visual { get; set; }
+        public object Data { get; set; }
 
         public object? Tag { get; set; }
 
@@ -80,7 +81,7 @@ namespace GeoAppWpf.Models
                 var dxfColor = point.Color;
                 Color = Color.FromArgb(255, dxfColor.R, dxfColor.G, dxfColor.B);
 
-                Visual = new LinesVisual3D
+                Visual = new PointsVisual3D
                 {
                     Color = Color
                 };

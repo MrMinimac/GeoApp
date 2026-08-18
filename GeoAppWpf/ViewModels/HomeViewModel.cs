@@ -11,6 +11,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -92,6 +93,7 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand _intermediateSectionsCommand;
         private readonly RelayCommand _extrapolateCommand;
         private readonly RelayCommand _sortAndRenameCarcasesCommand;
+        private readonly RelayCommand<GeoTreeNode> _renameCompositesCommand;
 
         public ICommand Open3DCommand => _open3DCommand;
         public ICommand SaveAsCommand => _saveAsCommand;
@@ -107,6 +109,7 @@ namespace GeoAppWpf.ViewModels
         public ICommand IntermediateSectionsCommand => _intermediateSectionsCommand;
         public ICommand ExtrapolateCommand => _extrapolateCommand;
         public ICommand SortAndRenameCarcasesCommand => _sortAndRenameCarcasesCommand;
+        public ICommand RenameCompositesCommand => _renameCompositesCommand;
 
         public HomeViewModel(IServiceProvider serviceProvider)
         {
@@ -129,6 +132,15 @@ namespace GeoAppWpf.ViewModels
             _dxfService.DocumentChanged += (doc) =>
             {
                 Documents.Add(new DxfDocumentNode(doc, this));
+            };
+
+            _dxfService.DatDocumentChanged += (doc, result) =>
+            {
+                Documents.Add(
+                    new DxfDocumentNode(
+                        doc,
+                        this,
+                        result));
             };
 
             Documents.CollectionChanged += (o, e) =>
@@ -162,10 +174,40 @@ namespace GeoAppWpf.ViewModels
             _intermediateSectionsCommand = new RelayCommand(IntermediateSections);
             _extrapolateCommand = new RelayCommand(Extrapolate);
             _sortAndRenameCarcasesCommand = new RelayCommand(SortAndRenameCarcases);
+            _renameCompositesCommand = new RelayCommand<GeoTreeNode>(RenameComposites);
 
             _undoManager.StateChanged += UndoManager_StateChanged;
 
             _dockPanelItems = BuildDockPanelItems();
+        }
+
+        private void RenameComposites(GeoTreeNode node)
+        {
+            if (node is DxfDocumentNode dxfNode)
+            {
+                if (dxfNode.DatResult == null)
+                {
+                    MessageBox.Show("DatResult was null");
+                    return;
+                }
+
+                var faces = Documents
+                    .OfType<DxfDocumentNode>()
+                    .SelectMany(x => x.Document.Entities.All)
+                    .OfType<Face3D>()
+                    .ToList();
+
+                var operation = new RenameCopositesOperation(dxfNode.DatResult, faces);
+
+                try
+                {
+                    _undoManager.Execute(operation);
+                }
+                catch (Exception e)
+                {
+                    _messageBox.ShowError(e.Message);
+                }
+            }
         }
 
         private void Open3D(GeoTreeNode node)
@@ -180,6 +222,7 @@ namespace GeoAppWpf.ViewModels
 
             else if (node is DxfDocumentNode dxfNode)
             {
+                Debug.WriteLine("Загружаем Документ");
                 OpenDxfDocument(dxfNode);
             }
         }
@@ -192,26 +235,30 @@ namespace GeoAppWpf.ViewModels
                 .OfType<Face3D>()
                 .ToList();
 
-            if (faces.Count == 0)
+            var polylines = entities
+                .OfType<Polyline3D>()
+                .ToList();
+
+            if (faces.Count != 0)
+                OpenFaceCarcases(faces);
+
+            if (polylines.Count != 0)
             {
                 var objects = entities
-                    .Select(e => new DrawerObject(e))
+                    .Where(e => e is Polyline3D)
+                    .Select(e =>
+                    {
+                        var obj = new DrawerObject(e);
+
+                        if (dxfNode.DatResult != null && dxfNode.DatResult.SampleData.TryGetValue(e, out var sample))
+                            obj.Data = sample;
+
+                        return obj;
+                    })
                     .ToList();
 
                 ViewportController.AddRange(objects);
-                return;
             }
-
-            // Все остальные DXF-сущности показываем как обычно
-            var otherObjects = entities
-                .Where(e => e is not Face3D)
-                .Select(e => new DrawerObject(e))
-                .ToList();
-
-            ViewportController.AddRange(otherObjects);
-
-            // Face3D превращаем в каркасы
-            OpenFaceCarcases(faces);
         }
 
         private void OpenFaceCarcases(List<Face3D> faces)
@@ -286,7 +333,15 @@ namespace GeoAppWpf.ViewModels
                 return;
             }
 
-            var operation = new SortAndRenameLayersOperation(dxfDoc);
+            var suffix = InputDialog.Show("Введите суфикс:", "", $"_OVP_1") ?? "";
+
+            var startNumInput = InputDialog.Show("Начать нумерацию с:", "", $"1") ?? "";
+            int startNumber = 1;
+
+            if (int.TryParse(startNumInput, out int result))
+                startNumber = result;
+
+            var operation = new SortAndRenameLayersOperation(dxfDoc, suffix, startNumber);
 
             try
             {

@@ -1,6 +1,7 @@
 ﻿using netDxf;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection.Metadata;
 
 namespace GeoAppWpf.Services
 {
@@ -106,8 +107,15 @@ namespace GeoAppWpf.Services
             if (FilePath == null)
                 return;
 
-            var datReader = new MacromineDatReader();
-            _data = datReader.ReadToDxf(FilePath);
+            var reader = new MacromineDatReader();
+            var result = reader.Read(FilePath);
+
+            if (result.Type == MacromineDatType.Strings && result.Dxf != null)
+            {
+                var doc = result.Dxf;
+                doc.Name = Path.GetFileNameWithoutExtension(FilePath);
+                _data = doc;
+            }
         }
 
         private void LoadDxf()

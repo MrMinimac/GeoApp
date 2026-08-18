@@ -1,5 +1,6 @@
 ﻿using GeoAppWpf.Enums;
 using GeoAppWpf.Interfaces;
+using GeoAppWpf.Services;
 using Microsoft.Win32;
 using netDxf;
 using netDxf.Entities;
@@ -13,6 +14,7 @@ namespace GeoAppWpf.Models
 {
     public class DxfDocumentNode : GeoTreeNode
     {
+        public MacromineDatResult? DatResult { get; set; }
         public DxfDocument Document { get; }
         public ObservableCollection<DxfEntityView> EntityViews { get; } = new();
 
@@ -22,6 +24,11 @@ namespace GeoAppWpf.Models
             {
                 Header = "Добавить в 3D-просмотр",
                 Command = CommandProvider.Open3DCommand
+            },
+            new()
+            {
+                Header = "Переименовать композиты",
+                Command = CommandProvider.RenameCompositesCommand
             },
             new()
             {
@@ -56,6 +63,20 @@ namespace GeoAppWpf.Models
             }
         }
 
+        public DxfDocumentNode(DxfDocument doc, ITreeCommandProvider commandProvider, MacromineDatResult result) : base(commandProvider)
+        {
+            Document = doc;
+            Name = doc.Name;
+
+            foreach (var entity in doc.Entities.All)
+            {
+                Children.Add(new EntitiesNode(entity, CommandProvider));
+                EntityViews.Add(new DxfEntityView(entity));
+            }
+
+            DatResult = result;
+        }
+
         public void Save(SupportExtensions extension)
         {
             switch (extension)
@@ -70,6 +91,170 @@ namespace GeoAppWpf.Models
         }
 
         private void SaveDAT()
+        {
+
+            switch (DatResult.Type)
+            {
+                case MacromineDatType.Strings:
+                    SaveStrings();
+                    break;
+                case MacromineDatType.Table:
+                    SaveTable();
+                    break;
+            }
+           
+        }
+
+        private void SaveTable()
+        {
+            if (DatResult == null)
+                return;
+
+            var dialog = new SaveFileDialog
+            {
+                Filter = "DAT files (*.dat)|*.dat",
+                DefaultExt = ".dat",
+                FileName = Name
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var filePath = dialog.FileName;
+
+            var culture = CultureInfo.InvariantCulture;
+
+            // Важно для старых Macromine DAT с кириллицей
+            Encoding.RegisterProvider(
+                CodePagesEncodingProvider.Instance);
+
+            using var writer = new StreamWriter(
+                filePath,
+                false,
+                Encoding.GetEncoding(1251));
+
+            bool hasRestrictionColumn = 
+                DatResult.Samples
+                    .Where(x => x.Restriction != 0.0)
+                    .Any();
+
+            // ============================================================
+            // HEADER
+            // ============================================================
+
+            writer.WriteLine(new string(' ', 40));
+
+            int variableCount = hasRestrictionColumn ? 12 : 11;
+
+            writer.WriteLine(
+                $"{variableCount}   VARIABLES");
+
+            writer.WriteLine("HoleID    C 20  0");
+            writer.WriteLine("From      N 20  9");
+            writer.WriteLine("To        N 20  9");
+            writer.WriteLine("Length    N 20  9");
+            writer.WriteLine("SampleID  C 20  0");
+            writer.WriteLine("Au_g/t    N 20  9");
+
+            if (hasRestrictionColumn)
+            {
+                writer.WriteLine("ОграничениN 20  9");
+            }
+
+            writer.WriteLine("ОВП       C 20  0");
+            writer.WriteLine("код       C 20  0");
+            writer.WriteLine("X         N 20  9");
+            writer.WriteLine("Y         N 20  9");
+            writer.WriteLine("Z         N 20  9");
+
+
+            // ============================================================
+            // DATA
+            // ============================================================
+
+            foreach (var sample in DatResult.Samples)
+            {
+                string holeId =
+                    FormatString(sample.HoleId, 20);
+
+                string from =
+                    FormatNumber(sample.From, 20);
+
+                string to =
+                    FormatNumber(sample.To, 20);
+
+                string length =
+                    FormatNumber(sample.Length, 20);
+
+                string sampleId =
+                    FormatString(sample.SampleId, 20);
+
+                string au =
+                    FormatNumber(sample.Au, 20);
+
+                string ovp =
+                    FormatString(sample.Ovp, 20);
+
+                string code =
+                    FormatString(sample.Code, 20);
+
+                string x =
+                    FormatNumber(sample.X, 20);
+
+                string y =
+                    FormatNumber(sample.Y, 20);
+
+                string z =
+                    FormatNumber(sample.Z, 20);
+
+
+                writer.Write(
+                    holeId);
+                writer.Write(
+                    from);
+                writer.Write(
+                    to);
+                writer.Write(
+                    length);
+                writer.Write(
+                    sampleId);
+                writer.Write(
+                    au);
+
+
+                // Только если колонка была в исходном DAT
+                if (hasRestrictionColumn)
+                {
+                    string restriction =
+                        FormatNumber(
+                            sample.Restriction,
+                            20);
+
+                    writer.Write(
+                        restriction);
+                }
+
+
+                writer.Write(
+                    ovp);
+
+                writer.Write(
+                    code);
+
+                writer.Write(
+                    x);
+
+                writer.Write(
+                    y);
+
+                writer.Write(
+                    z);
+
+                writer.WriteLine();
+            }
+        }
+
+        private void SaveStrings()
         {
             var dialog = new SaveFileDialog
             {
@@ -282,6 +467,27 @@ namespace GeoAppWpf.Models
                     }
                 }
             }
+        }
+
+        private string FormatNumber(
+    double value,
+    int width)
+        {
+            return value
+                .ToString("F9", CultureInfo.InvariantCulture)
+                .PadRight(width);
+        }
+
+        private string FormatString(
+            string? value,
+            int width)
+        {
+            value ??= string.Empty;
+
+            if (value.Length > width)
+                value = value[..width];
+
+            return value.PadRight(width);
         }
 
         /*
