@@ -1,36 +1,32 @@
-﻿using GeoAppWpf.Services;
-using LegendDesignWpf.Core.MVVM;
-using Microsoft.Extensions.DependencyInjection;
-using System.Windows.Input;
+﻿using LegendDesignWpf.Core.MVVM;
 
 namespace GeoAppWpf.ViewModels
 {
+    public class QuickMenuViewModel : BaseViewModel
+    {
+        public CommandsProvider CommandsProvider { get; }
+
+        public QuickMenuViewModel(CommandsProvider commandsProvider)
+        {
+            CommandsProvider = commandsProvider;
+        }
+    }
+
+    /*
     public class QuickPanelViewModel : BaseViewModel
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ACadService _acadService;
         private readonly IExcelService _excelService;
-        private readonly DXFService _dxfService;
 
         public QuickPanelViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _acadService = _serviceProvider.GetRequiredService<ACadService>();
             _excelService = _serviceProvider.GetRequiredService<IExcelService>();
-            _dxfService = _serviceProvider.GetRequiredService<DXFService>();
         }
 
         #region Commands
-
-        public ICommand ImportMacromineDat => new RelayCommand(async () =>
-        {
-            _dxfService.ImportDat();
-        });
-
-        public ICommand ImportDXF => new RelayCommand(async () =>
-        {
-            _dxfService.Import();
-        });
 
         public ICommand ImportFromExcel => new RelayCommand(async () =>
         {
@@ -50,4 +46,5 @@ namespace GeoAppWpf.ViewModels
 
         #endregion
     }
+    */
 }

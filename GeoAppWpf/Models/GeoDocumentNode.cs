@@ -1,19 +1,27 @@
 ﻿using GeoAppCore;
-using GeoAppWpf.Interfaces;
-using GeoAppWpf.ViewModels;
+using GeoAppCore.Abstractions.Document;
 
 namespace GeoAppWpf.Models
 {
     public class GeoDocumentNode : GeoTreeNode
     {
-        public GeoDoc Document { get; }
+        public IDocument Document { get; }
 
-        public GeoDocumentNode(GeoDoc doc, ITreeCommandProvider commandProvider) : base(commandProvider)
+        public GeoDocumentNode(IDocument doc)
         {
             Document = doc;
+            Header = doc.Name;
 
-            foreach (var line in doc.BoreholeLines)
-                Children.Add(new BoreholeLineNode(line, CommandProvider));
+            foreach (var obj in doc.GetObjects())
+            {
+                var node = obj switch
+                {
+                    BoreholeLine line => new BoreholeLineNode(line),
+                    _ => throw new Exception("Объект не поддерживается")
+                };
+
+                Children.Add(node);
+            }
         }
     }
 }

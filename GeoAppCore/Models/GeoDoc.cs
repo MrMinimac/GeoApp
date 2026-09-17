@@ -1,13 +1,21 @@
-﻿using Newtonsoft.Json;
+﻿using GeoAppCore.Abstractions.Document;
+using GeoAppCore.Models;
+using Newtonsoft.Json;
 
 namespace GeoAppCore
 {
-    public class GeoDoc
+    public class GeoDoc : IDocument
     {
         public string Name { get; set; }
+        public string? FilePath { get; set; }
+        public int VerticalScale { get; set; } = 10;
+
         public List<BoreholeLine> BoreholeLines { get; set; } = new();
 
-        public int VerticalScale { get; set; } = 10;
+        public IEnumerable<GeoObject> GetObjects()
+        {
+            return BoreholeLines;
+        }
 
         public void Save(string path)
         {

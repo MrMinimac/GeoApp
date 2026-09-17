@@ -6,31 +6,28 @@ namespace GeoAppWpf.Models
 {
     public abstract class GeoTreeNode : BaseViewModel
     {
-		private string _name;
-		public string Name
-		{
-			get => _name;
-            set 
-			{
-				if (value == _name)
-					return;
+        private string _name;
+        public string Header
+        {
+            get => _name;
+            set
+            {
+                if (value == _name)
+                    return;
 
                 _name = value;
-				OnPropertyChanged();
-			}
-		}
+                OnPropertyChanged();
+            }
+        }
 
         public string Extension { get; init; }
-
-        public ITreeCommandProvider CommandProvider { get; }
 
         public virtual IReadOnlyList<TreeMenuItem> MenuItems => [];
 
         public ObservableCollection<GeoTreeNode> Children { get; } = new();
 
-        protected GeoTreeNode(ITreeCommandProvider commandProvider)
+        protected GeoTreeNode()
         {
-            CommandProvider = commandProvider;
         }
     }
 }

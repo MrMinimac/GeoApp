@@ -1,8 +1,9 @@
-﻿using GeoAppCore.Services;
+﻿using GeoAppCore.Abstractions.Document;
+using GeoAppCore.Services;
 using GeoAppWpf.Interfaces;
 using GeoAppWpf.Services;
-using GeoAppWpf.TestServices;
 using GeoAppWpf.ViewModels;
+using GeoAppWpf.Views.Windows;
 using LegendDesignWpf.Core;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
@@ -41,13 +42,14 @@ namespace GeoAppWpf
         {
             services.AddSingleton<SettingsService>(sp => new SettingsService(AppDirectory));
 
-            services.AddSingleton<UndoManager>();
+            services.AddSingleton<IDocumentLoader, ExcelDocumentLoader>();
+            services.AddSingleton<ImportService>();
+            services.AddSingleton<WorkspaceManager>();
             services.AddSingleton<ACadService>();
-            services.AddSingleton<IExcelService, ExcelService>();
-            services.AddSingleton<DXFService>();
             services.AddSingleton<IMessageBox, MessageBoxService>();
 
-            services.AddSingleton<QuickPanelViewModel>();
+            services.AddSingleton<CommandsProvider>();
+            services.AddSingleton<QuickMenuViewModel>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<HomeViewModel>();

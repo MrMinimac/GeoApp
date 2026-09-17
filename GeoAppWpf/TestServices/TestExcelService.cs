@@ -1,12 +1,20 @@
 ﻿using GeoAppCore;
+using GeoAppCore.Abstractions.Document;
 using GeoAppWpf.Services;
 
 namespace GeoAppWpf.TestServices
 {
-    public class TestExcelService : IExcelService
+    public class TestExcelLoader : IDocumentLoader
     {
-        public GeoDoc? Load()
+        public IEnumerable<string> Extensions => [".xlsx"];
+
+        public bool CanLoad(string extension)
+            => extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+
+        public IDocument Load(string path)
         {
+            var boreholeLines = new List<BoreholeLine>();
+
             //         ПАРАМЕТРЫ            //
 
             const double diametr = 146;
@@ -19,7 +27,6 @@ namespace GeoAppWpf.TestServices
             //         ПАРАМЕТРЫ            //
 
 
-            var doc = new GeoDoc();
             double bLineDistX = 71.6;
             double bLineDistY = -82.6;
 
@@ -111,14 +118,16 @@ namespace GeoAppWpf.TestServices
                     boreholes.Add(bh);
                 }
 
-                doc.BoreholeLines.Add(new BoreholeLine { Number = i, Boreholes = boreholes });
+                boreholeLines.Add(new BoreholeLine { Number = i, Boreholes = boreholes });
 
                 bLineDistX += 71.6;
                 bLineDistY += -82.6;
             }
 
-            return doc;
+            var document = new ExcelDocument();
+            document.Objects.AddRange(boreholeLines);
+
+            return document;
         }
     }
-
 }

@@ -6,25 +6,25 @@ namespace GeoAppCore
     public class Borehole
     {
         private List<LithologyInterval>? _lithologyIntervals;
+        private double _deapth = 0;
 
         public string Key { get; set; } = "";
         public int LineNumber { get; set; }
         public int Id { get; set; }
 
-        public List<Sample> Samples = new List<Sample>();
+        public List<Sample> Samples = new();
 
         [JsonIgnore]
         public double Deapth
         {
             get
             {
-                double deapth = 0;
+                if (Samples.Count == 0)
+                    return _deapth;
 
-                foreach (var sample in Samples)
-                    deapth += sample.Length;
-
-                return Math.Round(deapth, 3);
+                return Samples.Sum(x => x.Length);
             }
+            set => _deapth = value;
         }
 
         [JsonIgnore]

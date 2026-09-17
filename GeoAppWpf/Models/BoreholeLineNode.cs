@@ -1,6 +1,4 @@
 ﻿using GeoAppCore;
-using GeoAppWpf.Interfaces;
-using GeoAppWpf.ViewModels;
 
 namespace GeoAppWpf.Models
 {
@@ -8,13 +6,13 @@ namespace GeoAppWpf.Models
     {
         public BoreholeLine Line { get; }
 
-        public BoreholeLineNode(BoreholeLine line, ITreeCommandProvider commandProvider) : base(commandProvider)
+        public BoreholeLineNode(BoreholeLine line)
         {
             Line = line;
-            Name = $"БЛ-{line.Number}";
+            Header = $"БЛ-{line.Number}";
 
             foreach (var borehole in line.Boreholes)
-                Children.Add(new BoreholeNode(borehole, CommandProvider));
+                Children.Add(new BoreholeNode(borehole));
         }
     }
 }

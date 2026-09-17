@@ -13,7 +13,7 @@ namespace GeoAppWpf.ViewModels
         private NavigationPage _selectedPage;
         private object _currentPage;
 
-        public QuickPanelViewModel QuickPanelViewModel { get; }
+        public QuickMenuViewModel QuickMenuViewModel { get; }
 
         public object CurrentPage
         {
@@ -47,7 +47,7 @@ namespace GeoAppWpf.ViewModels
             _homeViewModel = _serviceProvider.GetRequiredService<HomeViewModel>();
             _settingsViewModel = _serviceProvider.GetRequiredService<SettingsViewModel>();
 
-            QuickPanelViewModel = serviceProvider.GetRequiredService<QuickPanelViewModel>();
+            QuickMenuViewModel = serviceProvider.GetRequiredService<QuickMenuViewModel>();
 
             _currentPage = _homeViewModel;
             CurrentPage = _currentPage;

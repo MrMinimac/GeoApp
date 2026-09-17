@@ -1,4 +1,4 @@
-﻿using GeoAppCore.Objects;
+﻿using GeoAppCore.Models;
 
 namespace GeoAppCore.Abstractions.Document
 {
@@ -6,6 +6,6 @@ namespace GeoAppCore.Abstractions.Document
     {
         string Name { get; }
         string? FilePath { get; }
-        IEnumerable<WorkspaceObject> GetWorkspaceObjects();
+        IEnumerable<GeoObject> GetObjects();
     }
 }

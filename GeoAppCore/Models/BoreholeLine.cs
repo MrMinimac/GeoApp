@@ -1,8 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using GeoAppCore.Models;
+using Newtonsoft.Json;
 
 namespace GeoAppCore
 {
-    public class BoreholeLine
+    public class BoreholeLine : GeoObject
     {
         public int Number { get; set; }
 
