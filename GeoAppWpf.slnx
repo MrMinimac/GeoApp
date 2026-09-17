@@ -5,6 +5,5 @@
   <Project Path="GeoCadPlugin/GeoCadPlugin.csproj" Id="84e8d0f9-dfff-4741-8d91-010d16114226">
     <BuildType Project="Release" />
   </Project>
-  <Project Path="GeoCadWpf/GeoCadWpf.csproj" Id="6fe439d1-c8e9-41b7-ac6b-36c89f61d7c3" />
   <Project Path="LegendDesignWpf/LegendDesignWpf.csproj" />
 </Solution>
