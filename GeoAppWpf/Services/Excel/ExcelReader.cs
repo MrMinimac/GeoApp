@@ -22,6 +22,8 @@ namespace GeoAppWpf.Services
         public static IDocument ReadExcelDocument(string path)
         {
             var document = new ExcelDocument();
+            document.FilePath = path;
+            document.Name = Path.GetFileNameWithoutExtension(path);
 
             try
             {

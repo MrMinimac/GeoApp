@@ -3,16 +3,17 @@ using GeoAppCore.Abstractions.Document;
 
 namespace GeoAppWpf.Models
 {
-    public class GeoDocumentNode : GeoTreeNode
+    public class BoreholesDocumentNode : GeoTreeNode
     {
         public IDocument Document { get; }
+        public IEnumerable<BoreholeLine> Boreholes => Document.GetObjects().OfType<BoreholeLine>();
 
-        public GeoDocumentNode(IDocument doc)
+        public BoreholesDocumentNode(IDocument document)
         {
-            Document = doc;
-            Header = doc.Name;
+            Document = document;
+            Header = document.Name;
 
-            foreach (var obj in doc.GetObjects())
+            foreach (var obj in document.GetObjects())
             {
                 var node = obj switch
                 {

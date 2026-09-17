@@ -1,4 +1,5 @@
-﻿using GeoAppWpf.Interfaces;
+﻿using GeoAppCore.Abstractions.Document;
+using GeoAppWpf.Interfaces;
 using GeoAppWpf.Models;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
@@ -71,7 +72,7 @@ namespace GeoAppWpf.ViewModels
             _messageBox = _serviceProvider.GetRequiredService<IMessageBox>();
             _workspaceManager = _serviceProvider.GetRequiredService<WorkspaceManager>();
 
-            _workspaceManager.OnDocumentsChanged += _workspaceManager_OnDocumentsChanged;
+            _workspaceManager.OnDocumentAdded += _workspaceManager_OnDocumentsChanged;
 
             Documents.CollectionChanged += (o, e) =>
             {
@@ -83,7 +84,7 @@ namespace GeoAppWpf.ViewModels
 
                     DisplayItems = item switch
                     {
-                        GeoDocumentNode n => n.Document.GetObjects(),
+                        BoreholesDocumentNode n => n.Document.GetObjects(),
                         _ => null
                     };
                 }
@@ -91,12 +92,9 @@ namespace GeoAppWpf.ViewModels
 
         }
 
-        private void _workspaceManager_OnDocumentsChanged()
+        private void _workspaceManager_OnDocumentsChanged(IDocument document)
         {
-            foreach (var document in _workspaceManager.Documents)
-            {
-                Documents.Add(new GeoDocumentNode(document));
-            }
+            Documents.Add(new BoreholesDocumentNode(document));
         }
 
         public void OnSelectedItemChanged(GeoTreeNode node)
@@ -105,7 +103,7 @@ namespace GeoAppWpf.ViewModels
             {
                 BoreholeLineNode n => n.Line.Boreholes,
                 BoreholeNode n => n.Borehole.Samples,
-                GeoDocumentNode n => n.Children,
+                BoreholesDocumentNode n => n.Boreholes,
                 _ => null
             };
         }

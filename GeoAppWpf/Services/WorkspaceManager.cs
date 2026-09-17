@@ -9,7 +9,8 @@ namespace GeoAppWpf.Services
         public ImportService Importer { get; }
         public IReadOnlyList<IDocument> Documents => _documents;
 
-        public event Action? OnDocumentsChanged;
+        public event Action<IDocument>? OnDocumentAdded;
+        public event Action<IDocument>? OnDocumentRemoved;
 
         public WorkspaceManager(ImportService importer)
         {
@@ -31,7 +32,7 @@ namespace GeoAppWpf.Services
                     return;
 
                 _documents.Add(document);
-                OnDocumentsChanged?.Invoke();
+                OnDocumentAdded?.Invoke(document);
             }
         }
     }
