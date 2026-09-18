@@ -1,0 +1,421 @@
+﻿<ld:LDWindow
+    x:Class="GeoAppWpf.Views.Windows.InputWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:ld="clr-namespace:LegendDesignWpf.Controls;assembly=LegendDesignWpf"
+    xmlns:local="clr-namespace:GeoAppWpf.Views.Windows"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="InputWindow"
+    Width="500"
+    Height="450"
+    MinWidth="400"
+    MinHeight="200"
+    MaxWidth="800"
+    MaxHeight="600"
+    ResizeMode="NoResize"
+    SizeToContent="WidthAndHeight"
+    WindowStartupLocation="CenterOwner"
+    mc:Ignorable="d">
+    <ld:LDWindow.Resources>
+
+        <!--  Шаблон для SelectionPropertyItem  -->
+        <DataTemplate DataType="{x:Type local:SelectionPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Margin="0,0,0,5"
+                    FontSize="14"
+                    Text="{Binding Header}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                    <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ComboBox
+                    Grid.Row="1"
+                    Height="30"
+                    ItemsSource="{Binding Items}"
+                    SelectedItem="{Binding Value, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource SelectionItemDisplayConverter}">
+                                        <Binding />
+                                        <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=ComboBox}" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+            </Grid>
+        </DataTemplate>
+
+        <!--  Шаблон для BoolPropertyItem  -->
+        <DataTemplate DataType="{x:Type local:BoolPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <CheckBox
+                    Height="30"
+                    Margin="0,10,0,5"
+                    Content="{Binding Header}"
+                    IsChecked="{Binding Value, Mode=TwoWay}"
+                    Style="{StaticResource SimpleCheckBox}" />
+
+                <TextBlock
+                    Grid.Row="1"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+            </Grid>
+        </DataTemplate>
+
+        <!--  Шаблон для StringPropertyItem  -->
+        <DataTemplate DataType="{x:Type local:StringPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,5" VerticalAlignment="Center">
+                    <TextBlock FontSize="14" Text="{Binding Header}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <Border
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SecondaryBrush}"
+                    CornerRadius="15">
+                    <TextBox
+                        Grid.Column="1"
+                        Height="30"
+                        Margin="9,0,9,0"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource CleanTextBoxStyle}"
+                        Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                </Border>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+            </Grid>
+        </DataTemplate>
+
+        <!--  Шаблон для DoublePropertyItem  -->
+        <DataTemplate DataType="{x:Type local:DoublePropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,5" VerticalAlignment="Center">
+                    <TextBlock FontSize="14" Text="{Binding Header}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <Border
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SecondaryBrush}"
+                    CornerRadius="15">
+                    <TextBox
+                        Grid.Column="1"
+                        Height="30"
+                        Margin="9,0,9,0"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource CleanTextBoxStyle}"
+                        Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                </Border>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+            </Grid>
+        </DataTemplate>
+
+        <!--  Шаблон для IntegerPropertyItem  -->
+        <DataTemplate DataType="{x:Type local:IntegerPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,5" VerticalAlignment="Center">
+                    <TextBlock FontSize="14" Text="{Binding Header}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <Border
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SecondaryBrush}"
+                    CornerRadius="15">
+                    <TextBox
+                        Grid.Column="1"
+                        Height="30"
+                        Margin="9,0,9,0"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource CleanTextBoxStyle}"
+                        Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                </Border>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+            </Grid>
+        </DataTemplate>
+
+        <!--  Шаблон для FileDialogPropertyItem  -->
+        <DataTemplate DataType="{x:Type local:FileDialogPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,5" VerticalAlignment="Center">
+                    <TextBlock FontSize="14" Text="{Binding Header}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+
+                <ld:FlatButton
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SecondaryBrush}"
+                    BorderBrush="Transparent"
+                    Command="{Binding OpenFileDialogCommand}"
+                    ContentHorizontalAlignment="Stretch"
+                    CornerRadius="15"
+                    Foreground="{DynamicResource IconBrush}"
+                    HoverBrush="{DynamicResource HoverBrush}">
+
+                    <Grid>
+
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock
+                            Margin="12,0,9,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundBrush}"
+                            Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                            TextWrapping="WrapWithOverflow"
+                            Visibility="{Binding Value, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+                        <TextBlock
+                            Margin="12,0,9,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundBrush}"
+                            Text="{Binding Placeholder}"
+                            TextWrapping="WrapWithOverflow"
+                            Visibility="{Binding Value, Converter={StaticResource StringLengthToVisibilityConverter}, ConverterParameter=Reversed}" />
+
+                        <ld:PackIcon
+                            Grid.Column="1"
+                            Width="16"
+                            Margin="10,0,12,0"
+                            Kind="Folder" />
+                    </Grid>
+
+                </ld:FlatButton>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+            </Grid>
+        </DataTemplate>
+
+    </ld:LDWindow.Resources>
+
+    <Grid>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ContentControl
+            Margin="20,10,20,0"
+            Content="{Binding HeaderItem}"
+            Visibility="{Binding HeaderItem, Converter={StaticResource NullToVisibilityConverter}}" />
+
+        <ItemsControl
+            Grid.Row="1"
+            ItemsSource="{Binding ItemsView}"
+            VirtualizingPanel.ScrollUnit="Pixel">
+
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel MaxWidth="400" Margin="20,0,5,0" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                    <ScrollViewer
+                        CanContentScroll="True"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Visible">
+                        <ItemsPresenter />
+                    </ScrollViewer>
+                </ControlTemplate>
+            </ItemsControl.Template>
+
+        </ItemsControl>
+
+        <StackPanel
+            Grid.Row="2"
+            Margin="0,10,10,10"
+            HorizontalAlignment="Right"
+            Orientation="Horizontal">
+            <ld:FlatButton
+                x:Name="OkButton"
+                Width="75"
+                Height="26"
+                Margin="0,0,8,0"
+                Click="OkButton_Click"
+                Content="OK"
+                CornerRadius="12"
+                FontSize="13"
+                IsDefault="True" />
+            <ld:FlatButton
+                Width="75"
+                Height="26"
+                Click="CancelButton_Click"
+                Content="Отмена"
+                CornerRadius="12"
+                FontSize="13"
+                IsCancel="True" />
+        </StackPanel>
+    </Grid>
+
+</ld:LDWindow>

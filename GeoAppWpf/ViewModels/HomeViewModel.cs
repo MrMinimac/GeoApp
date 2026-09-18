@@ -7,105 +7,129 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Windows;
+using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels
 {
     public class HomeViewModel : BaseViewModel
     {
+        private Node? _selectionAnchor;
         private readonly IServiceProvider _serviceProvider;
         private readonly WorkspaceManager _workspaceManager;
-        private bool _documentsAny;
-        private GeoTreeNode? _selectedNode;
-        private IEnumerable? _displayItems;
-        private IMessageBox _messageBox;
+        private readonly CommandsProvider _commandsProvider;
+        private Node? _selectedNode;
 
         #region Public Properties
 
-        public ObservableCollection<GeoTreeNode> Documents { get; set; } = new();
+        public ObservableCollection<Node> Nodes { get; set; } = new();
+        public IEnumerable<Node> AllNodes => Nodes.SelectMany(n => n.Flatten());
 
-        public bool DocumentsAny
-        {
-            get => _documentsAny;
-            set
-            {
-                _documentsAny = value;
-                OnPropertyChanged();
-            }
-        }
+        public bool DocumentsAny => Nodes.Any();
 
-        public GeoTreeNode? SelectedNode
-        {
-            get => _selectedNode;
-            set
-            {
-                if (value == null || value == _selectedNode)
-                    return;
-
-                _selectedNode = value;
-                OnPropertyChanged();
-                OnSelectedItemChanged(value);
-            }
-        }
+        public Node? SelectedNode => AllNodes.Where(x => x.IsSelected).FirstOrDefault();
 
         public IEnumerable? DisplayItems
         {
-            get => _displayItems;
-            set
+            get
             {
-                if (value == _displayItems)
-                    return;
-
-                _displayItems = value;
-                OnPropertyChanged();
+                return SelectedNode switch
+                {
+                    BoreholeLineNode n => n.Line.Boreholes,
+                    BoreholeNode n => n.Borehole.Samples,
+                    BoreholesDocumentNode n => n.Boreholes,
+                    _ => null
+                };
             }
         }
 
-        private readonly IReadOnlyList<TreeMenuItem> _dockPanelItems;
-        public IReadOnlyList<TreeMenuItem> DockPanelItems => _dockPanelItems;
-
         #endregion
+
+        #region Commands
+        private readonly RelayCommand<NodeSelectionRequest> _selectNodeCommand;
+        public ICommand SelectNodeCommand => _selectNodeCommand;
+        #endregion
+
 
         public HomeViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
 
-            _messageBox = _serviceProvider.GetRequiredService<IMessageBox>();
             _workspaceManager = _serviceProvider.GetRequiredService<WorkspaceManager>();
+            _commandsProvider = _serviceProvider.GetRequiredService<CommandsProvider>();
 
-            _workspaceManager.OnDocumentAdded += _workspaceManager_OnDocumentsChanged;
+            _workspaceManager.OnDocumentAdded += OnWorkspaceManagerDocumentsChanged;
+            Nodes.CollectionChanged += OnNodesCollectionChanged;
 
-            Documents.CollectionChanged += (o, e) =>
-            {
-                DocumentsAny = Documents.Any();
-
-                if (e.Action.HasFlag(NotifyCollectionChangedAction.Add))
-                {
-                    var item = e.NewItems?[0];
-
-                    DisplayItems = item switch
-                    {
-                        BoreholesDocumentNode n => n.Document.GetObjects(),
-                        _ => null
-                    };
-                }
-            };
-
+            _selectNodeCommand = new RelayCommand<NodeSelectionRequest>(SelectNode);
         }
 
-        private void _workspaceManager_OnDocumentsChanged(IDocument document)
+        private void OnNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            Documents.Add(new BoreholesDocumentNode(document));
+            OnPropertyChanged(nameof(DocumentsAny));
         }
 
-        public void OnSelectedItemChanged(GeoTreeNode node)
+        private void OnWorkspaceManagerDocumentsChanged(IDocument document)
         {
-            DisplayItems = SelectedNode switch
+            Nodes.Add(new BoreholesDocumentNode(document, _commandsProvider));
+        }
+
+        private void SelectNode(NodeSelectionRequest request)
+        {
+            if (request.Modifiers.HasFlag(ModifierKeys.Shift))
             {
-                BoreholeLineNode n => n.Line.Boreholes,
-                BoreholeNode n => n.Borehole.Samples,
-                BoreholesDocumentNode n => n.Boreholes,
-                _ => null
-            };
+                SelectRange(request.Node);
+                return;
+            }
+
+            if (request.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                request.Node.IsSelected = !request.Node.IsSelected;
+                _selectionAnchor = request.Node;
+                return;
+            }
+
+            foreach (var node in AllNodes)
+            {
+                node.IsSelected = node == request.Node;
+            }
+
+            _selectionAnchor = request.Node;
+
+            OnPropertyChanged(nameof(SelectedNode));
+            OnPropertyChanged(nameof(DisplayItems));
+        }
+
+        private void SelectRange(Node node)
+        {
+            if (_selectionAnchor == null)
+            {
+                node.IsSelected = true;
+                _selectionAnchor = node;
+                return;
+            }
+
+            var flatNodes = AllNodes.ToList();
+
+            int anchorIndex = flatNodes.IndexOf(_selectionAnchor);
+            int targetIndex = flatNodes.IndexOf(node);
+
+            if (anchorIndex < 0 || targetIndex < 0)
+                return;
+
+            int start = Math.Min(anchorIndex, targetIndex);
+            int end = Math.Max(anchorIndex, targetIndex);
+
+            var nodesToSelect = flatNodes
+                .Skip(start)
+                .Take(end - start + 1)
+                .Where(x => x.IsVisible)
+                .ToHashSet();
+
+            foreach (var n in flatNodes)
+            {
+                n.IsSelected = nodesToSelect.Contains(n);
+            }
         }
     }
 }

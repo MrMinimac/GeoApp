@@ -38,7 +38,7 @@
                         <theme:DataGridHeaderBorder
                             Padding="4,2,4,2"
                             Background="Transparent"
-                            BorderBrush="{DynamicResource InactiveBrush}"
+                            BorderBrush="{DynamicResource InactiveStrokeBrush}"
                             BorderThickness="0,0,1,0"
                             IsClickable="{TemplateBinding CanUserSort}"
                             IsHovered="{TemplateBinding IsMouseOver}"
@@ -99,10 +99,10 @@
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource ForegroundTertiaryBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource InactiveBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource InactiveStrokeBrush}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                <Setter Property="BorderBrush" Value="{DynamicResource InactiveBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource InactiveStrokeBrush}" />
             </Trigger>
             <MultiTrigger>
                 <MultiTrigger.Conditions>
@@ -110,7 +110,7 @@
                     <Condition Property="Selector.IsSelectionActive" Value="false" />
                 </MultiTrigger.Conditions>
                 <Setter Property="Background" Value="{DynamicResource SecondaryBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource InactiveBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource InactiveStrokeBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
             </MultiTrigger>
             <Trigger Property="IsEnabled" Value="false">
@@ -128,7 +128,7 @@
 
     <Style x:Key="{x:Type DataGridRow}" TargetType="{x:Type DataGridRow}">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{DynamicResource InactiveBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource InactiveStrokeBrush}" />
         <Setter Property="SnapsToDevicePixels" Value="true" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="Validation.ErrorTemplate" Value="{x:Null}" />
@@ -227,7 +227,7 @@
 
     <Style TargetType="{x:Type DataGrid}">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="RowDetailsVisibilityMode" Value="VisibleWhenSelected" />
@@ -235,23 +235,18 @@
         <Setter Property="ScrollViewer.PanningMode" Value="Both" />
         <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
         <Setter Property="GridLinesVisibility" Value="Vertical" />
-        <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource InactiveBrush}" />
+        <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource InactiveStrokeBrush}" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type DataGrid}">
-                    <Border
-                        Padding="{TemplateBinding Padding}"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        SnapsToDevicePixels="True">
+                    <Border Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ScrollViewer x:Name="DG_ScrollViewer" Focusable="false">
                             <ScrollViewer.Template>
                                 <ControlTemplate TargetType="{x:Type ScrollViewer}">
                                     <Border
-                                        BorderBrush="{DynamicResource InactiveBrush}"
-                                        BorderThickness="1"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
                                         CornerRadius="3.5">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -276,7 +271,7 @@
                                             <Border
                                                 Grid.Column="1"
                                                 Background="{DynamicResource SecondaryBrush}"
-                                                BorderBrush="{DynamicResource InactiveBrush}"
+                                                BorderBrush="{DynamicResource InactiveStrokeBrush}"
                                                 BorderThickness="0,0,0,1"
                                                 CornerRadius="3.5,3.5,0,0">
                                                 <DataGridColumnHeadersPresenter

@@ -1,27 +1,52 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
+using GeoAppWpf.ViewModels;
 
 namespace GeoAppWpf.Models
 {
-    public class BoreholesDocumentNode : GeoTreeNode
+    public class BoreholesDocumentNode : Node
     {
         public IDocument Document { get; }
         public IEnumerable<BoreholeLine> Boreholes => Document.GetObjects().OfType<BoreholeLine>();
 
-        public BoreholesDocumentNode(IDocument document)
+        public override IReadOnlyList<NodeMenuItem> MenuItems => new NodeMenuItem[]
         {
-            Document = document;
-            Header = document.Name;
-
-            foreach (var obj in document.GetObjects())
+            new()
             {
-                var node = obj switch
-                {
-                    BoreholeLine line => new BoreholeLineNode(line),
-                    _ => throw new Exception("Объект не поддерживается")
-                };
+                Header = "Генерация данных",
+                Command = CommandsProvider.GenerateBoreholesCommand,
+                CommandParameter = Boreholes
+            },
+            new()
+            {
+                Header = "Экспорт в Excel",
+                Command = CommandsProvider.ExcelExportBoreholesCommand,
+                CommandParameter = Document
+            },
+            new()
+            {
+                Header = "Экспорт план в AutoCad",
+                Command = CommandsProvider.AutoCadExportPlanCommand,
+                CommandParameter = Boreholes
+            },
+        };
 
-                Children.Add(node);
+        public BoreholesDocumentNode(IDocument document, CommandsProvider cmdProvider)
+            : base(document.Name, cmdProvider)
+        {
+            {
+                Document = document;
+
+                foreach (var obj in document.GetObjects())
+                {
+                    var node = obj switch
+                    {
+                        BoreholeLine line => new BoreholeLineNode(line, cmdProvider),
+                        _ => throw new Exception("Объект не поддерживается")
+                    };
+
+                    Children.Add(node);
+                }
             }
         }
     }

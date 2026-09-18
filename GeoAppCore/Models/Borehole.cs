@@ -22,7 +22,7 @@ namespace GeoAppCore
                 if (Samples.Count == 0)
                     return _deapth;
 
-                return Samples.Sum(x => x.Length);
+                return double.Round(Samples.Sum(x => x.Length), 3);
             }
             set => _deapth = value;
         }

@@ -12,10 +12,18 @@
     d:DesignWidth="800"
     mc:Ignorable="d">
 
+    <UserControl.Resources>
+        <Style x:Key="BorderStyle" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="BorderBrush" Value="{DynamicResource InactiveStrokeBrush}" />
+        </Style>
+    </UserControl.Resources>
+
     <ld:CustomPage HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
         <ld:CustomPage.PageContent>
             <Grid>
-                <Grid>
+                <Grid Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}">
 
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="200" />
@@ -23,11 +31,28 @@
                         <ColumnDefinition />
                     </Grid.ColumnDefinitions>
 
-                    <components:ObjectTreeComponent
-                        Margin="3,3,0,3"
-                        Documents="{Binding Documents}"
-                        SelectedNode="{Binding SelectedNode}"
-                        Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <Border Margin="3,3,0,3" Style="{StaticResource BorderStyle}">
+
+                        <Grid>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock
+                                Margin="7,3,0,3"
+                                Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                Text="Обозреватель" />
+
+                            <components:ObjectTreeComponent
+                                Grid.Row="2"
+                                Nodes="{Binding Nodes}"
+                                SelectNodeCommand="{Binding SelectNodeCommand}" />
+
+                        </Grid>
+
+                    </Border>
 
                     <GridSplitter
                         Grid.Row="2"
@@ -43,18 +68,29 @@
                         Grid.Row="2"
                         Grid.Column="2"
                         Margin="0,3,3,3"
-                        BorderBrush="{DynamicResource InactiveBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3.5"
-                        Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}">
+                        Style="{StaticResource BorderStyle}">
 
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
 
-                            <components:TableComponent Grid.Row="1" ItemsSource="{Binding DisplayItems}" />
+                            <Grid Visibility="{Binding SelectedNode, Converter={StaticResource NullToVisibilityConverter}}">
+
+                                <components:TableComponent ItemsSource="{Binding DisplayItems}" Visibility="{Binding DisplayItems.Count, Converter={StaticResource IntToVisibilityConverter}}" />
+
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                    Text="Нет Данных"
+                                    Visibility="{Binding DisplayItems.Count, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=Reversed}" />
+
+                            </Grid>
+
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                Text="Выберите элемент для отображения данных."
+                                Visibility="{Binding SelectedNode, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Reversed}" />
 
                         </Grid>
 

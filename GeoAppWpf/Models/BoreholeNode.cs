@@ -1,15 +1,16 @@
 ﻿using GeoAppCore;
+using GeoAppWpf.ViewModels;
 
 namespace GeoAppWpf.Models
 {
-    public class BoreholeNode : GeoTreeNode
+    public class BoreholeNode : Node
     {
         public Borehole Borehole { get; }
 
-        public BoreholeNode(Borehole borehole)
+        public BoreholeNode(Borehole borehole, CommandsProvider cmdProvider)
+            : base($"Скв. {borehole.Id}", cmdProvider)
         {
             Borehole = borehole;
-            Header = $"Скв. {borehole.Id}";
         }
     }
 }

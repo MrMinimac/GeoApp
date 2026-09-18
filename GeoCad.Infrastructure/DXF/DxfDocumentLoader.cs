@@ -11,7 +11,7 @@ namespace GeoCad.Infrastructure.DXF
 
         public IDocument Load(string path)
         {
-            return DXFDocument.Load(path);
+            throw new NotImplementedException();
         }
     }
 }

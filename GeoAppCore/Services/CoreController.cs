@@ -10,17 +10,11 @@ namespace GeoAppCore.Services
         private static readonly HttpClient _httpClient = new();
         public bool IsReady;
 
-        public static readonly string[] Urls = new[]
-        {
-            "http://localhost:5050/",
-            "https://still-math-51e7.xlson-syper-90.workers.dev/",
-        };
-
         public static async Task<bool> CheckAsync()
         {
             return true;
             var response = await _httpClient.PostAsJsonAsync(
-                Urls[1],
+                "https://still-math-51e7.xlson-syper-90.workers.dev/",
                 new
                 {
                     key = "B&lx$S-KIp(R!&@A"

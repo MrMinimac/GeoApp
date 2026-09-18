@@ -2,24 +2,67 @@
     x:Class="GeoAppWpf.Views.Components.ObjectTreeComponent"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:GeoAppWpf.Views.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:ld="clr-namespace:LegendDesignWpf.Controls;assembly=LegendDesignWpf"
     xmlns:local="clr-namespace:GeoAppWpf.Views.Components"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     d:DesignHeight="450"
     d:DesignWidth="800"
     mc:Ignorable="d">
 
-    <TreeView
-        x:Name="GeoTree"
-        ItemsSource="{Binding Documents, RelativeSource={RelativeSource AncestorType=UserControl}}"
-        PreviewMouseRightButtonDown="GeoTree_PreviewMouseRightButtonDown"
-        SelectedItemChanged="TreeView_SelectedItemChanged">
+    <Grid>
 
-        <TreeView.ItemTemplate>
-            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                <TextBlock Text="{Binding Header}" />
-            </HierarchicalDataTemplate>
-        </TreeView.ItemTemplate>
-    </TreeView>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Margin="4,2,4,2"
+            Padding="6,4,6,4"
+            Background="{DynamicResource SecondaryBrush}"
+            CornerRadius="5">
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox
+                    FontSize="11"
+                    Style="{StaticResource CleanTextBoxStyle}"
+                    Tag="Поиск..."
+                    Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                <ld:PackIcon
+                    Grid.Column="1"
+                    Width="10"
+                    Margin="2,0"
+                    Foreground="{DynamicResource IconBrush}"
+                    Kind="Search" />
+
+            </Grid>
+
+        </Border>
+
+        <ld:CustomListBox
+            Grid.Row="1"
+            ItemsSource="{Binding Nodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            VerticalScrollBarVisibility="Auto">
+            <ld:CustomListBox.ItemTemplate>
+                <DataTemplate>
+                    <controls:ObjectItemControl
+                        Node="{Binding}"
+                        SelectCommand="{Binding SelectNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type local:ObjectTreeComponent}}}"
+                        Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                </DataTemplate>
+
+            </ld:CustomListBox.ItemTemplate>
+        </ld:CustomListBox>
+    </Grid>
 
 </UserControl>

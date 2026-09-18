@@ -1,36 +1,36 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-    <ApplicationIcon>GeoCad.ico</ApplicationIcon>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<ApplicationIcon>GeoCad.ico</ApplicationIcon>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="Node\**" />
-    <EmbeddedResource Remove="Node\**" />
-    <None Remove="Node\**" />
-    <Page Remove="Node\**" />
-  </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="Node\**" />
+		<EmbeddedResource Remove="Node\**" />
+		<None Remove="Node\**" />
+		<Page Remove="Node\**" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Include="GeoCad.ico" />
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="GeoCad.ico" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Clipper2" Version="2.0.0" />
-    <PackageReference Include="EPPlus" Version="8.6.2" />
-    <PackageReference Include="HelixToolkit.Wpf" Version="3.1.2" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
-    <PackageReference Include="netDxf" Version="2023.11.10" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Clipper2" Version="2.0.0" />
+		<PackageReference Include="EPPlus" Version="8.6.2" />
+		<PackageReference Include="HelixToolkit.Wpf" Version="3.1.2" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+		<PackageReference Include="netDxf" Version="2023.11.10" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\LegendDesign\LegendDesignWpf\LegendDesignWpf.csproj" />
-    <ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\LegendDesign\LegendDesignWpf\LegendDesignWpf.csproj" />
+		<ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
+	</ItemGroup>
 
 </Project>

@@ -24,19 +24,11 @@
 
         <ld:FlatButton.ContextMenu>
             <ContextMenu Placement="Bottom">
-
                 <MenuItem Command="{Binding CommandsProvider.ImportCommand}" Header="Импорт">
                     <MenuItem.Icon>
                         <ld:PackIcon Kind="Import" />
                     </MenuItem.Icon>
                 </MenuItem>
-
-                <MenuItem Command="{Binding CommandsProvider.ExportCommand}" Header="Экспорт">
-                    <MenuItem.Icon>
-                        <ld:PackIcon Kind="Import" />
-                    </MenuItem.Icon>
-                </MenuItem>
-
             </ContextMenu>
         </ld:FlatButton.ContextMenu>
 

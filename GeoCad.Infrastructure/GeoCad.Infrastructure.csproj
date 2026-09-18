@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\LegendDesign\LegendDesignWpf\LegendDesignWpf.csproj" />
     <ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
   </ItemGroup>
 
