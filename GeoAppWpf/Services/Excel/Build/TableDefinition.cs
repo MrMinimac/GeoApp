@@ -4,7 +4,7 @@ namespace GeoAppWpf.Services.Excel.Build
 {
     public sealed class TableDefinition
     {
-        public string Name { get; init; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public TableStyle Style { get; init; } = new();
 
         public List<TableColumn> Columns { get; init; } = [];

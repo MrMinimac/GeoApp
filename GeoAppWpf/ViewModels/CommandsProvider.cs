@@ -51,9 +51,18 @@ namespace GeoAppWpf.ViewModels
             if (lines == null || !lines.Any())
                 return;
 
-            var tables = lines
-                .SelectMany(x => x.Boreholes
-                    .Select(x => BoreholeReportTableBuilder.Build(x)));
+            var tables = new List<TableDefinition>();
+
+            foreach (var line in lines)
+            {
+                int bhIndex = 1;
+
+                foreach (var bh in line.Boreholes)
+                {
+                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.Key} СКВ-{bhIndex}"));
+                    bhIndex++;
+                }
+            }
 
             SaveTable(document.Name, tables);
         }

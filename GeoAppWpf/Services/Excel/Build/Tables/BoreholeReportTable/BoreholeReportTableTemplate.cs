@@ -18,18 +18,18 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
                 Columns =
                 [
-                    new() { Header = "№ Рейса", Key = "ReisNumber", Width = 10 },
-                    new() { Header = "от", Key = "From", Format = "F2", Width = 10 },
-                    new() { Header = "до", Key = "To", Format = "F2", Width = 10 },
-                    new() { Header = "длина", Key = "Length", Format = "F2", Width = 10 },
-                    new() { Header = "№", Key = "ProhodkaNum", Width = 10 },
-                    new() { Header = "подошва, м", Key = "Podoshva", Format = "F2", Width = 10 },
-                    new() { Header = "теор.", Key = "VolTeor", Width = 10 },
-                    new() { Header = "факт.", Key = "VolFact", Width = 10 },
-                    new() { Header = "% выхода керна", Key = "CoreRecovery", Format = "F1", Width = 10 },
-                    new() { Header = "Визуальное определение золота", Key = "VisGold", Width = 10 },
-                    new() { Header = "Геологич. Колонка", Key = "GeoColumn", Width = 10 },
-                    new() { Key = "RockDesc", Width = 40 }
+                    new() { Header = "№ Рейса", Key = "ReisNumber", Width = 10.5 },
+                    new() { Header = "от", Key = "From", Format = "F2", Width = 10.5 },
+                    new() { Header = "до", Key = "To", Format = "F2", Width = 10.5 },
+                    new() { Header = "длина", Key = "Length", Format = "F2", Width = 10.5 },
+                    new() { Header = "№", Key = "ProhodkaNum", Width = 10.5 },
+                    new() { Header = "подошва, м", Key = "Podoshva", Format = "F2", Width = 10.5 },
+                    new() { Header = "теор.", Key = "VolTeor", Width = 10.5 },
+                    new() { Header = "факт.", Key = "VolFact", Width = 10.5 },
+                    new() { Header = "% выхода керна", Key = "CoreRecovery", Format = "F1", Width = 10.5 },
+                    new() { Header = "Визуальное определение золота", Key = "VisGold", Width = 14 },
+                    new() { Header = "Геологич. Колонка", Key = "GeoColumn", Format = "F1", Width = 11 },
+                    new() { Key = "RockDesc", Width = 48 }
                 ],
 
                 MergeRules =
@@ -104,13 +104,13 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     },
                     new()
                     {
-                        ColumnKey = "VolFact",
-                        EndColumnKey = "VisGold",
+                        ColumnKey = "VolTeor",
+                        EndColumnKey = "CoreRecovery",
                         Horizontal = true,
 
                         CanMerge = row =>
                         {
-                            row.Values.TryGetValue("VolFact", out var value);
+                            row.Values.TryGetValue("VolTeor", out var value);
                             var text = value?.ToString();
                             return text?.Contains("Координаты", StringComparison.InvariantCultureIgnoreCase) ?? false;
                         }
@@ -120,6 +120,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         ColumnKey = "ProhodkaNum",
                         EndColumnKey = "Podoshva",
                         Horizontal = true,
+                        HorizontalAlignment = TableHorizontalAlignment.Right,
 
                         CanMerge = row =>
                         {
@@ -133,6 +134,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         ColumnKey = "VolTeor",
                         EndColumnKey = "VolFact",
                         Horizontal = true,
+                        HorizontalAlignment = TableHorizontalAlignment.Right,
 
                         CanMerge = row =>
                         {
@@ -140,6 +142,22 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                             var text = value?.ToString();
                             return (text?.Contains("Глубина обсадки", StringComparison.InvariantCultureIgnoreCase) ?? false)
                              || (text?.Contains("Диаметр коронки", StringComparison.InvariantCultureIgnoreCase) ?? false);
+                        }
+                    },
+                    new()
+                    {
+                        ColumnKey = "VolFact",
+                        EndColumnKey = "VisGold",
+                        Horizontal = true,
+                        HorizontalAlignment = TableHorizontalAlignment.Right,
+
+                        CanMerge = row =>
+                        {
+                            row.Values.TryGetValue("VolFact", out var value);
+                            var text = value?.ToString();
+                            return text != null &&
+                                (text.Contains("Пройдено", StringComparison.InvariantCultureIgnoreCase) ||
+                                 text.Contains("корен", StringComparison.InvariantCultureIgnoreCase));
                         }
                     }
                 ],
@@ -159,6 +177,28 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         BackgroundColor = Color.FromArgb(215, 215, 215),
                         Border = ExcelStyles.AllSidesBorder,
                         WrapText = true
+                    },
+                    new()
+                    {
+                        Condition = row =>
+                        {
+                            row.Values.TryGetValue("ReisNumber", out var value);
+                            var text = value?.ToString();
+
+                            return !string.IsNullOrEmpty(text) && !text.Contains("рейс", StringComparison.InvariantCultureIgnoreCase);
+                        },
+                        Border = ExcelStyles.AllSidesBorder,
+                    },
+                    new()
+                    {
+                        Condition = row =>
+                        {
+                            row.Values.TryGetValue("RockDesc", out var value);
+                            var text = value?.ToString();
+
+                            return text == "м";
+                        },
+                        HorizontalAlignment = TableHorizontalAlignment.Left
                     },
                     //new()
                     //{

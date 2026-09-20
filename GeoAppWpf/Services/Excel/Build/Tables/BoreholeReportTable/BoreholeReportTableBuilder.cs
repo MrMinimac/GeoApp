@@ -5,25 +5,27 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 {
     public static class BoreholeReportTableBuilder
     {
-        public static TableDefinition Build(Borehole borehole)
+        public static TableDefinition Build(Borehole borehole, string name)
         {
             int globalReisNumber = 1;
 
             var table = BoreholeReportTableTemplate.Create();
+            table.Name = name;
+
             table.HasHeader = false;
 
             int prohodkaNumber = 1;
 
-            table.Rows.Add(new TableRow
-            {
-                Values = { ["From"] = $"Колонка скважины: № {borehole.Key}", }
-            });
+            string bhKey = borehole.Key.Length >= 2
+                ? borehole.Key[..2].ToUpper() + borehole.Key[2..]
+                : borehole.Key.ToUpper();
 
             table.Rows.Add(new TableRow
             {
-                Values = { 
-                    ["From"] = "Участок: р. Нюкжа", 
-                    ["VolFact"] = "Координаты",
+                Values = 
+                { 
+                    ["From"] = $"Колонка скважины: № {bhKey}", 
+                    ["VolTeor"] = "Координаты ГСК 2011",
                 }
             });
 
@@ -31,11 +33,10 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             {
                 Values = 
                 { 
-                    //["From"] = "Начало бурения: 13.11.2025",
-
-                    ["VolFact"] = "Широта",
-                    ["CoreRecovery"] = "Долгота",
-                    ["VisGold"] = "Высота",
+                    ["From"] = "Участок: руч. Рогатый",
+                    ["VolTeor"] = "Широта",
+                    ["VolFact"] = "Долгота",
+                    ["CoreRecovery"] = "Высота",
                 }
             });
 
@@ -43,22 +44,40 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
             table.Rows.Add(new TableRow
             {
-                Values =
+                Values = 
                 { 
-                    //["From"] = "Конец бурения: -", }
-
-                    ["VolFact"] = $"{coords.Latitude:F4}",
-                    ["CoreRecovery"] = $"{coords.Longitude:F4}",
-                    ["VisGold"] = $"{borehole.Z:F1}",
+                    //["From"] = "Начало бурения: 13.11.2025",
+                    ["VolTeor"] = $"{coords.Latitude:F4}",
+                    ["VolFact"] = $"{coords.Longitude:F4}",
+                    ["CoreRecovery"] = $"{borehole.Z:F1}",
                 }
             });
 
             table.Rows.Add(new TableRow
             {
-                Values = { ["From"] = $"Глубина скважины, м: {borehole.Deapth}", }
+                Values =
+                { 
+                    //["From"] = "Конец бурения: -", }
+                }
             });
 
-            table.Rows.Add(new TableRow { Values = { } });
+            table.Rows.Add(new TableRow
+            {
+                Values = 
+                { 
+                    ["From"] = $"Глубина скважины, м: {borehole.Deapth}", 
+                }
+            });
+
+            table.Rows.Add(new TableRow 
+            { 
+                Values = 
+                {
+                    ["VolFact"] = "Пройдено наносами",
+                    ["GeoColumn"] = 16.0, // пройдено
+                    ["RockDesc"] = "м", // пройдено
+                } 
+            });
 
             table.Rows.Add(new TableRow
             {
@@ -67,6 +86,10 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     ["From"] = $"Диаметр бурения", 
                     ["ProhodkaNum"] = $"начальный:",
                     ["Podoshva"] = "151 мм",
+
+                    ["VolFact"] = "Разрушен. коренными породами",
+                    ["GeoColumn"] = 0.8, // РКП
+                    ["RockDesc"] = "м", // РКП
                 },
             });
 
@@ -76,6 +99,10 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 { 
                     ["ProhodkaNum"] = $"конечный: ", 
                     ["Podoshva"] = "132 мм",
+
+                    ["VolFact"] = "Плотными коренными породами",
+                    ["GeoColumn"] = 0.4, // ПКП
+                    ["RockDesc"] = "м", // ПКП
                 }
             });
 
@@ -85,8 +112,8 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             {
                 Values =
                 {
-                    ["From"] = $"Обсадка: диаметр, мм - ",
-                    ["ProhodkaNum"] = $"151",
+                    //["From"] = $"Обсадка: диаметр, мм - ",
+                    //["ProhodkaNum"] = $"151",
                     ["VolTeor"] = $"Глубина обсадки, м:",
                     ["CoreRecovery"] = "0.8",
                 },
@@ -179,6 +206,14 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     }
                 });
             }
+
+            table.Rows.Add(new TableRow
+            {
+                Values =
+                {
+                    ["GeoColumn"] = "Геолог:",
+                },
+            });
 
             return table;
         }
