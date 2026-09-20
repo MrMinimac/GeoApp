@@ -45,7 +45,23 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                             row.Values.TryGetValue("ReisNumber", out var value);
                             var text = value?.ToString();
                             return Contains(text, "№ Рейса");
-                        }
+                        },
+                        
+                    },
+                    new()
+                    {
+                        ColumnKey = "RockDesc",
+                        Vertical = true,
+                        SkipEmpty = true,
+
+                        CanMerge = row =>
+                        {
+                            row.Values.TryGetValue("RockDesc", out var value);
+                            var text = value?.ToString();
+                            return text != "Описание горных пород" && text != "м";
+                        },
+                        HorizontalAlignment = TableHorizontalAlignment.Left,
+                        VerticalAlignment = TableVerticalAlignment.Top,
                     },
                     new()
                     {
@@ -212,6 +228,19 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                             return text == "м";
                         },
                         HorizontalAlignment = TableHorizontalAlignment.Left
+                    },
+                    new()
+                    {
+                        ColumnKey = "RockDesc",
+                        Condition = row =>
+                        {
+                            row.Values.TryGetValue("RockDesc", out var value);
+                            var text = value?.ToString();
+                            return text != "Описание горных пород" && text != "м";
+                        },
+                        WrapText = true,
+                        HorizontalAlignment = TableHorizontalAlignment.Left,
+                        VerticalAlignment = TableVerticalAlignment.Top,
                     },
                     //new()
                     //{

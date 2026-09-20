@@ -1,5 +1,6 @@
 ﻿using GeoAppCore;
 using GeoAppWpf.Helpers;
+using System.Globalization;
 using System.Xml.Linq;
 using static OfficeOpenXml.ExcelErrorValue;
 
@@ -173,6 +174,8 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
             Random random = new Random();
 
+            var desc = GetRockDesc(borehole);
+
             foreach (var sample in borehole.Samples)
             {
                 // Генерируем случайное число от 0.0 до 1.0, умножаем на 5 и прибавляем 90
@@ -202,7 +205,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
                         ["VisGold"] = "пс",
                         ["GeoColumn"] = string.Empty,
-                        ["RockDesc"] = string.Empty,
+                        ["RockDesc"] = desc,
                     },
                     Style = new TableRowStyle
                     {
@@ -234,6 +237,83 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             });
 
             return table;
+        }
+
+        private static string GetRockDesc(Borehole borehole)
+        {
+            var result = new List<string>();
+
+            AddDescription("ПРС", "ПРС Интервал");
+            AddDescription("Делювий", "Делювий Интервал");
+            AddDescription("Торф", "Торф Интервал");
+            AddDescription("Аллювий", "Аллювий Интервал");
+            AddDescription("РКП", "РКП Интервал");
+            AddDescription("ПКП", "ПКП Интервал");
+
+            return string.Join("\n", result);
+
+            void AddDescription(string type, string intervalKey)
+            {
+                var interval = borehole.Atributes
+                    .GetValueOrDefault(intervalKey)?
+                    .ToString();
+
+                if (string.IsNullOrWhiteSpace(interval))
+                    return;
+
+                var description = GetRandomDescription(borehole, $"{type} Описание");
+
+                if (!string.IsNullOrWhiteSpace(description))
+                    result.Add($"{NormalizeInterval(interval)}: {description}");
+            }
+        }
+
+        private static string NormalizeInterval(string value)
+        {
+            var parts = value
+                .Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length != 2)
+                return value.Trim();
+
+            if (!TryParseDepth(parts[0], out var start) ||
+                !TryParseDepth(parts[1], out var end))
+            {
+                return value.Trim();
+            }
+
+            return $"{start:0.0}-{end:0.0} м.";
+        }
+
+        private static bool TryParseDepth(string value, out double depth)
+        {
+            value = value
+                .Replace(',', '.');
+
+            var number = new string(
+                value
+                    .Trim()
+                    .TakeWhile(c => char.IsDigit(c) || c == '.')
+                    .ToArray());
+
+            return double.TryParse(
+                number,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out depth);
+        }
+
+        private static readonly Random Random = new();
+
+        private static string GetRandomDescription(Borehole borehole, string key)
+        {
+            if (!borehole.Atributes.TryGetValue(key, out var value))
+                return string.Empty;
+
+            if (value is not List<string> descriptions || descriptions.Count == 0)
+                return string.Empty;
+
+            return descriptions[Random.Next(descriptions.Count)];
         }
     }
 }

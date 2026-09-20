@@ -405,7 +405,8 @@ namespace GeoAppWpf.Services.Excel
                         worksheet,
                         startRow,
                         excelRow - 1,
-                        columnIndex);
+                        columnIndex,
+                        rule);
 
                     startRow = -1;
                     previousValue = null;
@@ -428,7 +429,8 @@ namespace GeoAppWpf.Services.Excel
                         worksheet,
                         startRow,
                         excelRow - 1,
-                        columnIndex);
+                        columnIndex,
+                        rule);
 
                     startRow = excelRow;
                     previousValue = currentValue;
@@ -439,20 +441,14 @@ namespace GeoAppWpf.Services.Excel
                 worksheet,
                 startRow,
                 table.Rows.Count + 1,
-                columnIndex);
+                columnIndex,
+                rule);
         }
 
-        private static void FinishMerge(
-            ExcelWorksheet worksheet,
-            int startRow,
-            int endRow,
-            int column)
+        private static void FinishMerge(ExcelWorksheet worksheet, int startRow, int endRow, int column, TableMergeRule rule)
         {
-            if (startRow < 0 ||
-                startRow >= endRow)
-            {
+            if (startRow < 0 || startRow >= endRow)
                 return;
-            }
 
             var range = worksheet.Cells[
                 startRow,
@@ -463,7 +459,14 @@ namespace GeoAppWpf.Services.Excel
             range.Merge = true;
 
             range.Style.VerticalAlignment =
-                ExcelVerticalAlignment.Center;
+                rule.VerticalAlignment.HasValue
+                    ? ConvertVerticalAlignment(rule.VerticalAlignment.Value)
+                    : ExcelVerticalAlignment.Center;
+
+            range.Style.HorizontalAlignment =
+                rule.HorizontalAlignment.HasValue
+                    ? ConvertHorizontalAlignment(rule.HorizontalAlignment.Value)
+                    : ExcelHorizontalAlignment.Center;
         }
 
         #endregion

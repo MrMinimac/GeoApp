@@ -137,7 +137,41 @@ namespace GeoAppWpf.Services
             int rkp = GetColIndex(cols, "РКП");
             int pkp = GetColIndex(cols, "ПКП");
 
+            int prsRange = GetColIndex(cols, "ПРС Интервал");
+            int delRange = GetColIndex(cols, "Делювий Интервал");
+            int torfRange = GetColIndex(cols, "Торф Интервал");
+            int alRange = GetColIndex(cols, "Аллювий Интервал");
+            int rkpRange = GetColIndex(cols, "РКП Интервал");
+            int pkpRange = GetColIndex(cols, "ПКП Интервал");
+
+            int prsDesc = GetColIndex(cols, "ПРС Описание");
+            int delDesc = GetColIndex(cols, "Делювий Описание");
+            int torfDesc = GetColIndex(cols, "Торф Описание");
+            int alDesc = GetColIndex(cols, "Аллювий Описание");
+            int rkpDesc = GetColIndex(cols, "РКП Описание");
+            int pkpDesc = GetColIndex(cols, "ПКП Описание");
+
             if (keyCol == -1) return boreholes; // Без ключа чтение невозможно
+
+            var descriptions = new Dictionary<string, List<string>>
+            {
+                ["ПРС"] = [],
+                ["Делювий"] = [],
+                ["Торф"] = [],
+                ["Аллювий"] = [],
+                ["РКП"] = [],
+                ["ПКП"] = []
+            };
+
+            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+            {
+                AddDescription(worksheet, row, prsDesc, descriptions["ПРС"]);
+                AddDescription(worksheet, row, delDesc, descriptions["Делювий"]);
+                AddDescription(worksheet, row, torfDesc, descriptions["Торф"]);
+                AddDescription(worksheet, row, alDesc, descriptions["Аллювий"]);
+                AddDescription(worksheet, row, rkpDesc, descriptions["РКП"]);
+                AddDescription(worksheet, row, pkpDesc, descriptions["ПКП"]);
+            }    
 
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
             {
@@ -157,7 +191,21 @@ namespace GeoAppWpf.Services
                         ["Участок"] = GetCellTextSafe(worksheet, row, regionName),
                         ["Наносы"] = GetCellTextSafe(worksheet, row, sediments),
                         ["РКП"] = GetCellTextSafe(worksheet, row, rkp),
-                        ["ПКП"] = GetCellTextSafe(worksheet, row, pkp)
+                        ["ПКП"] = GetCellTextSafe(worksheet, row, pkp),
+
+                        ["ПРС Интервал"] = GetCellTextSafe(worksheet, row, prsRange),
+                        ["Делювий Интервал"] = GetCellTextSafe(worksheet, row, delRange),
+                        ["Торф Интервал"] = GetCellTextSafe(worksheet, row, torfRange),
+                        ["Аллювий Интервал"] = GetCellTextSafe(worksheet, row, alRange),
+                        ["РКП Интервал"] = GetCellTextSafe(worksheet, row, rkpRange),
+                        ["ПКП Интервал"] = GetCellTextSafe(worksheet, row, pkpRange),
+
+                        ["ПРС Описание"] = descriptions["ПРС"],
+                        ["Делювий Описание"] = descriptions["Делювий"],
+                        ["Торф Описание"] = descriptions["Торф"],
+                        ["Аллювий Описание"] = descriptions["Аллювий"],
+                        ["РКП Описание"] = descriptions["РКП"],
+                        ["ПКП Описание"] = descriptions["ПКП"],
                     }
                 };
 
@@ -165,6 +213,14 @@ namespace GeoAppWpf.Services
             }
 
             return boreholes;
+        }
+
+        private static void AddDescription(ExcelWorksheet worksheet, int row, int column, List<string> descriptions)
+        {
+            var value = GetCellTextSafe(worksheet, row, column);
+
+            if (!string.IsNullOrWhiteSpace(value) && !descriptions.Contains(value))
+                descriptions.Add(value);
         }
 
         public static List<Borehole>? LoadBoreholesWithSamples(ExcelWorksheet worksheet, Dictionary<string, int> cols)
