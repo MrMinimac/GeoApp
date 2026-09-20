@@ -132,6 +132,11 @@ namespace GeoAppWpf.Services
             int zCol = GetColIndex(cols, "Z");
             int depthCol = GetColIndex(cols, "Длина", "Глубина", "Depth");
 
+            int regionName = GetColIndex(cols, "Участок");
+            int sediments = GetColIndex(cols, "Наносы");
+            int rkp = GetColIndex(cols, "РКП");
+            int pkp = GetColIndex(cols, "ПКП");
+
             if (keyCol == -1) return boreholes; // Без ключа чтение невозможно
 
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
@@ -146,7 +151,14 @@ namespace GeoAppWpf.Services
                     X = ParseDoubleSafe(worksheet, row, xCol),
                     Y = ParseDoubleSafe(worksheet, row, yCol),
                     Z = ParseDoubleSafe(worksheet, row, zCol),
-                    Deapth = ParseDoubleSafe(worksheet, row, depthCol)
+                    Deapth = ParseDoubleSafe(worksheet, row, depthCol),
+                    Atributes =
+                    {
+                        ["Участок"] = GetCellTextSafe(worksheet, row, regionName),
+                        ["Наносы"] = GetCellTextSafe(worksheet, row, sediments),
+                        ["РКП"] = GetCellTextSafe(worksheet, row, rkp),
+                        ["ПКП"] = GetCellTextSafe(worksheet, row, pkp)
+                    }
                 };
 
                 boreholes.Add(currentBorehole);
@@ -243,6 +255,14 @@ namespace GeoAppWpf.Services
                     return index;
             }
             return -1; // Если ни одно из возможных имен колонок не найдено
+        }
+
+        private static string? GetCellTextSafe(ExcelWorksheet worksheet, int row, int column)
+        {
+            if (column < 1)
+                return null;
+
+            return worksheet.Cells[row, column].Text;
         }
 
         private static double ParseDoubleSafe(ExcelWorksheet ws, int row, int col, double fallback = 0)

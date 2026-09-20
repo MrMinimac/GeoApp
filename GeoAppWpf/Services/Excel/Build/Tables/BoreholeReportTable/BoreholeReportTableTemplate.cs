@@ -6,7 +6,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
     {
         public static TableDefinition Create()
         {
-            string[] headerValues = ["Колонка скважины", "Участок", "Начало бурения", "Конец бурения", "Глубина скважины", "Диаметр", "Обсадка", "Коронка"];
+            string[] headerValues = ["Участок", "Начало бурения", "Конец бурения", "Глубина скважины", "Обсадка", "Диаметр"];
 
             return new TableDefinition
             {
@@ -44,7 +44,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("ReisNumber", out var value);
                             var text = value?.ToString();
-                            return text?.Contains("№ Рейса", StringComparison.InvariantCultureIgnoreCase) ?? false;
+                            return Contains(text, "№ Рейса");
                         }
                     },
                     new()
@@ -83,8 +83,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("VolTeor", out var value);
                             var text = value?.ToString();
-
-                            return text?.Contains("Объем пробы", StringComparison.InvariantCultureIgnoreCase) ?? false;
+                            return Contains(text, "Объем пробы");
                         }
                     },
                     new()
@@ -97,8 +96,35 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("From", out var value);
                             var text = value?.ToString();
-                            bool contains(string _text) => text?.Contains(_text, StringComparison.InvariantCultureIgnoreCase) ?? false;
-                            return headerValues.Any(x => contains(x));
+                            return headerValues.Any(x => Contains(text, x));
+                        },
+                        HorizontalAlignment = TableHorizontalAlignment.Left
+                    },
+                    new()
+                    {
+                        ColumnKey = "From",
+                        EndColumnKey = "Length",
+                        Horizontal = true,
+
+                        CanMerge = row =>
+                        {
+                            row.Values.TryGetValue("From", out var value);
+                            var text = value?.ToString();
+                            return Contains(text, "Коронка");
+                        },
+                        HorizontalAlignment = TableHorizontalAlignment.Right
+                    },
+                    new()
+                    {
+                        ColumnKey = "From",
+                        EndColumnKey = "ProhodkaNum",
+                        Horizontal = true,
+
+                        CanMerge = row =>
+                        {
+                            row.Values.TryGetValue("From", out var value);
+                            var text = value?.ToString();
+                            return Contains(text, "Колонка");
                         },
                         HorizontalAlignment = TableHorizontalAlignment.Left
                     },
@@ -112,7 +138,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("VolTeor", out var value);
                             var text = value?.ToString();
-                            return text?.Contains("Координаты", StringComparison.InvariantCultureIgnoreCase) ?? false;
+                            return Contains(text, "Координаты");
                         }
                     },
                     new()
@@ -126,7 +152,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("From", out var value);
                             var text = value?.ToString();
-                            return text?.Contains("Коронка", StringComparison.InvariantCultureIgnoreCase) ?? false;
+                            return Contains(text, "Коронка");
                         }
                     },
                     new()
@@ -140,8 +166,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("VolTeor", out var value);
                             var text = value?.ToString();
-                            return (text?.Contains("Глубина обсадки", StringComparison.InvariantCultureIgnoreCase) ?? false)
-                             || (text?.Contains("Диаметр коронки", StringComparison.InvariantCultureIgnoreCase) ?? false);
+                            return Contains(text, "Глубина обсадки") || Contains(text, "Диаметр коронки");
                         }
                     },
                     new()
@@ -155,9 +180,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("VolFact", out var value);
                             var text = value?.ToString();
-                            return text != null &&
-                                (text.Contains("Пройдено", StringComparison.InvariantCultureIgnoreCase) ||
-                                 text.Contains("корен", StringComparison.InvariantCultureIgnoreCase));
+                            return Contains(text, "Пройдено") || Contains(text, "корен");
                         }
                     }
                 ],
@@ -170,7 +193,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         {
                             row.Values.TryGetValue("ReisNumber", out var value);
                             var text = value?.ToString();
-                            return text?.Contains("рейс", StringComparison.InvariantCultureIgnoreCase) ?? false;
+                            return Contains(text, "рейс");
                         },
 
                         Bold = true,
@@ -180,17 +203,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     },
                     new()
                     {
-                        Condition = row =>
-                        {
-                            row.Values.TryGetValue("ReisNumber", out var value);
-                            var text = value?.ToString();
-
-                            return !string.IsNullOrEmpty(text) && !text.Contains("рейс", StringComparison.InvariantCultureIgnoreCase);
-                        },
-                        Border = ExcelStyles.AllSidesBorder,
-                    },
-                    new()
-                    {
+                        ColumnKey = "RockDesc",
                         Condition = row =>
                         {
                             row.Values.TryGetValue("RockDesc", out var value);
@@ -215,5 +228,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 ],
             };
         }
+
+        static bool Contains(string? text, string _text) => text?.Contains(_text, StringComparison.InvariantCultureIgnoreCase) ?? false;
     }
 }

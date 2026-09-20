@@ -166,14 +166,24 @@ namespace GeoAppWpf.Services.Excel
         private static void ApplyRowStyle(ExcelWorksheet worksheet, int rowIndex, TableDefinition table, TableRow row)
         {
             if (row.Height.HasValue)
-            {
                 worksheet.Row(rowIndex).Height = row.Height.Value;
-            }
+
+            ApplyRowStyle(worksheet, rowIndex, table, row, row.Style);
 
             foreach (var rule in table.RowStyleRules)
             {
                 if (!rule.Condition(row))
                     continue;
+
+                var style = new TableRowStyle
+                {
+                    Bold = rule.Bold,
+                    BackgroundColor = rule.BackgroundColor,
+                    Border = rule.Border,
+                    HorizontalAlignment = rule.HorizontalAlignment,
+                    VerticalAlignment = rule.VerticalAlignment,
+                    WrapText = rule.WrapText
+                };
 
                 ExcelRange range;
 
@@ -184,66 +194,51 @@ namespace GeoAppWpf.Services.Excel
                     if (columnIndex < 0)
                         continue;
 
-                    range = worksheet.Cells[rowIndex,columnIndex + 1];
+                    range = worksheet.Cells[rowIndex, columnIndex + 1];
                 }
                 else
                 {
                     range = worksheet.Cells[rowIndex, 1, rowIndex, table.Columns.Count];
                 }
 
-                if (rule.Bold)
-                    range.Style.Font.Bold = true;
-
-                // Включение / выключение переноса текста
-                if (rule.WrapText.HasValue)
-                {
-                    range.Style.WrapText = rule.WrapText.Value;
-                }
-
-                if (rule.BackgroundColor.HasValue)
-                {
-                    range.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    range.Style.Fill.BackgroundColor.SetColor(rule.BackgroundColor.Value);
-                }
-
-                if (rule.HorizontalAlignment.HasValue)
-                {
-                    range.Style.HorizontalAlignment =
-                        rule.HorizontalAlignment.Value switch
-                        {
-                            TableHorizontalAlignment.Left =>
-                                ExcelHorizontalAlignment.Left,
-
-                            TableHorizontalAlignment.Center =>
-                                ExcelHorizontalAlignment.Center,
-
-                            TableHorizontalAlignment.Right =>
-                                ExcelHorizontalAlignment.Right,
-
-                            _ => ExcelHorizontalAlignment.General
-                        };
-                }
-
-                if (rule.VerticalAlignment.HasValue)
-                {
-                    range.Style.VerticalAlignment =
-                        rule.VerticalAlignment.Value switch
-                        {
-                            TableVerticalAlignment.Top =>
-                                ExcelVerticalAlignment.Top,
-
-                            TableVerticalAlignment.Center =>
-                                ExcelVerticalAlignment.Center,
-
-                            TableVerticalAlignment.Bottom =>
-                                ExcelVerticalAlignment.Bottom,
-
-                            _ => ExcelVerticalAlignment.Bottom
-                        };
-                }
-
-                ApplyBorder(range, rule.Border);
+                ApplyRowStyle(range, style);
             }
+        }
+
+        private static void ApplyRowStyle(ExcelWorksheet worksheet, int rowIndex, TableDefinition table, TableRow row, TableRowStyle? style)
+        {
+            if (style == null)
+                return;
+
+            var range = worksheet.Cells[rowIndex, 1, rowIndex, table.Columns.Count];
+
+            ApplyRowStyle(range, style);
+
+            if (style.Height.HasValue)
+                worksheet.Row(rowIndex).Height = style.Height.Value;
+        }
+
+        private static void ApplyRowStyle(ExcelRange range, TableRowStyle style)
+        {
+            if (style.Bold)
+                range.Style.Font.Bold = true;
+
+            if (style.WrapText.HasValue)
+                range.Style.WrapText = style.WrapText.Value;
+
+            if (style.BackgroundColor.HasValue)
+            {
+                range.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                range.Style.Fill.BackgroundColor.SetColor(style.BackgroundColor.Value);
+            }
+
+            if (style.HorizontalAlignment.HasValue)
+                range.Style.HorizontalAlignment = ConvertHorizontalAlignment(style.HorizontalAlignment.Value);
+
+            if (style.VerticalAlignment.HasValue)
+                range.Style.VerticalAlignment = ConvertVerticalAlignment(style.VerticalAlignment.Value);
+
+            ApplyBorder(range, style.Border);
         }
 
         private static void ApplyBorder(ExcelRange range, TableBorderStyle? border)

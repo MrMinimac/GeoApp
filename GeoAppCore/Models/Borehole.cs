@@ -50,6 +50,8 @@ namespace GeoAppCore
         public double Y { get; set; }
         public double Z { get; set; }
 
+        public Dictionary<string, object?> Atributes { get; } = [];
+
         public List<LithologyInterval> LithologyIntervals => BuildLithologyIntervals();
 
         private List<LithologyInterval> BuildLithologyIntervals()

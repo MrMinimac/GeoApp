@@ -28,6 +28,23 @@ namespace GeoAppWpf.Services.Excel.Build
         public List<TableRowStyleRule> RowStyleRules { get; init; } = [];
     }
 
+    public sealed class TableRowStyle
+    {
+        public bool Bold { get; init; }
+
+        public Color? BackgroundColor { get; init; }
+
+        public TableBorderStyle? Border { get; init; }
+
+        public TableHorizontalAlignment? HorizontalAlignment { get; init; }
+
+        public TableVerticalAlignment? VerticalAlignment { get; init; }
+
+        public bool? WrapText { get; init; }
+
+        public double? Height { get; init; }
+    }
+
     public sealed class TableStyle
     {
         public TableBorderStyle? Border { get; init; }
@@ -87,6 +104,7 @@ namespace GeoAppWpf.Services.Excel.Build
     public sealed class TableRow
     {
         public Dictionary<string, object?> Values { get; } = [];
+        public TableRowStyle? Style { get; init; }
         public bool Highlight { get; set; } = false;
         public double? Height { get; set; }
     }
