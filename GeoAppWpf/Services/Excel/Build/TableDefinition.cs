@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using OfficeOpenXml.Style;
+using System.Drawing;
 
 namespace GeoAppWpf.Services.Excel.Build
 {
@@ -43,6 +44,9 @@ namespace GeoAppWpf.Services.Excel.Build
         public bool? WrapText { get; init; }
 
         public double? Height { get; init; }
+
+        public ExcelFillStyle? PatternType { get; set; }
+        public Color? PatternColor { get; set; }
     }
 
     public sealed class TableStyle

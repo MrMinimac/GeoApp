@@ -1,13 +1,19 @@
 ﻿using GeoAppCore;
 using GeoAppWpf.Helpers;
+using GeoAppWpf.Services.Excel.Render;
+using System.Diagnostics;
 using System.Globalization;
-using System.Xml.Linq;
-using static OfficeOpenXml.ExcelErrorValue;
 
 namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 {
     public static class BoreholeReportTableBuilder
     {
+        private record GeoLayer(
+            string Name,
+            double Start,
+            double End,
+            HatchConfig Hatch);
+
         public static TableDefinition Build(Borehole borehole, string name)
         {
             int globalReisNumber = 1;
@@ -46,21 +52,14 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             table.Rows.Add(new TableRow
             {
                 Values =
-                { 
-                    //["From"] = "Начало бурения: 13.11.2025",
+                {
                     ["VolTeor"] = $"{coords.Latitude:F4}",
                     ["VolFact"] = $"{coords.Longitude:F4}",
                     ["CoreRecovery"] = $"{borehole.Z:F1}",
                 }
             });
 
-            table.Rows.Add(new TableRow
-            {
-                Values =
-                { 
-                    //["From"] = "Конец бурения: -", }
-                }
-            });
+            table.Rows.Add(new TableRow { Values = { } });
 
             table.Rows.Add(new TableRow
             {
@@ -75,8 +74,8 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 Values =
                 {
                     ["VolFact"] = "Пройдено наносами",
-                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("Наносы"), // пройдено
-                    ["RockDesc"] = "м", // пройдено
+                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("Наносы"),
+                    ["RockDesc"] = "м",
                 }
             });
 
@@ -89,8 +88,8 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     ["Podoshva"] = "151 мм",
 
                     ["VolFact"] = "Разрушен. коренными породами",
-                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("РКП"), // РКП
-                    ["RockDesc"] = "м", // РКП
+                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("РКП"),
+                    ["RockDesc"] = "м",
                 },
             });
 
@@ -102,23 +101,12 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     ["Podoshva"] = "132 мм",
 
                     ["VolFact"] = "Плотными коренными породами",
-                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("ПКП"), // ПКП
-                    ["RockDesc"] = "м", // ПКП
+                    ["GeoColumn"] = borehole.Atributes.GetValueOrDefault("ПКП"),
+                    ["RockDesc"] = "м",
                 }
             });
 
             table.Rows.Add(new TableRow { Values = { } });
-
-            //table.Rows.Add(new TableRow
-            //{
-            //    Values =
-            //    {
-            //        //["From"] = $"Обсадка: диаметр, мм - ",
-            //        //["ProhodkaNum"] = $"151",
-            //        //["VolTeor"] = $"Глубина обсадки, м:",
-            //        //["CoreRecovery"] = "0.8",
-            //    },
-            //});
 
             table.Rows.Add(new TableRow
             {
@@ -136,14 +124,11 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 Values =
                 {
                     ["ReisNumber"] = "№ Рейса",
-
                     ["From"] = "Рейс, м",
                     ["To"] = "Рейс, м",
                     ["Length"] = "Рейс, м",
-
                     ["ProhodkaNum"] = "Проходка",
                     ["Podoshva"] = "Проходка",
-
                     ["VolTeor"] = "Объем пробы, см3",
                     ["VolFact"] = "Объем пробы, см3",
                 }
@@ -154,18 +139,14 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 Values =
                 {
                     ["ReisNumber"] = "№ Рейса",
-
                     ["From"] = "От",
                     ["To"] = "До",
                     ["Length"] = "Длина",
-
                     ["ProhodkaNum"] = "№",
                     ["Podoshva"] = "Подошва, м",
-
                     ["VolTeor"] = "Теор.",
                     ["VolFact"] = "Факт.",
                     ["CoreRecovery"] = "% выхода керна",
-
                     ["VisGold"] = "Визуальное определение золота",
                     ["GeoColumn"] = "Геологич. Колонка",
                     ["RockDesc"] = "Описание горных пород",
@@ -176,16 +157,20 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
             var desc = GetRockDesc(borehole);
 
+            // Подготавливаем интервалы слоев заранее
+            var geoLayers = ParseGeoLayers(borehole);
+
             foreach (var sample in borehole.Samples)
             {
-                // Генерируем случайное число от 0.0 до 1.0, умножаем на 5 и прибавляем 90
-                // Получаем диапазон от 90.0 до 95.0
                 double coreRecovery = 90.0 + (random.NextDouble() * 5.0);
-
                 double volTeor = 5471;
-
-                // Вычисляем фактический объем (процент от теоретического)
                 double volFact = volTeor * (coreRecovery / 100.0);
+
+                // Получаем конфигурацию штриховки (HatchConfig) для пробы
+                var hatching = GetHatchForSample(
+                    Convert.ToDouble(sample.From),
+                    Convert.ToDouble(sample.To),
+                    geoLayers);
 
                 table.Rows.Add(new TableRow
                 {
@@ -204,7 +189,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         ["CoreRecovery"] = coreRecovery,
 
                         ["VisGold"] = "пс",
-                        ["GeoColumn"] = string.Empty,
+                        ["GeoColumn"] = hatching,
                         ["RockDesc"] = desc,
                     },
                     Style = new TableRowStyle
@@ -241,7 +226,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 
         private static string GetRockDesc(Borehole borehole)
         {
-            var result = new List<string>();
+            var result = new List<(double From, string Text)>();
 
             AddDescription("ПРС", "ПРС Интервал");
             AddDescription("Делювий", "Делювий Интервал");
@@ -250,7 +235,11 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             AddDescription("РКП", "РКП Интервал");
             AddDescription("ПКП", "ПКП Интервал");
 
-            return string.Join("\n", result);
+            return string.Join(
+                "\n",
+                result
+                    .OrderBy(x => x.From)
+                    .Select(x => x.Text));
 
             void AddDescription(string type, string intervalKey)
             {
@@ -261,34 +250,125 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 if (string.IsNullOrWhiteSpace(interval))
                     return;
 
-                var description = GetRandomDescription(borehole, $"{type} Описание");
+                var description = GetRandomDescription(
+                    borehole,
+                    $"{type} Описание");
 
-                if (!string.IsNullOrWhiteSpace(description))
-                    result.Add($"{NormalizeInterval(interval)}: {description}");
+                if (string.IsNullOrWhiteSpace(description))
+                    return;
+
+                var normalized = NormalizeInterval(interval);
+
+                // Берём начало интервала
+                if (!TryGetIntervalStart(normalized, out var from))
+                    return;
+
+                result.Add((from, $"{normalized}: {description}"));
             }
+
+            static bool TryGetIntervalStart(string interval, out double from)
+            {
+                from = 0;
+
+                var parts = interval.Split('-', StringSplitOptions.TrimEntries);
+
+                var firstPart = parts[0].Replace(",", ".");
+
+                Debug.WriteLine(firstPart);
+
+                return parts.Length >= 1 &&
+                       double.TryParse(
+                           firstPart,
+                           System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture,
+                           out from);
+            }
+        }
+
+        private static List<GeoLayer> ParseGeoLayers(Borehole borehole)
+        {
+            var layers = new List<GeoLayer>();
+
+            var layerKeys = new[]
+            {
+                ("ПРС", "ПРС Интервал"),
+                ("Делювий", "Делювий Интервал"),
+                ("Торф", "Торф Интервал"),
+                ("Аллювий", "Аллювий Интервал"),
+                ("РКП", "РКП Интервал"),
+                ("ПКП", "ПКП Интервал")
+            };
+
+            foreach (var (type, key) in layerKeys)
+            {
+                var intervalStr =
+                    borehole.Atributes.GetValueOrDefault(key)?.ToString();
+
+                if (!TryParseInterval(
+                        intervalStr,
+                        out double start,
+                        out double end))
+                {
+                    continue;
+                }
+
+                if (!GeometriesData.LayerHatches.TryGetValue(type, out var hatch))
+                    continue;
+
+                layers.Add(
+                    new GeoLayer(
+                        type,
+                        start,
+                        end,
+                        hatch));
+            }
+
+            return layers;
+        }
+
+        private static HatchConfig? GetHatchForSample(
+            double sampleFrom,
+            double sampleTo,
+            List<GeoLayer> layers)
+        {
+            double sampleCenter =
+                (sampleFrom + sampleTo) / 2.0;
+
+            var matchedLayer = layers.FirstOrDefault(
+                l => sampleCenter >= l.Start &&
+                     sampleCenter <= l.End);
+
+            return matchedLayer?.Hatch;
         }
 
         private static string NormalizeInterval(string value)
         {
-            var parts = value
-                .Split('-', StringSplitOptions.RemoveEmptyEntries);
+            if (TryParseInterval(value, out double start, out double end))
+            {
+                return $"{start:0.0}-{end:0.0} м.";
+            }
+            return value?.Trim() ?? string.Empty;
+        }
+
+        private static bool TryParseInterval(string value, out double start, out double end)
+        {
+            start = 0;
+            end = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            var parts = value.Split('-', StringSplitOptions.RemoveEmptyEntries);
 
             if (parts.Length != 2)
-                return value.Trim();
+                return false;
 
-            if (!TryParseDepth(parts[0], out var start) ||
-                !TryParseDepth(parts[1], out var end))
-            {
-                return value.Trim();
-            }
-
-            return $"{start:0.0}-{end:0.0} м.";
+            return TryParseDepth(parts[0], out start) && TryParseDepth(parts[1], out end);
         }
 
         private static bool TryParseDepth(string value, out double depth)
         {
-            value = value
-                .Replace(',', '.');
+            value = value.Replace(',', '.');
 
             var number = new string(
                 value

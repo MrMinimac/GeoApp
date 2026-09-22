@@ -8,8 +8,11 @@ using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Xml.Linq;
 
 namespace GeoAppWpf.ViewModels
 {
@@ -51,20 +54,25 @@ namespace GeoAppWpf.ViewModels
             if (lines == null || !lines.Any())
                 return;
 
-            var tables = new List<TableDefinition>();
+            var dialog = new OpenFolderDialog();
+            dialog.Title = "Выберите директорию сохранения";
+
+            if (dialog.ShowDialog() != true)
+                return;
 
             foreach (var line in lines)
             {
-                int bhIndex = 1;
+                var tables = new List<TableDefinition>();
 
                 foreach (var bh in line.Boreholes)
                 {
-                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.Key} СКВ-{bhIndex}"));
-                    bhIndex++;
+                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.Key} СКВ-{bh.Id}"));
                 }
-            }
 
-            SaveTable(document.Name, tables);
+                var excelDoc = new ExcelDocument();
+                excelDoc.Tables.AddRange(tables);
+                excelDoc.Save(Path.Combine(dialog.FolderName, $"{line.Id}.xlsx"));
+            }
         }
 
         private void GenerateBoreholes(IEnumerable<BoreholeLine> boreholeLines)

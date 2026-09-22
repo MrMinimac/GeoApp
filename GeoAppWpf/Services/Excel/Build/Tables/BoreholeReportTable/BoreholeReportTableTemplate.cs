@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using GeoAppWpf.Services.Excel.Render;
+using System.Drawing;
 
 namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
 {
@@ -28,7 +29,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                     new() { Header = "факт.", Key = "VolFact", Width = 10.5 },
                     new() { Header = "% выхода керна", Key = "CoreRecovery", Format = "F1", Width = 10.5 },
                     new() { Header = "Визуальное определение золота", Key = "VisGold", Width = 14 },
-                    new() { Header = "Геологич. Колонка", Key = "GeoColumn", Format = "F1", Width = 11 },
+                    new() { Header = "Геологич. Колонка", Key = "GeoColumn", Format = "F1", Width = 10 },
                     new() { Key = "RockDesc", Width = 48 }
                 ],
 
@@ -46,7 +47,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                             var text = value?.ToString();
                             return Contains(text, "№ Рейса");
                         },
-                        
+
                     },
                     new()
                     {
@@ -198,6 +199,21 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                             var text = value?.ToString();
                             return Contains(text, "Пройдено") || Contains(text, "корен");
                         }
+                    },
+                    new()
+                    {
+                        ColumnKey = "GeoColumn",
+                        Vertical = true,
+                        SkipEmpty = true,
+
+                        CanMerge = row =>
+                        {
+                            row.Values.TryGetValue(
+                                "GeoColumn",
+                                out var value);
+
+                            return value is HatchConfig;
+                        }
                     }
                 ],
 
@@ -242,18 +258,6 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         HorizontalAlignment = TableHorizontalAlignment.Left,
                         VerticalAlignment = TableVerticalAlignment.Top,
                     },
-                    //new()
-                    //{
-                    //    Condition = row =>
-                    //    {
-                    //        row.Values.TryGetValue("From", out var value);
-                    //        var text = value?.ToString();
-                    //        bool contains(string _text) => text?.Contains(_text, StringComparison.InvariantCultureIgnoreCase) ?? false;
-                    //        return headerValues.Any(x => contains(x));
-                    //    },
-
-                    //    Bold = true,
-                    //},
                 ],
             };
         }

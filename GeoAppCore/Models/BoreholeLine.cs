@@ -6,6 +6,7 @@ namespace GeoAppCore
     public class BoreholeLine : GeoObject
     {
         public int Number { get; set; }
+        public string Id { get; set; }
 
         public List<Borehole> Boreholes { get; set; } = new();
 

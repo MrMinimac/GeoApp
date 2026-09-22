@@ -72,7 +72,8 @@ namespace GeoAppWpf.Services
                                     .GroupBy(x => x.Key)
                                     .Select(x => new BoreholeLine
                                     {
-                                        Boreholes = x.OrderBy(b => b.Id).ToList()
+                                        Boreholes = x.OrderBy(b => b.Id).ToList(),
+                                        Id = x.Key,
                                     })
                                     .ToList();
 
