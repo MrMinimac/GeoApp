@@ -29,6 +29,9 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportPlanCommand;
         public ICommand AutoCadExportPlanCommand => _autoCadExportPlanCommand;
 
+        private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportSectionsCommand;
+        public ICommand AutoCadExportSectionsCommand => _autoCadExportSectionsCommand;
+
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _generateBoreholesCommand;
         public ICommand GenerateBoreholesCommand => _generateBoreholesCommand;
 
@@ -45,6 +48,7 @@ namespace GeoAppWpf.ViewModels
             _autoCadExportPlanCommand = new(AutoCadExportPlan);
             _generateBoreholesCommand = new(GenerateBoreholes);
             _excelExportBoreholesCommand = new(ExcelExportBorehole);
+            _autoCadExportSectionsCommand = new(AutoCadExportSections);
         }
 
         private void ExcelExportBorehole(IDocument document)
@@ -93,6 +97,16 @@ namespace GeoAppWpf.ViewModels
             };
 
             await _acadExporter.ExportPlan(geoDoc);
+        }
+
+        private async Task AutoCadExportSections(IEnumerable<BoreholeLine> boreholeLines)
+        {
+            var geoDoc = new GeoDoc
+            {
+                BoreholeLines = boreholeLines.ToList()
+            };
+
+            await _acadExporter.ExportSections(geoDoc);
         }
 
         private void Import()

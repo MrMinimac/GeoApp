@@ -29,6 +29,12 @@ namespace GeoAppWpf.Models
                 Command = CommandsProvider.AutoCadExportPlanCommand,
                 CommandParameter = Boreholes
             },
+            new()
+            {
+                Header = "Экспорт разрез в AutoCad",
+                Command = CommandsProvider.AutoCadExportSectionsCommand,
+                CommandParameter = Boreholes
+            },
         };
 
         public BoreholesDocumentNode(IDocument document, CommandsProvider cmdProvider)

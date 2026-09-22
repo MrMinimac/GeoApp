@@ -1,17 +1,14 @@
 ﻿using GeoAppWpf.Services.Excel.Build;
-using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
 using GeoAppWpf.Services.Excel.Render;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace GeoAppWpf.Services.Excel
 {
     public class ExcelWorksheetBuilder
     {
-        private record PendingHatch(int Row, int Col, HatchConfig Config);
+        private record PendingHatch(int Row, int Col, object Config);
 
         public static void Build(ExcelWorksheet worksheet, TableDefinition tableDefinition)
         {
@@ -40,7 +37,6 @@ namespace GeoAppWpf.Services.Excel
 
             ApplyColumnWidths(worksheet, tableDefinition);
 
-            // Вставляем картинки в самом конце, когда ширины/высоты/merge уже финальные
             InsertPendingHatches(worksheet, pendingHatches);
         }
 
@@ -62,7 +58,6 @@ namespace GeoAppWpf.Services.Excel
         private static void ApplyTableSettings(ExcelWorksheet worksheet, TableDefinition table)
             => worksheet.View.ShowGridLines = table.ShowGridLines;
 
-        // Единственная версия WriteRows (старая дублирующая версия без pendingImages удалена)
         private static void WriteRows(
             ExcelWorksheet worksheet,
             TableDefinition table,
@@ -88,6 +83,11 @@ namespace GeoAppWpf.Services.Excel
                                 excelRow,
                                 columnIndex + 1,
                                 hatchConfig));
+                    }
+                    else if (value is GeoColumnHatchConfig columnHatch)
+                    {
+                        cell.Value = null;
+                        pendingHatches.Add(new PendingHatch(excelRow, columnIndex + 1, columnHatch));
                     }
                     else
                     {
@@ -344,8 +344,6 @@ namespace GeoAppWpf.Services.Excel
                 }
                 else
                 {
-                    // Для немёрдженной ячейки ключуем её координатами,
-                    // чтобы случайно не вставить повторно.
                     string key = $"{hatch.Row}:{hatch.Col}";
 
                     if (!processedRanges.Add(key))
@@ -361,11 +359,7 @@ namespace GeoAppWpf.Services.Excel
             }
         }
 
-        private static void InsertCellHatch(
-    ExcelWorksheet worksheet,
-    int row,
-    int col,
-    HatchConfig config)
+        private static void InsertCellHatch(ExcelWorksheet worksheet, int row, int col, object config)
         {
             var (boxWidthPx, boxHeightPx, anchorRow, anchorCol) =
                 GetCellPixelBox(
@@ -381,11 +375,12 @@ namespace GeoAppWpf.Services.Excel
                 1,
                 (int)Math.Ceiling(boxHeightPx));
 
-            byte[] imageBytes = HatchImageRenderer.Render(
-                width,
-                height,
-                config.Elements,
-                config.Color);
+            byte[] imageBytes = config switch
+            {
+                HatchConfig hc => HatchImageRenderer.Render(width, height, hc.Elements, hc.Color),
+                GeoColumnHatchConfig gc => HatchImageRenderer.RenderColumn(width, height, gc),
+                _ => throw new NotSupportedException()
+            };
 
             string tempFile = Path.Combine(
                 Path.GetTempPath(),
@@ -438,15 +433,6 @@ namespace GeoAppWpf.Services.Excel
 
             return (width, height, rowStart, colStart);
         }
-
-        //private static double GetColumnWidthPixels(ExcelWorksheet ws, int col)
-        //{
-        //    double width = ws.Column(col).Width;
-        //    if (width <= 0) width = ws.DefaultColWidth;
-
-        //    const double mdw = 7;
-        //    return Math.Truncate(((256 * width + Math.Truncate(128 / mdw)) / 256) * mdw);
-        //}
 
         private static double GetColumnWidthPixels(ExcelWorksheet ws, int col)
         {
@@ -623,19 +609,5 @@ namespace GeoAppWpf.Services.Excel
         }
 
         #endregion
-
-        private static string GetExcelColumnName(int column)
-        {
-            var result = string.Empty;
-
-            while (column > 0)
-            {
-                column--;
-                result = (char)('A' + column % 26) + result;
-                column /= 26;
-            }
-
-            return result;
-        }
     }
 }

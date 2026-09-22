@@ -160,17 +160,21 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             // Подготавливаем интервалы слоев заранее
             var geoLayers = ParseGeoLayers(borehole);
 
+            double minDepth = Convert.ToDouble(borehole.Samples.First().From);
+            double maxDepth = Convert.ToDouble(borehole.Samples.Last().To);
+
+            var bands = geoLayers
+                    .OrderBy(l => l.Start)
+                    .Select(l => (l.Start, l.End, l.Hatch))
+                    .ToList();
+
+            var columnHatch = new GeoColumnHatchConfig(bands, minDepth, maxDepth);
+
             foreach (var sample in borehole.Samples)
             {
                 double coreRecovery = 90.0 + (random.NextDouble() * 5.0);
                 double volTeor = 5471;
                 double volFact = volTeor * (coreRecovery / 100.0);
-
-                // Получаем конфигурацию штриховки (HatchConfig) для пробы
-                var hatching = GetHatchForSample(
-                    Convert.ToDouble(sample.From),
-                    Convert.ToDouble(sample.To),
-                    geoLayers);
 
                 table.Rows.Add(new TableRow
                 {
@@ -189,7 +193,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                         ["CoreRecovery"] = coreRecovery,
 
                         ["VisGold"] = "пс",
-                        ["GeoColumn"] = hatching,
+                        ["GeoColumn"] = columnHatch,
                         ["RockDesc"] = desc,
                     },
                     Style = new TableRowStyle
@@ -324,21 +328,6 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             }
 
             return layers;
-        }
-
-        private static HatchConfig? GetHatchForSample(
-            double sampleFrom,
-            double sampleTo,
-            List<GeoLayer> layers)
-        {
-            double sampleCenter =
-                (sampleFrom + sampleTo) / 2.0;
-
-            var matchedLayer = layers.FirstOrDefault(
-                l => sampleCenter >= l.Start &&
-                     sampleCenter <= l.End);
-
-            return matchedLayer?.Hatch;
         }
 
         private static string NormalizeInterval(string value)

@@ -212,7 +212,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                                 "GeoColumn",
                                 out var value);
 
-                            return value is HatchConfig;
+                            return value is GeoColumnHatchConfig;
                         }
                     }
                 ],
