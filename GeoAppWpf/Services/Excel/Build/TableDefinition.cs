@@ -27,6 +27,21 @@ namespace GeoAppWpf.Services.Excel.Build
         public List<TableMergeRule> HeaderMergeRules { get; init; } = [];
 
         public List<TableRowStyleRule> RowStyleRules { get; init; } = [];
+        public TablePrintSettings? PrintSettings { get; set; }
+    }
+
+    public sealed class TablePrintSettings
+    {
+        public TableOrintation Orientation { get; set; }
+        public bool FitToPage { get; set; }
+        public int FitToWidth { get; set; }
+        public int FitToHeight { get; set; }
+    }
+
+    public enum TableOrintation
+    {
+        Landscape,
+        Portrait,
     }
 
     public sealed class TableRowStyle

@@ -3,6 +3,7 @@ using GeoAppCore.Abstractions.Document;
 using GeoAppWpf.InputDalogBuilders;
 using GeoAppWpf.Services;
 using GeoAppWpf.Services.Excel.Build;
+using GeoAppWpf.Services.Excel.Build.Tables.BoreholeDataBaseTable;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,9 +11,7 @@ using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Xml.Linq;
 
 namespace GeoAppWpf.ViewModels
 {
@@ -35,6 +34,9 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _generateBoreholesCommand;
         public ICommand GenerateBoreholesCommand => _generateBoreholesCommand;
 
+        private readonly RelayCommand<IDocument> _excelExportBoreholesDBCommand;
+        public ICommand ExcelExportBoreholesDBCommand => _excelExportBoreholesDBCommand;
+
         private readonly RelayCommand<IDocument> _excelExportBoreholesCommand;
         public ICommand ExcelExportBoreholesCommand => _excelExportBoreholesCommand;
 
@@ -44,14 +46,19 @@ namespace GeoAppWpf.ViewModels
         {
             _workspaceManager = serviceProvider.GetRequiredService<WorkspaceManager>();
             _acadExporter = serviceProvider.GetRequiredService<AutoCadExporter>();
+
             _importCommand = new(Import);
+
             _autoCadExportPlanCommand = new(AutoCadExportPlan);
             _generateBoreholesCommand = new(GenerateBoreholes);
-            _excelExportBoreholesCommand = new(ExcelExportBorehole);
+
+            _excelExportBoreholesDBCommand = new(ExcelExportBoreholesDB);
+            _excelExportBoreholesCommand = new(ExcelExportBoreholes);
+
             _autoCadExportSectionsCommand = new(AutoCadExportSections);
         }
 
-        private void ExcelExportBorehole(IDocument document)
+        private void ExcelExportBoreholes(IDocument document)
         {
             var lines = document.GetObjects().OfType<BoreholeLine>();
 
@@ -70,13 +77,24 @@ namespace GeoAppWpf.ViewModels
 
                 foreach (var bh in line.Boreholes)
                 {
-                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.Key} СКВ-{bh.Id}"));
+                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.BoreholeLineId} СКВ-{bh.Id}"));
                 }
 
                 var excelDoc = new ExcelDocument();
                 excelDoc.Tables.AddRange(tables);
                 excelDoc.Save(Path.Combine(dialog.FolderName, $"{line.Id}.xlsx"));
             }
+        }
+
+        private void ExcelExportBoreholesDB(IDocument document)
+        {
+            var lines = document.GetObjects().OfType<BoreholeLine>();
+
+            if (lines == null || !lines.Any())
+                return;
+
+            var table = BoreholeDataBaseTableBuilder.Build(lines);
+            SaveTable(document.Name, [table]);
         }
 
         private void GenerateBoreholes(IEnumerable<BoreholeLine> boreholeLines)

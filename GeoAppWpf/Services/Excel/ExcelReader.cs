@@ -1,12 +1,10 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
+using netDxf.Entities;
 using OfficeOpenXml;
 using System.Globalization;
 using System.IO;
 using System.Windows;
-using System.Collections.Generic;
-using System.Linq;
-using System;
 
 namespace GeoAppWpf.Services
 {
@@ -50,10 +48,10 @@ namespace GeoAppWpf.Services
                                     continue;
 
                                 var lines = boreholes
-                                    .GroupBy(x => x.LineNumber)
+                                    .GroupBy(x => x.BoreholeLineId)
                                     .Select(x => new BoreholeLine
                                     {
-                                        Number = x.Key,
+                                        Id = x.Key,
                                         Boreholes = x.OrderBy(b => b.Id).ToList()
                                     })
                                     .ToList();
@@ -69,11 +67,11 @@ namespace GeoAppWpf.Services
                                     continue;
 
                                 var lines = boreholes
-                                    .GroupBy(x => x.Key)
-                                    .Select(x => new BoreholeLine
+                                    .GroupBy(x => x.BoreholeLineId)
+                                    .Select((x) => new BoreholeLine
                                     {
-                                        Boreholes = x.OrderBy(b => b.Id).ToList(),
                                         Id = x.Key,
+                                        Boreholes = x.OrderBy(b => b.Id).ToList(),
                                     })
                                     .ToList();
 
@@ -116,27 +114,173 @@ namespace GeoAppWpf.Services
                 return TableType.BoreholesAndSamplesData;
 
             // Если есть хотя бы Ключ и базовые координаты X, Y
-            if (columns.ContainsKey("Ключ") && (columns.ContainsKey("X") || columns.ContainsKey("Y")))
+            if (columns.ContainsKey("БЛ") && (columns.ContainsKey("X") || columns.ContainsKey("Y")))
                 return TableType.BoreholesData;
 
             return TableType.Unknown;
         }
 
-        public static List<Borehole>? LoadBoreholes(ExcelWorksheet worksheet, Dictionary<string, int> cols)
+        private static List<Borehole>? LoadBoreholes(ExcelWorksheet worksheet, Dictionary<string, int> cols)
         {
             var boreholes = new List<Borehole>();
 
-            int keyCol = GetColIndex(cols, "Ключ", "Key");
+            int lineCol = GetColIndex(cols, "БЛ", "Key");
             int idCol = GetColIndex(cols, "№ Скв", "ID", "Скважина");
             int xCol = GetColIndex(cols, "X");
             int yCol = GetColIndex(cols, "Y");
             int zCol = GetColIndex(cols, "Z");
             int depthCol = GetColIndex(cols, "Длина", "Глубина", "Depth");
+            int regionName = GetColIndex(cols, "Участок");
+            int sediments = GetColIndex(cols, "Наносы");
+            int rkp = GetColIndex(cols, "РКП");
+            int pkp = GetColIndex(cols, "ПКП");
+
+            var descAtributes = GetDescriptionsAtributes(worksheet, cols);
+
+            if (lineCol == -1) return boreholes; // Без ключа чтение невозможно
+
+            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+            {
+                string line = worksheet.Cells[row, lineCol].Text;
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var currentBorehole = new Borehole
+                {
+                    BoreholeLineId = line,
+                    Id = TryGetIntSafe(worksheet, row, idCol) ?? 0,
+                    X = ParseDoubleSafe(worksheet, row, xCol),
+                    Y = ParseDoubleSafe(worksheet, row, yCol),
+                    Z = ParseDoubleSafe(worksheet, row, zCol),
+                    Deapth = ParseDoubleSafe(worksheet, row, depthCol),
+                };
+
+                addAttribute("Участок", GetCellTextSafe(worksheet, row, regionName), regionName);
+                addAttribute("Наносы", GetCellTextSafe(worksheet, row, sediments), sediments);
+                addAttribute("РКП", GetCellTextSafe(worksheet, row, rkp), rkp);
+                addAttribute("ПКП", GetCellTextSafe(worksheet, row, pkp), pkp);
+
+                var intervals = GetIntervalAttributes(worksheet, cols, row);
+
+                AddAttributes(currentBorehole.Atributes, intervals);
+                AddAttributes(currentBorehole.Atributes, descAtributes);
+
+                boreholes.Add(currentBorehole);
+
+                void addAttribute(string key, object? obj, int col)
+                {
+                    if (col == -1)
+                        return;
+
+                    currentBorehole.Atributes.Add(key, obj);
+                }
+            }
+
+            return boreholes;
+        }
+
+        private static List<Borehole>? LoadBoreholesWithSamples(ExcelWorksheet worksheet, Dictionary<string, int> cols)
+        {
+            Borehole currentBorehole = null;
+            var boreholes = new List<Borehole>();
+            string oldkey = "";
+
+            int lineCol = GetColIndex(cols, "БЛ", "Линия");
+            int idCol = GetColIndex(cols, "№ Скв");
+            int xCol = GetColIndex(cols, "X");
+            int yCol = GetColIndex(cols, "Y");
+            int zCol = GetColIndex(cols, "Z");
+
+            int fromCol = GetColIndex(cols, "От");
+            int toCol = GetColIndex(cols, "До");
+            int lengthCol = GetColIndex(cols, "Длина");
+            int valueCol = GetColIndex(cols, "Содержание");
+            int lithoCol = GetColIndex(cols, "Литология");
+
+            int diametrCol = GetColIndex(cols, "Диаметр");
+            int finenessCol = GetColIndex(cols, "Пробность");
+            int scaleCol = GetColIndex(cols, "Масштаб");
 
             int regionName = GetColIndex(cols, "Участок");
             int sediments = GetColIndex(cols, "Наносы");
             int rkp = GetColIndex(cols, "РКП");
             int pkp = GetColIndex(cols, "ПКП");
+
+            // Единичные значения для всего файла (если нужно считывать только со 2 строки)
+            var diametr = TryGetDoubleSafe(worksheet, 2, diametrCol);
+            var fineness = TryGetDoubleSafe(worksheet, 2, finenessCol);
+            var vScale = TryGetDoubleSafe(worksheet, 2, scaleCol);
+
+            var descAtributes = GetDescriptionsAtributes(worksheet, cols);
+
+            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+            {
+                string key = $"{worksheet.Cells[row, lineCol].Text}_{worksheet.Cells[row, idCol].Text}";
+
+                if (!string.IsNullOrWhiteSpace(key) && key != oldkey)
+                {
+                    oldkey = key;
+                    currentBorehole = new Borehole
+                    {
+                        BoreholeLineId = worksheet.Cells[row, lineCol].Text,
+                        Id = TryGetIntSafe(worksheet, row, idCol) ?? 0,
+                        X = ParseDoubleSafe(worksheet, row, xCol),
+                        Y = ParseDoubleSafe(worksheet, row, yCol),
+                        Z = ParseDoubleSafe(worksheet, row, zCol),
+                    };
+
+                    addAttribute("Участок", GetCellTextSafe(worksheet, row, regionName), regionName);
+                    addAttribute("Наносы", GetCellTextSafe(worksheet, row, sediments), sediments);
+                    addAttribute("РКП", GetCellTextSafe(worksheet, row, rkp), rkp);
+                    addAttribute("ПКП", GetCellTextSafe(worksheet, row, pkp), pkp);
+
+                    var intervals = GetIntervalAttributes(worksheet, cols, row);
+
+                    AddAttributes(currentBorehole.Atributes, intervals);
+                    AddAttributes(currentBorehole.Atributes, descAtributes);
+
+                    boreholes.Add(currentBorehole);
+
+                    void addAttribute(string key, object? obj, int col)
+                    {
+                        if (col == -1)
+                            return;
+
+                        currentBorehole.Atributes.Add(key, obj);
+                    }
+                }
+
+                if (currentBorehole != null)
+                {
+                    Sample sample = new Sample();
+
+                    // Если у пробы нет своих X,Y,Z (ячейки пустые), fallback берет координаты скважины
+                    sample.X = ParseDoubleSafe(worksheet, row, xCol);
+                    sample.Y = ParseDoubleSafe(worksheet, row, yCol);
+                    sample.Z = ParseDoubleSafe(worksheet, row, zCol);
+
+                    sample.From = TryGetDoubleSafe(worksheet, row, fromCol) ?? 0;
+                    sample.To = TryGetDoubleSafe(worksheet, row, toCol) ?? 0;
+                    sample.Length = TryGetDoubleSafe(worksheet, row, lengthCol) ?? 0;
+                    sample.Grade = ParseDoubleSafe(worksheet, row, valueCol);
+
+                    sample.Diametr = diametr ?? 0;
+                    sample.Fineness = fineness ?? 0;
+
+                    if (lithoCol != -1)
+                    {
+                        sample.Lithologies = ParseLithology(worksheet, row, lithoCol);
+                    }
+
+                    currentBorehole.Samples.Add(sample);
+                }
+            }
+
+            return boreholes;
+        }
+
+        private static Dictionary<string, object?> GetIntervalAttributes(ExcelWorksheet worksheet, Dictionary<string, int> cols, int row)
+        {
+            var atributes = new Dictionary<string, object?>();
 
             int prsRange = GetColIndex(cols, "ПРС Интервал");
             int delRange = GetColIndex(cols, "Делювий Интервал");
@@ -145,14 +289,34 @@ namespace GeoAppWpf.Services
             int rkpRange = GetColIndex(cols, "РКП Интервал");
             int pkpRange = GetColIndex(cols, "ПКП Интервал");
 
+            add("ПРС Интервал", prsRange);
+            add("Делювий Интервал", delRange);
+            add("Торф Интервал", torfRange);
+            add("Аллювий Интервал", alRange);
+            add("РКП Интервал", rkpRange);
+            add("ПКП Интервал", pkpRange);
+
+            void add(string key, int col)
+            {
+                if (col == -1)
+                    return;
+
+                atributes.Add(key, GetCellTextSafe(worksheet, row, col));
+            }
+
+            return atributes;
+        }
+
+        private static Dictionary<string, object?> GetDescriptionsAtributes(ExcelWorksheet worksheet, Dictionary<string, int> cols)
+        {
+            var atributes = new Dictionary<string, object?>();
+
             int prsDesc = GetColIndex(cols, "ПРС Описание");
             int delDesc = GetColIndex(cols, "Делювий Описание");
             int torfDesc = GetColIndex(cols, "Торф Описание");
             int alDesc = GetColIndex(cols, "Аллювий Описание");
             int rkpDesc = GetColIndex(cols, "РКП Описание");
             int pkpDesc = GetColIndex(cols, "ПКП Описание");
-
-            if (keyCol == -1) return boreholes; // Без ключа чтение невозможно
 
             var descriptions = new Dictionary<string, List<string>>
             {
@@ -172,137 +336,42 @@ namespace GeoAppWpf.Services
                 AddDescription(worksheet, row, alDesc, descriptions["Аллювий"]);
                 AddDescription(worksheet, row, rkpDesc, descriptions["РКП"]);
                 AddDescription(worksheet, row, pkpDesc, descriptions["ПКП"]);
-            }    
-
-            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
-            {
-                string key = worksheet.Cells[row, keyCol].Text;
-                if (string.IsNullOrWhiteSpace(key)) continue;
-
-                var currentBorehole = new Borehole
-                {
-                    Key = key,
-                    Id = TryGetIntSafe(worksheet, row, idCol) ?? 0,
-                    X = ParseDoubleSafe(worksheet, row, xCol),
-                    Y = ParseDoubleSafe(worksheet, row, yCol),
-                    Z = ParseDoubleSafe(worksheet, row, zCol),
-                    Deapth = ParseDoubleSafe(worksheet, row, depthCol),
-                    Atributes =
-                    {
-                        ["Участок"] = GetCellTextSafe(worksheet, row, regionName),
-                        ["Наносы"] = GetCellTextSafe(worksheet, row, sediments),
-                        ["РКП"] = GetCellTextSafe(worksheet, row, rkp),
-                        ["ПКП"] = GetCellTextSafe(worksheet, row, pkp),
-
-                        ["ПРС Интервал"] = GetCellTextSafe(worksheet, row, prsRange),
-                        ["Делювий Интервал"] = GetCellTextSafe(worksheet, row, delRange),
-                        ["Торф Интервал"] = GetCellTextSafe(worksheet, row, torfRange),
-                        ["Аллювий Интервал"] = GetCellTextSafe(worksheet, row, alRange),
-                        ["РКП Интервал"] = GetCellTextSafe(worksheet, row, rkpRange),
-                        ["ПКП Интервал"] = GetCellTextSafe(worksheet, row, pkpRange),
-
-                        ["ПРС Описание"] = descriptions["ПРС"],
-                        ["Делювий Описание"] = descriptions["Делювий"],
-                        ["Торф Описание"] = descriptions["Торф"],
-                        ["Аллювий Описание"] = descriptions["Аллювий"],
-                        ["РКП Описание"] = descriptions["РКП"],
-                        ["ПКП Описание"] = descriptions["ПКП"],
-                    }
-                };
-
-                boreholes.Add(currentBorehole);
             }
 
-            return boreholes;
+            add("ПРС Описание", descriptions["ПРС"], prsDesc);
+            add("Делювий Описание", descriptions["Делювий"], delDesc);
+            add("Торф Описание", descriptions["Торф"], torfDesc);
+            add("Аллювий Описание", descriptions["Аллювий"], alDesc);
+            add("РКП Описание", descriptions["РКП"], rkpDesc);
+            add("ПКП Описание", descriptions["ПКП"], pkpDesc);
+
+            return atributes;
+
+            void add(string key, object obj, int column)
+            {
+                if (column == -1)
+                    return;
+
+                atributes.Add(key, obj);
+            }
+        }
+
+        private static void AddAttributes(Dictionary<string, object?> target, Dictionary<string, object?> source)
+        {
+            foreach (var pair in source)
+                target[pair.Key] = pair.Value;
         }
 
         private static void AddDescription(ExcelWorksheet worksheet, int row, int column, List<string> descriptions)
         {
+            if (column == -1)
+                return;
+
             var value = GetCellTextSafe(worksheet, row, column);
 
             if (!string.IsNullOrWhiteSpace(value) && !descriptions.Contains(value))
                 descriptions.Add(value);
         }
-
-        public static List<Borehole>? LoadBoreholesWithSamples(ExcelWorksheet worksheet, Dictionary<string, int> cols)
-        {
-            Borehole currentBorehole = null;
-            var boreholes = new List<Borehole>();
-            string oldkey = "";
-
-            int keyCol = GetColIndex(cols, "Ключ");
-            int lineCol = GetColIndex(cols, "БЛ", "Линия");
-            int idCol = GetColIndex(cols, "№ Скв");
-            int xCol = GetColIndex(cols, "X");
-            int yCol = GetColIndex(cols, "Y");
-            int zCol = GetColIndex(cols, "Z");
-
-            int fromCol = GetColIndex(cols, "От");
-            int toCol = GetColIndex(cols, "До");
-            int lengthCol = GetColIndex(cols, "Длина");
-            int valueCol = GetColIndex(cols, "Содержание");
-            int lithoCol = GetColIndex(cols, "Литология");
-
-            int diametrCol = GetColIndex(cols, "Диаметр");
-            int finenessCol = GetColIndex(cols, "Крупность");
-            int scaleCol = GetColIndex(cols, "Масштаб");
-
-            if (keyCol == -1) return boreholes;
-
-            // Единичные значения для всего файла (если нужно считывать только со 2 строки)
-            var diametr = TryGetDoubleSafe(worksheet, 2, diametrCol);
-            var fineness = TryGetDoubleSafe(worksheet, 2, finenessCol);
-            var vScale = TryGetDoubleSafe(worksheet, 2, scaleCol);
-
-            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
-            {
-                string key = worksheet.Cells[row, keyCol].Text;
-
-                if (!string.IsNullOrWhiteSpace(key) && key != oldkey)
-                {
-                    oldkey = key;
-                    currentBorehole = new Borehole
-                    {
-                        Key = key,
-                        LineNumber = TryGetIntSafe(worksheet, row, lineCol) ?? 0,
-                        Id = TryGetIntSafe(worksheet, row, idCol) ?? 0,
-                        X = ParseDoubleSafe(worksheet, row, xCol),
-                        Y = ParseDoubleSafe(worksheet, row, yCol),
-                        Z = ParseDoubleSafe(worksheet, row, zCol),
-                    };
-                    boreholes.Add(currentBorehole);
-                }
-
-                if (currentBorehole != null)
-                {
-                    Sample sample = new Sample();
-
-                    // Если у пробы нет своих X,Y,Z (ячейки пустые), fallback берет координаты скважины
-                    sample.X = ParseDoubleSafe(worksheet, row, xCol, currentBorehole.X);
-                    sample.Y = ParseDoubleSafe(worksheet, row, yCol, currentBorehole.Y);
-                    sample.Z = ParseDoubleSafe(worksheet, row, zCol, currentBorehole.Z);
-
-                    sample.From = TryGetDoubleSafe(worksheet, row, fromCol) ?? 0;
-                    sample.To = TryGetDoubleSafe(worksheet, row, toCol) ?? 0;
-                    sample.Length = TryGetDoubleSafe(worksheet, row, lengthCol) ?? 0;
-                    sample.Value = ParseDoubleSafe(worksheet, row, valueCol);
-
-                    sample.Diametr = diametr ?? 0;
-                    sample.Fineness = fineness ?? 0;
-
-                    if (lithoCol != -1)
-                    {
-                        sample.Lithologies = ParseLithology(worksheet, row, lithoCol);
-                    }
-
-                    currentBorehole.Samples.Add(sample);
-                }
-            }
-
-            return boreholes;
-        }
-
-        // --- Вспомогательные безопасные методы ---
 
         private static int GetColIndex(Dictionary<string, int> map, params string[] possibleNames)
         {
@@ -355,7 +424,7 @@ namespace GeoAppWpf.Services
             return null;
         }
 
-        public static List<Lithology> ParseLithology(ExcelWorksheet ws, int row, int column)
+        private static List<Lithology> ParseLithology(ExcelWorksheet ws, int row, int column)
         {
             var lithologies = new List<Lithology>();
             if (column == -1) return lithologies;
@@ -376,7 +445,7 @@ namespace GeoAppWpf.Services
             return lithologies;
         }
 
-        public static double ParseDouble(string value, double fallback = 0)
+        private static double ParseDouble(string value, double fallback = 0)
         {
             if (string.IsNullOrWhiteSpace(value))
                 return fallback;

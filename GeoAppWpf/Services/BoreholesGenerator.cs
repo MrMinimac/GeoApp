@@ -40,6 +40,9 @@ namespace GeoAppWpf.Services
                     Length = Math.Round(to - from, precision),
                     From = from,
                     To = to,
+                    X = borehole.X,
+                    Y = borehole.Y,
+                    Z = borehole.Z - from
                 });
             }
 

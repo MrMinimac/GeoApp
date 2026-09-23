@@ -8,19 +8,19 @@ namespace GeoAppCore
         public double From { get; set; }
         public double To { get; set; }
 
-        public double Value { get; set; }
+        public double Grade { get; set; }
 
 
         [JsonIgnore]
         public double Capacity => Math.Round((3.14 * Diametr * Diametr * Length) / 4);
         [JsonIgnore]
-        public double AvgValue => Value == -1 ? -1 : Math.Round(Value * 1000 / Capacity, 3);
+        public double AvgValue => Grade == -1 ? -1 : Math.Round(Grade * 1000 / Capacity, 3);
         [JsonIgnore]
-        public double VertReserve => Value == -1 ? -1 : Math.Round(Length * AvgValue, 3);
+        public double VertReserve => Grade == -1 ? -1 : Math.Round(Length * AvgValue, 3);
         [JsonIgnore]
-        public double CleanedAvgValue => Value == -1 ? -1 : Math.Round(AvgValue * Fineness, 3);
+        public double CleanedAvgValue => Grade == -1 ? -1 : Math.Round(AvgValue * Fineness, 3);
         [JsonIgnore]
-        public double CleanedVertReserve => Value == -1 ? -1 : Math.Round(VertReserve * Fineness, 3);
+        public double CleanedVertReserve => Grade == -1 ? -1 : Math.Round(VertReserve * Fineness, 3);
 
         public double X { get; set; }
         public double Y { get; set; }
@@ -32,7 +32,7 @@ namespace GeoAppCore
 
         public string GetValueString()
         {
-            return Value switch
+            return Grade switch
             {
                 0 => "пс",
                 -1 => "зн",

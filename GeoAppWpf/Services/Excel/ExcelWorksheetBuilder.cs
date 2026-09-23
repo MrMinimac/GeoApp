@@ -1,6 +1,7 @@
 ﻿using GeoAppWpf.Services.Excel.Build;
 using GeoAppWpf.Services.Excel.Render;
 using OfficeOpenXml;
+using OfficeOpenXml.Drawing;
 using OfficeOpenXml.Style;
 using System.IO;
 
@@ -38,6 +39,9 @@ namespace GeoAppWpf.Services.Excel
             ApplyColumnWidths(worksheet, tableDefinition);
 
             InsertPendingHatches(worksheet, pendingHatches);
+
+            if (tableDefinition.PrintSettings != null)
+                ApplyPrintSettings(worksheet, tableDefinition.PrintSettings);
         }
 
         private static void ApplyColumnWidths(ExcelWorksheet worksheet, TableDefinition table)
@@ -316,9 +320,7 @@ namespace GeoAppWpf.Services.Excel
 
         #region Images
 
-        private static void InsertPendingHatches(
-    ExcelWorksheet worksheet,
-    List<PendingHatch> hatches)
+        private static void InsertPendingHatches(ExcelWorksheet worksheet, List<PendingHatch> hatches)
         {
             var processedRanges = new HashSet<string>(
                 StringComparer.OrdinalIgnoreCase);
@@ -361,20 +363,13 @@ namespace GeoAppWpf.Services.Excel
 
         private static void InsertCellHatch(ExcelWorksheet worksheet, int row, int col, object config)
         {
-            var (boxWidthPx, boxHeightPx, anchorRow, anchorCol) =
-                GetCellPixelBox(
-                    worksheet,
-                    row,
-                    col);
+            // Получаем координаты углов из измененного метода
+            var (boxWidthPx, boxHeightPx, rowStart, colStart, rowEnd, colEnd) = GetCellPixelBox(worksheet, row, col);
 
-            int width = Math.Max(
-                1,
-                (int)Math.Ceiling(boxWidthPx));
+            int width = Math.Max(1, (int)Math.Ceiling(boxWidthPx));
+            int height = Math.Max(1, (int)Math.Ceiling(boxHeightPx));
 
-            int height = Math.Max(
-                1,
-                (int)Math.Ceiling(boxHeightPx));
-
+            // Генерация картинки (оставляем ширину и высоту для рендера качественного битмапа)
             byte[] imageBytes = config switch
             {
                 HatchConfig hc => HatchImageRenderer.Render(width, height, hc.Elements, hc.Color),
@@ -382,34 +377,30 @@ namespace GeoAppWpf.Services.Excel
                 _ => throw new NotSupportedException()
             };
 
-            string tempFile = Path.Combine(
-                Path.GetTempPath(),
-                $"{Guid.NewGuid():N}.png");
+            string name = $"hatch_{row}_{col}_{Guid.NewGuid():N}";
 
-            File.WriteAllBytes(
-                tempFile,
-                imageBytes);
+            using (var ms = new MemoryStream(imageBytes))
+            {
+                var picture = worksheet.Drawings.AddPicture(name, ms);
 
-            string name =
-                $"hatch_{row}_{col}_{Guid.NewGuid():N}";
+                // 1. СНАЧАЛА меняем тип привязки! Это инициализирует свойство picture.To
+                picture.ChangeCellAnchor(eEditAs.TwoCell);
 
-            var picture =
-                worksheet.Drawings.AddPicture(
-                    name,
-                    tempFile);
+                // 2. Теперь безопасно привязываем левый верхний угол картинки
+                picture.From.Row = rowStart - 1; // 0-based индекс
+                picture.From.Column = colStart - 1;
+                picture.From.RowOff = 0;         // Смещение 0 (точно в угол)
+                picture.From.ColumnOff = 0;
 
-            picture.SetSize(
-                width,
-                height);
-
-            picture.SetPosition(
-                anchorRow - 1,
-                0,
-                anchorCol - 1,
-                0);
+                // 3. Безопасно привязываем правый нижний угол картинки
+                picture.To.Row = rowEnd;
+                picture.To.Column = colEnd;
+                picture.To.RowOff = 0;           // Точно по нижней границе
+                picture.To.ColumnOff = 0;
+            }
         }
 
-        private static (double Width, double Height, int AnchorRow, int AnchorCol) GetCellPixelBox(ExcelWorksheet ws, int row, int col)
+        private static (double Width, double Height, int RowStart, int ColStart, int RowEnd, int ColEnd) GetCellPixelBox(ExcelWorksheet ws, int row, int col)
         {
             int rowStart = row, rowEnd = row, colStart = col, colEnd = col;
 
@@ -431,7 +422,7 @@ namespace GeoAppWpf.Services.Excel
             for (int r = rowStart; r <= rowEnd; r++)
                 height += GetRowHeightPixels(ws, r);
 
-            return (width, height, rowStart, colStart);
+            return (width, height, rowStart, colStart, rowEnd, colEnd);
         }
 
         private static double GetColumnWidthPixels(ExcelWorksheet ws, int col)
@@ -606,6 +597,25 @@ namespace GeoAppWpf.Services.Excel
                 TableVerticalAlignment.Bottom => ExcelVerticalAlignment.Bottom,
                 _ => ExcelVerticalAlignment.Center
             };
+        }
+
+        #endregion
+
+        #region PrintSettings
+
+        private static void ApplyPrintSettings(ExcelWorksheet worksheet, TablePrintSettings settings)
+        {
+            worksheet.PrinterSettings.Orientation = settings.Orientation switch
+            {
+                TableOrintation.Portrait => eOrientation.Portrait,
+                TableOrintation.Landscape => eOrientation.Landscape,
+                _ => eOrientation.Portrait
+            };
+            
+            worksheet.PrinterSettings.FitToPage = settings.FitToPage;
+
+            worksheet.PrinterSettings.FitToWidth = settings.FitToWidth;
+            worksheet.PrinterSettings.FitToHeight = settings.FitToHeight;
         }
 
         #endregion

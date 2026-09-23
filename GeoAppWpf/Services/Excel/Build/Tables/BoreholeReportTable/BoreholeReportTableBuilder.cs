@@ -254,9 +254,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
                 if (string.IsNullOrWhiteSpace(interval))
                     return;
 
-                var description = GetRandomDescription(
-                    borehole,
-                    $"{type} Описание");
+                var description = GetRandomDescription(borehole, $"{type} Описание");
 
                 if (string.IsNullOrWhiteSpace(description))
                     return;

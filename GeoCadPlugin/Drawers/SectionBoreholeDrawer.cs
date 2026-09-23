@@ -52,14 +52,7 @@ namespace GeoCadPlugin.Drawers
                 string valueStr = sample.GetValueString();
                 double textY = samplesStartY - sampleLength / 2;
 
-                var textColor = sample.Value switch
-                {
-                    0 => Color.FromRgb(0, 0, 0),
-                    -1 => Color.FromRgb(255, 0, 0),
-                    _ => Color.FromRgb(255, 0, 0)
-                };
-
-                var layer = sample.Value switch
+                var layer = sample.Grade switch
                 {
                     0 => GeoLayers.EmptyAvgs,
                     -1 => GeoLayers.NotDeterminedAvgs,
@@ -67,7 +60,6 @@ namespace GeoCadPlugin.Drawers
                 };
 
                 var dbtext = AddText(valueStr, cbhX + 1, textY, layer);
-                dbtext.Color = textColor;
 
                 samplesStartY -= sampleLength;
             }

@@ -36,7 +36,7 @@ namespace GeoCadPlugin.Drawers
 
             // рисуем номер буровой линии
             DrawLineNumber(
-                line.Number,
+                line.Id,
                 first,
                 GetTextAngle(line.Azimuth));
 
@@ -46,7 +46,7 @@ namespace GeoCadPlugin.Drawers
                 DrawBorehole(bh, GetTextAngle(line.Azimuth));
         }
 
-        private static void DrawLineNumber(int number, Borehole first, double angle)
+        private static void DrawLineNumber(string number, Borehole first, double angle)
         {
             ACDOC doc =
                 Application.DocumentManager.MdiActiveDocument;
@@ -70,7 +70,7 @@ namespace GeoCadPlugin.Drawers
                 DBText text = new DBText
                 {
                     Height = 3,
-                    TextString = $"БЛ-{number}",
+                    TextString = number,
                     Rotation = angle,
                     HorizontalMode = TextHorizontalMode.TextCenter,
                     VerticalMode = TextVerticalMode.TextVerticalMid
@@ -120,11 +120,11 @@ namespace GeoCadPlugin.Drawers
                 BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                 BlockTableRecord ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
 
-                LayerManager.CreateLayers(db, tr, 
+                LayerManager.CreateLayers(db, tr,
                     [
-                        GeoLayers.Boreholes, 
-                        GeoLayers.BoreholeNumbers, 
-                        GeoLayers.AbsoluteElevations, 
+                        GeoLayers.Boreholes,
+                        GeoLayers.BoreholeNumbers,
+                        GeoLayers.AbsoluteElevations,
                         GeoLayers.Deapths,
                         GeoLayers.PeatThinckness,
                         GeoLayers.SandThickness,

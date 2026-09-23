@@ -4,6 +4,8 @@
     {
         private Borehole _source;
 
+        public Borehole Source => _source;
+
         public double Distance { get; }
         public double Elevation { get; }
 

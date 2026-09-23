@@ -1,4 +1,5 @@
-﻿using Autodesk.AutoCAD.DatabaseServices;
+﻿using Autodesk.AutoCAD.Colors;
+using Autodesk.AutoCAD.DatabaseServices;
 
 namespace GeoCadPlugin.Managers
 {
@@ -23,6 +24,7 @@ namespace GeoCadPlugin.Managers
                 GeoLayers.Header => "Заголовок",
                 GeoLayers.Surface => "Поверхность",
                 GeoLayers.Litologies => "Литология",
+                GeoLayers.OreBody => "Контур",
             };
         }
 
@@ -42,20 +44,21 @@ namespace GeoCadPlugin.Managers
         {
             var layerName = GetLayerName(layer);
 
-            LayerTable lt =
-                (LayerTable)tr.GetObject(
-                    db.LayerTableId,
-                    OpenMode.ForRead);
+            LayerTable lt = (LayerTable)tr.GetObject( db.LayerTableId, OpenMode.ForRead);
 
 
             if (!lt.Has(layerName))
             {
                 lt.UpgradeOpen();
 
-                LayerTableRecord lay =
-                    new LayerTableRecord();
+                LayerTableRecord lay = new LayerTableRecord();
 
                 lay.Name = layerName;
+
+                var color = GetLayerColor(layer);
+
+                if (color != null)
+                    lay.Color = color;
 
                 lt.Add(lay);
 
@@ -63,6 +66,16 @@ namespace GeoCadPlugin.Managers
                     lay,
                     true);
             }
+        }
+
+        private static Color? GetLayerColor(GeoLayers layer)
+        {
+            return layer switch
+            {
+                GeoLayers.Avgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
+                GeoLayers.NotDeterminedAvgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
+                _ => null
+            };
         }
     }
 }

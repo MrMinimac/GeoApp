@@ -8,8 +8,7 @@ namespace GeoAppCore
         private List<LithologyInterval>? _lithologyIntervals;
         private double _deapth = 0;
 
-        public string Key { get; set; } = "";
-        public int LineNumber { get; set; }
+        public string BoreholeLineId { get; set; }
         public int Id { get; set; }
 
         public List<Sample> Samples = new();
@@ -32,12 +31,12 @@ namespace GeoAppCore
         {
             get
             {
-                double total = Samples.Sum(x => (x.Value == -1 || x.Value == 0) ? 0 : x.Length);
+                double total = Samples.Sum(x => (x.Grade == -1 || x.Grade == 0) ? 0 : x.Length);
 
                 if (total == 0)
                     return 0;
 
-                var avg = Samples.Sum(x => (x.Value == -1 ? 0 : x.CleanedVertReserve)) / total;
+                var avg = Samples.Sum(x => (x.Grade == -1 ? 0 : x.CleanedVertReserve)) / total;
 
                 return Math.Round(avg, 3);
             }

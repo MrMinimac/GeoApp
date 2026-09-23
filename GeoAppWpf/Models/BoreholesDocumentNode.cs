@@ -25,6 +25,12 @@ namespace GeoAppWpf.Models
             },
             new()
             {
+                Header = "Экспорт БД в Excel",
+                Command = CommandsProvider.ExcelExportBoreholesDBCommand,
+                CommandParameter = Document
+            },
+            new()
+            {
                 Header = "Экспорт план в AutoCad",
                 Command = CommandsProvider.AutoCadExportPlanCommand,
                 CommandParameter = Boreholes

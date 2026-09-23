@@ -8,7 +8,7 @@ namespace GeoAppWpf.Models
         public BoreholeLine Line { get; }
 
         public BoreholeLineNode(BoreholeLine line, CommandsProvider cmdProvider)
-            : base($"БЛ-{line.Number}", cmdProvider)
+            : base(line.Id, cmdProvider)
         {
             Line = line;
 

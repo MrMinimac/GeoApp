@@ -3,19 +3,22 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
 using GeoAppCore.Models;
+using GeoAppCore.Services;
 using GeoCadPlugin.Managers;
 
 namespace GeoCadPlugin.Drawers
 {
     public class GeoSectionDrawer
     {
+        private const double HEADER_Y_OFFSET = 20;
+        private const double RULER_X_OFFSET = -20;
+        private const double TABLE_START_X_OFFSET = -110;
+        private const double TABLE_END_X_OFFSET = 15;
+        private const double SECTIONS_SPACING = 15;
+
         public static void Draw(GeoDoc project)
         {
             double xOffset = 0; // Смещенее разреза
-            double rulerStartX = -20; // Отступ влево
-            double tableLeftOffset = -110; // Отступ влево
-            double tableRightOffset = 15; // Отступ вправо
-            double blockPadding = 15; // Отступ между разрезами
 
             var editor = Application.DocumentManager.MdiActiveDocument.Editor;
             Database db = Application.DocumentManager.MdiActiveDocument.Database;
@@ -29,7 +32,7 @@ namespace GeoCadPlugin.Drawers
                 var rulerDrawer = new RulerDrawer(dc);
                 rulerDrawer.VerticalScale = project.VerticalScale;
 
-                LayerManager.CreateLayers(dc.Database, dc.Transaction, [GeoLayers.Header, GeoLayers.Surface, GeoLayers.Litologies]);
+                LayerManager.CreateLayers(dc.Database, dc.Transaction, [GeoLayers.Header, GeoLayers.Surface, GeoLayers.Litologies, GeoLayers.OreBody]);
 
                 foreach (var line in project.BoreholeLines)
                 {
@@ -54,23 +57,25 @@ namespace GeoCadPlugin.Drawers
                     DrawLithologies(dc, sections, xOffset, project.VerticalScale);
 
                     // Линейка
-                    rulerDrawer.DrawVertRuler(rulerStartX + xOffset, line.MinZ, line.MaxZ);
+                    rulerDrawer.DrawVertRuler(RULER_X_OFFSET + xOffset, line.MinZ, line.MaxZ);
 
                     // Таблица
                     var startX = sections[0].X;
                     var endX = sections[^1].X;
-                    var tableStartX = startX + tableLeftOffset;
-                    var tableEndX = endX + tableRightOffset;
-                    var tableStartY = line.MinZ;
+                    var tableStartX = startX + TABLE_START_X_OFFSET;
+                    var tableEndX = endX + TABLE_END_X_OFFSET;
+                    var tableStartY = Math.Floor(line.MinZ / rulerDrawer.ValuesStep) * rulerDrawer.ValuesStep;
                     DrawTable(sections, dc, tableStartX, tableEndX, tableStartY, xOffset, project.VerticalScale);
 
                     // считаем реальную ширину блока
-                    double blockMinX = Math.Min(startX + tableLeftOffset, rulerStartX);
+                    double blockMinX = Math.Min(startX + TABLE_START_X_OFFSET, RULER_X_OFFSET);
                     double blockMaxX = Math.Max(endX, tableEndX);
                     double blockWidth = blockMaxX - blockMinX;
 
                     // Добавляем смещение
-                    xOffset += blockWidth + blockPadding;
+                    xOffset += blockWidth + SECTIONS_SPACING;
+
+                    //OreBodyDrawer.Draw(dc, sections, xOffset, project.VerticalScale, minGrade: 0.15);
                 }
 
                 tr.Commit();
@@ -218,12 +223,12 @@ namespace GeoCadPlugin.Drawers
         {
             X += xOffset;
             Y *= vScale;
-            Y += 10; // Отступ вверх
+            Y += HEADER_Y_OFFSET; // Отступ вверх
 
             // Номер линии
             DBText lineNumberText = new DBText
             {
-                TextString = $"БЛ-{line.Number}",
+                TextString = $"{line.Id}",
                 Height = 5,
                 HorizontalMode = TextHorizontalMode.TextCenter,
                 VerticalMode = TextVerticalMode.TextVerticalMid,
@@ -343,7 +348,7 @@ namespace GeoCadPlugin.Drawers
                 // Интервалы
                 var distance = i != cbhs.Count - 1 ? (cbhs[i + 1].X - bh.X) : 0;
                 var text = distance != 0 ? distance.ToString("F1") : null;
-                boreholeDistances.Add(new GeoTableRowValue(text, bh.X + distance / 2, [bhX]));
+                boreholeDistances.Add(new GeoTableRowValue(text, bhX + distance / 2, [bhX]));
 
                 // Глубины скважин
                 boreholeDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
@@ -352,10 +357,12 @@ namespace GeoCadPlugin.Drawers
                 overburdenDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
 
                 // Пройдено в РКП
-                bedrockDepths.Add(new GeoTableRowValue("-", bhX));
+                string rkp = bh.Source.Atributes.GetValueOrDefault("РКП")?.ToString() ?? "-";
+                bedrockDepths.Add(new GeoTableRowValue(rkp, bhX));
 
                 // Пройдено в ПКП
-                weatheredBedrockDepths.Add(new GeoTableRowValue("-", bhX));
+                string pkp = bh.Source.Atributes.GetValueOrDefault("ПКП")?.ToString() ?? "-";
+                weatheredBedrockDepths.Add(new GeoTableRowValue(pkp, bhX));
 
                 // Мощность торфов
                 peatThicknesses.Add(new GeoTableRowValue("-", bhX));

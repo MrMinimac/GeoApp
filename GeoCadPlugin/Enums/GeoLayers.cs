@@ -18,5 +18,6 @@
         Header,
         Surface,
         Litologies,
+        OreBody,
     }
 }
