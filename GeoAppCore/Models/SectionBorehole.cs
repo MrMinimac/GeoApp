@@ -1,27 +1,7 @@
-﻿using GeoAppCore.Services;
-using System.Net;
+﻿using GeoAppCore.Ore;
 
 namespace GeoAppCore
 {
-    public static class BoreholeMainOreIntervalExtensions
-    {
-        public static OreInterval? GetMainOreInterval(
-            this Borehole borehole,
-            double minGrade,
-            double? maxWasteThickness = null)
-        {
-            var intervals = borehole.BuildOreIntervals(minGrade, maxWasteThickness);
-
-            if (intervals.Count == 0)
-                return null;
-
-            return intervals
-                .OrderByDescending(x => x.Length)
-                .ThenByDescending(x => x.AvgGrade)
-                .First();
-        }
-    }
-
     public class SectionBorehole
     {
         private Borehole _source;
@@ -38,26 +18,13 @@ namespace GeoAppCore
         public double Bottom => Elevation - _source.Deapth;
         public double Deapth => _source.Deapth;
 
-        public double OreIntervalMinGrade { get; set; } = 0.15;
-        public double? OreIntervalMaxWasteThickness { get; set; } = null;
+        public IOreCondition OreCondition { get; set; } = new StrippingRatioCondition();
 
         public List<LithologyInterval> LithologiesIntervals => _source.LithologyIntervals;
 
         public IEnumerable<Sample> Samples => _source.Samples;
 
-        public OreInterval? OreInterval
-        {
-            get 
-            {
-                if (_oreIterval == null)
-                {
-                    _oreIterval = _source
-                        .GetMainOreInterval(OreIntervalMinGrade, OreIntervalMaxWasteThickness);
-                }
-
-                return _oreIterval;
-            }
-        }
+        public OreInterval? OreInterval => _oreIterval ??= _source.GetMainOreInterval(OreCondition);
 
         public SectionBorehole(Borehole borehole, double distance, double elevation)
         {

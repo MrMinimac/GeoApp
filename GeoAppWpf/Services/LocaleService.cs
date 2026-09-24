@@ -66,10 +66,10 @@ namespace GeoAppCore.Services
             [nameof(Sample.To)] = ColumnInfo.Create(nameof(Sample.To), "До"),
             [nameof(Sample.Capacity)] = ColumnInfo.Create(nameof(Sample.Capacity), "Объем"),
             [nameof(Sample.Grade)] = ColumnInfo.Create(nameof(Sample.Grade), "Сод.", new ValueConverter()),
-            [nameof(Sample.AvgValue)] = ColumnInfo.Create(nameof(Sample.AvgValue), "Ср. сод.", new ValueConverter()),
+            [nameof(Sample.AvgGrade)] = ColumnInfo.Create(nameof(Sample.AvgGrade), "Ср. сод.", new ValueConverter()),
             [nameof(Sample.VertReserve)] = ColumnInfo.Create(nameof(Sample.VertReserve), "Верт. запас", new ValueConverter()),
-            [nameof(Sample.CleanedAvgValue)] = ColumnInfo.Create(nameof(Sample.CleanedAvgValue), "Ср. сод. (чист.)", new ValueConverter()),
-            [nameof(Sample.CleanedVertReserve)] = ColumnInfo.Create(nameof(Sample.CleanedVertReserve), "Верт. запас (чист.)", new ValueConverter()),
+            [nameof(Sample.PureAvgGrade)] = ColumnInfo.Create(nameof(Sample.PureAvgGrade), "Ср. сод. (чист.)", new ValueConverter()),
+            [nameof(Sample.PureVertReserve)] = ColumnInfo.Create(nameof(Sample.PureVertReserve), "Верт. запас (чист.)", new ValueConverter()),
             [nameof(Sample.Lithologies)] = ColumnInfo.Create(nameof(Sample.Lithologies), "Литология", new LitologiesConverter()),
 
             // DXF

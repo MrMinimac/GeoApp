@@ -17,7 +17,7 @@ namespace GeoCadPlugin
         public double Height => RowHeight * Rows.Count;
         public double MarginTop { get; set; } = -3;
 
-        public double TextHeight { get; set; } = 3;
+        public double TextHeight { get; set; } = 2.5;
         public double TextLeftMargin { get; set; } = 3;
 
         public double TitlesColumnWidth = 85;

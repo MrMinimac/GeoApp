@@ -26,10 +26,8 @@ namespace GeoCadPlugin.Drawers
                 .OrderBy(x => x.Id)
                 .ToList();
 
-
             if (boreholes.Count < 2)
                 return;
-
 
             Borehole first = boreholes.First();
             Borehole last = boreholes.Last();
@@ -39,7 +37,6 @@ namespace GeoCadPlugin.Drawers
                 line.Id,
                 first,
                 GetTextAngle(line.Azimuth));
-
 
             // рисуем скважины
             foreach (var bh in boreholes)
@@ -107,8 +104,7 @@ namespace GeoCadPlugin.Drawers
 
         public static void DrawBorehole(Borehole bh, double angle)
         {
-            ACDOC doc =
-                Application.DocumentManager.MdiActiveDocument;
+            ACDOC doc = Application.DocumentManager.MdiActiveDocument;
 
             Database db = doc.Database;
 

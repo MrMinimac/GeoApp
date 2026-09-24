@@ -22,7 +22,7 @@ namespace GeoAppCore
                     azimuth += Math.PI * 2;
 
                 // перевод в градусы
-                return Math.Round(azimuth * 180 / Math.PI, 1);
+                return azimuth * 180 / Math.PI;
             }
         }
 

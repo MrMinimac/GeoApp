@@ -21,7 +21,7 @@ namespace GeoAppCore
                 if (Samples.Count == 0)
                     return _deapth;
 
-                return double.Round(Samples.Sum(x => x.Length), 3);
+                return Samples.Sum(x => x.Length);
             }
             set => _deapth = value;
         }
@@ -36,9 +36,9 @@ namespace GeoAppCore
                 if (total == 0)
                     return 0;
 
-                var avg = Samples.Sum(x => (x.Grade == -1 ? 0 : x.CleanedVertReserve)) / total;
+                var avg = Samples.Sum(x => (x.Grade == -1 ? 0 : x.PureVertReserve)) / total;
 
-                return Math.Round(avg, 3);
+                return 3;
             }
         }
 

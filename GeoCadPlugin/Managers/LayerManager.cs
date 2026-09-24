@@ -44,7 +44,7 @@ namespace GeoCadPlugin.Managers
         {
             var layerName = GetLayerName(layer);
             var color = GetLayerColor(layer);
-            CreateLayer(db, tr, layerName);
+            CreateLayer(db, tr, layerName, color);
         }
 
         public static void CreateLayer(Database db, Transaction tr, string layerName, Color? color = null)

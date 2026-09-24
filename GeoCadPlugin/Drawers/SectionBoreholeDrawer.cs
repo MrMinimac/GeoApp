@@ -49,7 +49,7 @@ namespace GeoCadPlugin.Drawers
                 AddLine(cbhX - lineOffset, sampleY, cbhX + lineLength, sampleY, GeoLayers.Intervals);
 
                 // Текст содержания
-                string valueStr = sample.GetValueString();
+                string valueStr = sample.GetPureAvgGradeString();
                 double textY = samplesStartY - sampleLength / 2;
 
                 var layer = sample.Grade switch

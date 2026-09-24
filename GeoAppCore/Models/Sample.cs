@@ -12,15 +12,15 @@ namespace GeoAppCore
 
 
         [JsonIgnore]
-        public double Capacity => Math.Round((3.14 * Diametr * Diametr * Length) / 4);
+        public double Capacity => (3.14 * Diametr * Diametr * Length) / 4;
         [JsonIgnore]
-        public double AvgValue => Grade == -1 ? -1 : Math.Round(Grade * 1000 / Capacity, 3);
+        public double AvgGrade => Grade == -1 ? -1 : Grade * 1000 / Capacity;
         [JsonIgnore]
-        public double VertReserve => Grade == -1 ? -1 : Math.Round(Length * AvgValue, 3);
+        public double VertReserve => Grade == -1 ? -1 : Length * AvgGrade;
         [JsonIgnore]
-        public double CleanedAvgValue => Grade == -1 ? -1 : Math.Round(AvgValue * Fineness, 3);
+        public double PureAvgGrade => Grade == -1 ? -1 : AvgGrade * Fineness;
         [JsonIgnore]
-        public double CleanedVertReserve => Grade == -1 ? -1 : Math.Round(VertReserve * Fineness, 3);
+        public double PureVertReserve => Grade == -1 ? -1 : VertReserve * Fineness;
 
         public double X { get; set; }
         public double Y { get; set; }
@@ -30,13 +30,13 @@ namespace GeoAppCore
         public double Diametr { get; set; }
         public double Fineness { get; set; }
 
-        public string GetValueString()
+        public string GetPureAvgGradeString(int round = 3)
         {
             return Grade switch
             {
                 0 => "пс",
                 -1 => "зн",
-                _ => AvgValue.ToString()
+                _ => PureAvgGrade.ToString($"F{round}")
             };
         }
     }

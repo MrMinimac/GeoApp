@@ -3,7 +3,6 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
 using GeoAppCore.Models;
-using GeoAppCore.Services;
 using GeoCadPlugin.Managers;
 using System.Globalization;
 
@@ -16,6 +15,8 @@ namespace GeoCadPlugin.Drawers
         private const double TABLE_START_X_OFFSET = -110;
         private const double TABLE_END_X_OFFSET = 15;
         private const double SECTIONS_SPACING = 15;
+        private const double BOTTOM_OFFSET = 0.4;
+        private const double RIGHT_LEFT_OFFSET = 15;
 
         public static void Draw(GeoDoc project)
         {
@@ -53,7 +54,7 @@ namespace GeoCadPlugin.Drawers
                     }
 
                     // Поверхность
-                    // DrawSurface(dc, sections, xOffset, project.VerticalScale);
+                    DrawSurface(dc, sections, xOffset, project.VerticalScale);
 
                     // DrawLithologies(dc, sections, xOffset, project.VerticalScale);
 
@@ -81,6 +82,8 @@ namespace GeoCadPlugin.Drawers
                         extrapolationFraction: 0.5,
                         extrapolationThicknessFraction: 0.5);
 
+                    DrawSideLines(dc, sections, xOffset, project.VerticalScale);
+
                     // Добавляем смещение
                     xOffset += blockWidth + SECTIONS_SPACING;
                 }
@@ -88,11 +91,49 @@ namespace GeoCadPlugin.Drawers
                 tr.Commit();
             }
 
-            editor.WriteMessage(
-                $"\nИмпорт документа.\n" +
-                $"Буровых линий: {project.BoreholeLines.Count}\n" +
-                $"Общее кол-во скважин: {project.BoreholeLines.Sum(x => x.Boreholes.Count)}\n" +
-                $"Общее кол-во проб: {project.BoreholeLines.Sum(x => x.Boreholes.Sum(x => x.SamplesCount))}\n");
+            //editor.WriteMessage(
+            //    $"\nИмпорт документа.\n" +
+            //    $"Буровых линий: {project.BoreholeLines.Count}\n" +
+            //    $"Общее кол-во скважин: {project.BoreholeLines.Sum(x => x.Boreholes.Count)}\n" +
+            //    $"Общее кол-во проб: {project.BoreholeLines.Sum(x => x.Boreholes.Sum(x => x.SamplesCount))}\n");
+        }
+
+        private static void DrawSideLines(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
+        {
+            if (sections.Count == 0)
+                return;
+
+            // Рисуем левую границу (для sections[0] со смещением -RIGHT_LEFT_OFFSET)
+            DrawSideLineForBorehole(dc, sections[0], -RIGHT_LEFT_OFFSET, xOffset, verticalScale);
+
+            // Рисуем правую границу (для sections[^1] со смещением +RIGHT_LEFT_OFFSET)
+            DrawSideLineForBorehole(dc, sections[^1], RIGHT_LEFT_OFFSET, xOffset, verticalScale);
+        }
+
+        private static void DrawSideLineForBorehole(DrawContext dc, SectionBorehole section, double sideOffset, double xOffset, int verticalScale)
+        {
+            double edgeX = (section.X + sideOffset) + xOffset;
+            double surfaceY = section.Top * verticalScale;
+            Point3d surfacePoint = new Point3d(edgeX, surfaceY, 0);
+
+            var intervals = ExtractIntervals(section);
+            if (intervals.Count == 0)
+                return;
+
+            var lowestInterval = intervals.OrderBy(x => x.BottomElevation).FirstOrDefault();
+            if (lowestInterval == null)
+                return;
+
+            double intervalBottomElevation = lowestInterval.BottomElevation - BOTTOM_OFFSET;
+            Point3d intervalPoint = new Point3d(edgeX, intervalBottomElevation * verticalScale, 0);
+
+            Line boundaryLine = new Line(surfacePoint, intervalPoint)
+            {
+                Layer = LayerManager.GetLayerName(GeoLayers.Surface)
+            };
+
+            dc.ModelSpace.AppendEntity(boundaryLine);
+            dc.Transaction.AddNewlyCreatedDBObject(boundaryLine, true);
         }
 
         private static void DrawLithologies(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
@@ -201,120 +242,366 @@ namespace GeoCadPlugin.Drawers
             if (sections.Count < 2)
                 return;
 
-            Polyline polyline = new Polyline();
+            var points = new Point3dCollection();
 
+            // 1. Левый отступ RIGHT_LEFT_OFFSET для поверхности
+            double firstX = (sections[0].X - RIGHT_LEFT_OFFSET) + xOffset;
+            double firstY = sections[0].Top * verticalScale;
+            points.Add(new Point3d(firstX, firstY, 0));
+
+            // 2. Вершины поверхности по скважинам
             for (int i = 0; i < sections.Count; i++)
             {
                 double x = sections[i].X + xOffset;
                 double y = sections[i].Top * verticalScale;
-
-                polyline.AddVertexAt(
-                    i,
-                    new Point2d(x, y),
-                    0,      // bulge (0 = прямая линия между вершинами)
-                    0,
-                    0);
+                points.Add(new Point3d(x, y, 0));
             }
 
-            polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
-            dc.ModelSpace.AppendEntity(polyline);
-            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+            // 3. Правый отступ RIGHT_LEFT_OFFSET для поверхности
+            double lastX = (sections[^1].X + RIGHT_LEFT_OFFSET) + xOffset;
+            double lastY = sections[^1].Top * verticalScale;
+            Point3d rightSurfacePoint = new Point3d(lastX, lastY, 0);
+            points.Add(rightSurfacePoint);
+
+            // 4. Создаем сглаженную 2D-полилинию поверхности (сглаживание CurveFit)
+            using (var polyline2d = new Polyline2d(Poly2dType.SimplePoly, points, 0, false, 0, 0, null))
+            {
+                polyline2d.CurveFit();
+                polyline2d.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
+
+                dc.ModelSpace.AppendEntity(polyline2d);
+                dc.Transaction.AddNewlyCreatedDBObject(polyline2d, true);
+            }
         }
         #endregion
 
         #region DrawIntervals
 
-        /// <summary>
-        /// Рисует геологические горизонты ("Наносы Интервал", "РКП Интервал",
-        /// "ПКП Интервал" и т.п.) - по одному замкнутому контуру на каждый
-        /// встречающийся тип, так же, как DrawLithologies строит контур на
-        /// каждый тип литологии. Кровля/подошва берутся от той же точки
-        /// отсчёта (section.Top), что и поверхность и литология, поэтому
-        /// контуры автоматически согласованы по вертикали и не "гуляют"
-        /// относительно линии поверхности.
-        /// </summary>
+        public class GeoInterval
+        {
+            public string Type { get; set; }
+            public double TopElevation { get; set; }
+            public double BottomElevation { get; set; }
+        }
+
+        private class IntervalSegment
+        {
+            public string Type { get; init; } = "";
+
+            public double LeftX { get; init; }
+            public double RightX { get; init; }
+
+            public double LeftTop { get; init; }
+            public double LeftBottom { get; init; }
+
+            public double RightTop { get; init; }
+            public double RightBottom { get; init; }
+        }
+
         private static void DrawIntervals(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
         {
             if (sections.Count < 2)
                 return;
 
-            foreach (var (type, points) in BuildIntervalLayers(sections))
-                DrawIntervalLayer(dc, type, points, xOffset, verticalScale);
-        }
+            var boreholeIntervals = sections.Select(ExtractIntervals).ToList();
 
-        private static Dictionary<string, List<LayerPoint>> BuildIntervalLayers(List<SectionBorehole> sections)
-        {
-            const string suffix = " Интервал";
-
-            // тип -> точки кровли/подошвы по скважинам, где он встретился
-            var layers = new Dictionary<string, List<LayerPoint>>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var section in sections)
+            foreach (var intervals in boreholeIntervals)
             {
-                var types = section.Source.Atributes.Keys
-                    .Where(k => k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                    .Select(k => k[..^suffix.Length]);
+                if (intervals.Count == 0) continue;
 
-                foreach (var type in types)
+                var lowestInterval = intervals.OrderBy(x => x.BottomElevation).FirstOrDefault();
+                if (lowestInterval != null)
                 {
-                    var raw = section.Source.Atributes
-                        .GetValueOrDefault($"{type}{suffix}")?
-                        .ToString();
-
-                    if (!TryParseInterval(raw, out double start, out double end))
-                        continue;
-
-                    if (!layers.TryGetValue(type, out var points))
-                    {
-                        points = new List<LayerPoint>();
-                        layers[type] = points;
-                    }
-
-                    points.Add(new LayerPoint
-                    {
-                        X = section.X,
-                        Top = section.Top - start,
-                        Bottom = section.Top - end
-                    });
+                    lowestInterval.BottomElevation -= 0.4;
                 }
             }
 
-            return layers;
+            var segments = new List<IntervalSegment>();
+
+            for (int i = 0; i < sections.Count - 1; i++)
+            {
+                var leftSection = sections[i];
+                var rightSection = sections[i + 1];
+
+                var leftIntervals = boreholeIntervals[i];
+                var rightIntervals = boreholeIntervals[i + 1];
+
+                var types = leftIntervals.Select(x => x.Type)
+                    .Union(rightIntervals.Select(x => x.Type))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var type in types)
+                {
+                    var leftOfType = leftIntervals
+                        .Where(x => string.Equals(x.Type, type, StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(x => x.TopElevation)
+                        .ToList();
+
+                    var rightOfType = rightIntervals
+                        .Where(x => string.Equals(x.Type, type, StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(x => x.TopElevation)
+                        .ToList();
+
+                    int maxCount = Math.Max(leftOfType.Count, rightOfType.Count);
+
+                    for (int j = 0; j < maxCount; j++)
+                    {
+                        bool hasLeft = j < leftOfType.Count;
+                        bool hasRight = j < rightOfType.Count;
+
+                        if (hasLeft && hasRight)
+                        {
+                            var left = leftOfType[j];
+                            var right = rightOfType[j];
+
+                            segments.Add(new IntervalSegment
+                            {
+                                Type = type,
+                                LeftX = leftSection.X,
+                                RightX = rightSection.X,
+                                LeftTop = left.TopElevation,
+                                LeftBottom = left.BottomElevation,
+                                RightTop = right.TopElevation,
+                                RightBottom = right.BottomElevation
+                            });
+                        }
+                        else if (hasLeft && !hasRight)
+                        {
+                            var left = leftOfType[j];
+                            double rightPinchElevation = GetPinchElevation(left, leftIntervals, rightIntervals);
+
+                            segments.Add(new IntervalSegment
+                            {
+                                Type = type,
+                                LeftX = leftSection.X,
+                                RightX = rightSection.X,
+                                LeftTop = left.TopElevation,
+                                LeftBottom = left.BottomElevation,
+                                RightTop = rightPinchElevation,
+                                RightBottom = rightPinchElevation
+                            });
+                        }
+                        else if (!hasLeft && hasRight)
+                        {
+                            var right = rightOfType[j];
+                            double leftPinchElevation = GetPinchElevation(right, rightIntervals, leftIntervals);
+
+                            segments.Add(new IntervalSegment
+                            {
+                                Type = type,
+                                LeftX = leftSection.X,
+                                RightX = rightSection.X,
+                                LeftTop = leftPinchElevation,
+                                LeftBottom = leftPinchElevation,
+                                RightTop = right.TopElevation,
+                                RightBottom = right.BottomElevation
+                            });
+                        }
+                    }
+                }
+            }
+
+            var groups = MergeIntervalSegments(segments);
+
+            // Координаты X самой первой и самой последней скважин в профиле
+            double firstX = sections[0].X;
+            double lastX = sections[^1].X;
+
+            foreach (var group in groups)
+            {
+                DrawMergedInterval(dc, group, xOffset, verticalScale, firstX, lastX);
+            }
         }
 
-        private static void DrawIntervalLayer(DrawContext dc, string type, List<LayerPoint> points, double xOffset, int verticalScale)
+        private static double GetPinchElevation(GeoInterval missingInterval, List<GeoInterval> sourceIntervals, List<GeoInterval> targetIntervals)
         {
-            // одна точка - контур не построить (нечего соединять по горизонтали)
-            if (points.Count < 2)
+            return (missingInterval.TopElevation + missingInterval.BottomElevation) / 2.0;
+
+
+            if (targetIntervals.Count == 0)
+                return (missingInterval.TopElevation + missingInterval.BottomElevation) / 2.0;
+
+            double missingCenter = (missingInterval.TopElevation + missingInterval.BottomElevation) / 2.0;
+
+            var layersAbove = sourceIntervals
+                .Where(x => x.BottomElevation >= missingInterval.TopElevation && x != missingInterval)
+                .OrderBy(x => x.BottomElevation);
+
+            GeoInterval targetAbove = null;
+            foreach (var layer in layersAbove)
+            {
+                targetAbove = targetIntervals
+                    .Where(t => string.Equals(t.Type, layer.Type, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(t => Math.Abs(t.BottomElevation - layer.BottomElevation))
+                    .FirstOrDefault();
+
+                if (targetAbove != null) break;
+            }
+
+            var layersBelow = sourceIntervals
+                .Where(x => x.TopElevation <= missingInterval.BottomElevation && x != missingInterval)
+                .OrderByDescending(x => x.TopElevation);
+
+            GeoInterval targetBelow = null;
+            foreach (var layer in layersBelow)
+            {
+                targetBelow = targetIntervals
+                    .Where(t => string.Equals(t.Type, layer.Type, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(t => Math.Abs(t.TopElevation - layer.TopElevation))
+                    .FirstOrDefault();
+
+                if (targetBelow != null) break;
+            }
+
+            double maxTargetElevation = targetIntervals.Max(x => x.TopElevation);
+            double minTargetElevation = targetIntervals.Min(x => x.BottomElevation);
+
+            if (targetAbove != null) maxTargetElevation = targetAbove.BottomElevation;
+            if (targetBelow != null) minTargetElevation = targetBelow.TopElevation;
+
+            if (minTargetElevation > maxTargetElevation)
+                return (minTargetElevation + maxTargetElevation) / 2.0;
+
+            if (missingCenter > maxTargetElevation) return maxTargetElevation;
+            if (missingCenter < minTargetElevation) return minTargetElevation;
+
+            return missingCenter;
+        }
+
+        private static void DrawMergedInterval(DrawContext dc, List<IntervalSegment> segments, double xOffset, int verticalScale, double firstX, double lastX)
+        {
+            if (segments.Count == 0)
                 return;
 
-            LayerManager.CreateLayer(dc.Database, dc.Transaction, type);
+            var type = segments[0].Type;
 
-            var polyline = new Polyline();
+            LayerManager.CreateLayer(
+                dc.Database,
+                dc.Transaction,
+                type);
 
-            foreach (var point in points)
+            var points = new Point3dCollection();
+
+            for (int i = 0; i < segments.Count; i++)
             {
-                polyline.AddVertexAt(
-                    polyline.NumberOfVertices,
-                    new Point2d(point.X + xOffset, point.Top * verticalScale),
-                    0, 0, 0);
+                var segment = segments[i];
+
+                if (i == 0)
+                {
+                    if (AreEqual(segment.LeftX, firstX))
+                    {
+                        points.Add(new Point3d(
+                            (segment.LeftX - RIGHT_LEFT_OFFSET) + xOffset,
+                            segment.LeftBottom * verticalScale,
+                            0));
+                    }
+
+                    points.Add(new Point3d(
+                        segment.LeftX + xOffset,
+                        segment.LeftBottom * verticalScale,
+                        0));
+                }
+
+                points.Add(new Point3d(
+                    segment.RightX + xOffset,
+                    segment.RightBottom * verticalScale,
+                    0));
+
+                if (i == segments.Count - 1 && AreEqual(segment.RightX, lastX))
+                {
+                    points.Add(new Point3d(
+                        (segment.RightX + RIGHT_LEFT_OFFSET) + xOffset,
+                        segment.RightBottom * verticalScale,
+                        0));
+                }
             }
 
-            for (int i = points.Count - 1; i >= 0; i--)
+            // Создаем классическую 2D-полилинию и сглаживаем её
+            using (var polyline2d = new Polyline2d(Poly2dType.SimplePoly, points, 0, false, 0, 0, null))
             {
-                var point = points[i];
+                polyline2d.CurveFit();
+                polyline2d.Layer = type;
 
-                polyline.AddVertexAt(
-                    polyline.NumberOfVertices,
-                    new Point2d(point.X + xOffset, point.Bottom * verticalScale),
-                    0, 0, 0);
+                dc.ModelSpace.AppendEntity(polyline2d);
+                dc.Transaction.AddNewlyCreatedDBObject(polyline2d, true);
+            }
+        }
+
+        private static List<List<IntervalSegment>> MergeIntervalSegments(List<IntervalSegment> segments)
+        {
+            var result = new List<List<IntervalSegment>>();
+
+            foreach (var typeGroup in segments.GroupBy(x => x.Type, StringComparer.OrdinalIgnoreCase))
+            {
+                var ordered = typeGroup.OrderBy(x => x.LeftX).ToList();
+                var current = new List<IntervalSegment>();
+
+                foreach (var segment in ordered)
+                {
+                    if (current.Count == 0)
+                    {
+                        current.Add(segment);
+                        continue;
+                    }
+
+                    var previous = current[^1];
+                    bool continues = AreEqual(previous.RightX, segment.LeftX);
+
+                    if (continues)
+                    {
+                        current.Add(segment);
+                    }
+                    else
+                    {
+                        result.Add(current);
+                        current = new List<IntervalSegment> { segment };
+                    }
+                }
+
+                if (current.Count > 0)
+                    result.Add(current);
             }
 
-            polyline.Closed = true;
-            polyline.Layer = type;
+            return result;
+        }
 
-            dc.ModelSpace.AppendEntity(polyline);
-            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        private static bool AreEqual(double a, double b)
+        {
+            return Math.Abs(a - b) < 0.000001;
+        }
+
+        private static List<GeoInterval> ExtractIntervals(SectionBorehole section)
+        {
+            var intervals = new List<GeoInterval>();
+            const string suffix = " Интервал";
+
+            var types = section.Source.Atributes.Keys
+                .Where(k => k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                .Select(k => k[..^suffix.Length]);
+
+            foreach (var type in types)
+            {
+                var raw = section.Source.Atributes.GetValueOrDefault($"{type}{suffix}")?.ToString();
+                if (string.IsNullOrWhiteSpace(raw))
+                    continue;
+
+                var parts = raw.Split(new[] { ';', '|', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var part in parts)
+                {
+                    if (TryParseInterval(part, out double start, out double end))
+                    {
+                        intervals.Add(new GeoInterval
+                        {
+                            Type = type,
+                            TopElevation = section.Top - start,
+                            BottomElevation = section.Top - end
+                        });
+                    }
+                }
+            }
+
+            return intervals;
         }
 
         private static bool TryParseInterval(string value, out double start, out double end)
@@ -335,23 +622,105 @@ namespace GeoCadPlugin.Drawers
 
         private static bool TryParseDepth(string value, out double depth)
         {
-            value = value.Replace(',', '.');
-
-            var number = new string(
-                value
-                    .Trim()
-                    .TakeWhile(c => char.IsDigit(c) || c == '.')
-                    .ToArray());
+            value = value.Trim().Replace(',', '.');
 
             return double.TryParse(
-                number,
+                value,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
                 out depth);
         }
+
         #endregion
 
+
+        /*
+        private static void DrawMergedInterval(DrawContext dc, List<IntervalSegment> segments, double xOffset, int verticalScale)
+        {
+            if (segments.Count == 0)
+                return;
+
+            var type = segments[0].Type;
+
+            LayerManager.CreateLayer(
+                dc.Database,
+                dc.Transaction,
+                type);
+
+            var polyline = new Polyline();
+
+            // -------------------------
+            // Верхняя граница
+            // -------------------------
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+
+                // Первый сегмент добавляет левую точку.
+                if (i == 0)
+                {
+                    polyline.AddVertexAt(
+                        polyline.NumberOfVertices,
+                        new Point2d(
+                            segment.LeftX + xOffset,
+                            segment.LeftTop * verticalScale),
+                        0, 0, 0);
+                }
+
+                // Каждый сегмент добавляет свою правую верхнюю точку.
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(
+                        segment.RightX + xOffset,
+                        segment.RightTop * verticalScale),
+                    0, 0, 0);
+            }
+
+            // -------------------------
+            // Нижняя граница
+            // -------------------------
+
+            // Идём справа налево.
+            for (int i = segments.Count - 1; i >= 0; i--)
+            {
+                var segment = segments[i];
+
+                // Для последнего сегмента
+                // сначала добавляем правую нижнюю точку.
+                if (i == segments.Count - 1)
+                {
+                    polyline.AddVertexAt(
+                        polyline.NumberOfVertices,
+                        new Point2d(
+                            segment.RightX + xOffset,
+                            segment.RightBottom * verticalScale),
+                        0, 0, 0);
+                }
+
+                // Затем левую нижнюю точку.
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(
+                        segment.LeftX + xOffset,
+                        segment.LeftBottom * verticalScale),
+                    0, 0, 0);
+            }
+
+            polyline.Closed = true;
+            polyline.Layer = type;
+
+            dc.ModelSpace.AppendEntity(polyline);
+            dc.Transaction.AddNewlyCreatedDBObject(
+                polyline,
+                true);
+        }
+
+        */
+
+
         #region Header
+
         private static void DrawHeader(DrawContext dc, BoreholeLine line, double X, double Y, double xOffset, double vScale)
         {
             X += xOffset;
@@ -438,6 +807,7 @@ namespace GeoCadPlugin.Drawers
             dc.ModelSpace.AppendEntity(dirBackwardText);
             dc.Transaction.AddNewlyCreatedDBObject(dirBackwardText, true);
         }
+
         #endregion
 
         #region Table
@@ -498,22 +868,22 @@ namespace GeoCadPlugin.Drawers
                 weatheredBedrockDepths.Add(new GeoTableRowValue(pkp, bhX));
 
                 // Мощность торфов
-                peatThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.From.ToString() ?? "-", bhX));
+                peatThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.From.ToString("F1") ?? "-", bhX));
 
                 // Мощность пласта песков
-                sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Length.ToString("F1") ?? "-", bhX));
+                sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Thinkness.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на пласт
-                oreGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.AvgGrade.ToString("F1") ?? "0,000", bhX));
+                oreGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.AvgGrade.ToString("F3") ?? "пс", bhX));
 
                 // Вертикальный запас на пласт
-                oreReserveValues.Add(new GeoTableRowValue("0,000", bhX));
+                oreReserveValues.Add(new GeoTableRowValue(cbh.OreInterval?.VertReserv.ToString("F3") ?? "пс", bhX));
 
                 // Мощность горной массы
-                rockMassThicknesses.Add(new GeoTableRowValue("-", bhX));
+                rockMassThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.RockMassThickness.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на горную массу
-                rockMassGradeValues.Add(new GeoTableRowValue("0,000", bhX));
+                rockMassGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.AvgRockMassGrade.ToString("F3") ?? "пс", bhX));
             }
 
             var table = new GeoTable(tableStartX, tableEndX, tableStartY, verticalScale);
@@ -532,26 +902,8 @@ namespace GeoCadPlugin.Drawers
 
             return table;
         }
+
         #endregion
-
-    }
-
-    public class IntervalInfo
-    {
-        public string Type { get; init; } = "";
-        public double Start { get; init; }
-        public double End { get; init; }
-    }
-
-    public class SectionInterval
-    {
-        public string Type { get; init; }
-
-        public double Start { get; init; }
-        public double End { get; init; }
-
-        public double Top => Start;
-        public double Bottom => End;
     }
 
     public class LithologyComparer : IEqualityComparer<List<Lithology>>
