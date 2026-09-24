@@ -43,9 +43,13 @@ namespace GeoCadPlugin.Managers
         public static void CreateLayer(Database db, Transaction tr, GeoLayers layer)
         {
             var layerName = GetLayerName(layer);
+            var color = GetLayerColor(layer);
+            CreateLayer(db, tr, layerName);
+        }
 
-            LayerTable lt = (LayerTable)tr.GetObject( db.LayerTableId, OpenMode.ForRead);
-
+        public static void CreateLayer(Database db, Transaction tr, string layerName, Color? color = null)
+        {
+            LayerTable lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
 
             if (!lt.Has(layerName))
             {
@@ -55,16 +59,12 @@ namespace GeoCadPlugin.Managers
 
                 lay.Name = layerName;
 
-                var color = GetLayerColor(layer);
-
                 if (color != null)
                     lay.Color = color;
 
                 lt.Add(lay);
 
-                tr.AddNewlyCreatedDBObject(
-                    lay,
-                    true);
+                tr.AddNewlyCreatedDBObject(lay, true);
             }
         }
 
@@ -74,6 +74,7 @@ namespace GeoCadPlugin.Managers
             {
                 GeoLayers.Avgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
                 GeoLayers.NotDeterminedAvgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
+                GeoLayers.OreBody => Color.FromColorIndex(ColorMethod.ByAci, 1),
                 _ => null
             };
         }

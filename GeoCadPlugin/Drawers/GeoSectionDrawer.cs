@@ -5,6 +5,7 @@ using GeoAppCore;
 using GeoAppCore.Models;
 using GeoAppCore.Services;
 using GeoCadPlugin.Managers;
+using System.Globalization;
 
 namespace GeoCadPlugin.Drawers
 {
@@ -52,9 +53,11 @@ namespace GeoCadPlugin.Drawers
                     }
 
                     // Поверхность
-                    DrawSurface(dc, sections, xOffset, project.VerticalScale);
+                    // DrawSurface(dc, sections, xOffset, project.VerticalScale);
 
-                    DrawLithologies(dc, sections, xOffset, project.VerticalScale);
+                    // DrawLithologies(dc, sections, xOffset, project.VerticalScale);
+
+                    DrawIntervals(dc, sections, xOffset, project.VerticalScale);
 
                     // Линейка
                     rulerDrawer.DrawVertRuler(RULER_X_OFFSET + xOffset, line.MinZ, line.MaxZ);
@@ -72,10 +75,14 @@ namespace GeoCadPlugin.Drawers
                     double blockMaxX = Math.Max(endX, tableEndX);
                     double blockWidth = blockMaxX - blockMinX;
 
+                    OreBodyDrawer.Draw(
+                        dc, sections, xOffset, project.VerticalScale,
+                        maxElevationJump: 5,
+                        extrapolationFraction: 0.5,
+                        extrapolationThicknessFraction: 0.5);
+
                     // Добавляем смещение
                     xOffset += blockWidth + SECTIONS_SPACING;
-
-                    //OreBodyDrawer.Draw(dc, sections, xOffset, project.VerticalScale, minGrade: 0.15);
                 }
 
                 tr.Commit();
@@ -157,7 +164,6 @@ namespace GeoCadPlugin.Drawers
                     Lithologies = new List<Lithology>(lithologySet)
                 };
 
-
                 foreach (var section in sections)
                 {
                     double depth = 0;
@@ -172,9 +178,7 @@ namespace GeoCadPlugin.Drawers
                             layer.Points.Add(new LayerPoint
                             {
                                 X = section.X,
-
                                 Top = section.Top - depth,
-
                                 Bottom = section.Top - depth - interval.Length
                             });
 
@@ -215,6 +219,135 @@ namespace GeoCadPlugin.Drawers
             polyline.Layer = LayerManager.GetLayerName(GeoLayers.Surface);
             dc.ModelSpace.AppendEntity(polyline);
             dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
+        #endregion
+
+        #region DrawIntervals
+
+        /// <summary>
+        /// Рисует геологические горизонты ("Наносы Интервал", "РКП Интервал",
+        /// "ПКП Интервал" и т.п.) - по одному замкнутому контуру на каждый
+        /// встречающийся тип, так же, как DrawLithologies строит контур на
+        /// каждый тип литологии. Кровля/подошва берутся от той же точки
+        /// отсчёта (section.Top), что и поверхность и литология, поэтому
+        /// контуры автоматически согласованы по вертикали и не "гуляют"
+        /// относительно линии поверхности.
+        /// </summary>
+        private static void DrawIntervals(DrawContext dc, List<SectionBorehole> sections, double xOffset, int verticalScale)
+        {
+            if (sections.Count < 2)
+                return;
+
+            foreach (var (type, points) in BuildIntervalLayers(sections))
+                DrawIntervalLayer(dc, type, points, xOffset, verticalScale);
+        }
+
+        private static Dictionary<string, List<LayerPoint>> BuildIntervalLayers(List<SectionBorehole> sections)
+        {
+            const string suffix = " Интервал";
+
+            // тип -> точки кровли/подошвы по скважинам, где он встретился
+            var layers = new Dictionary<string, List<LayerPoint>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var section in sections)
+            {
+                var types = section.Source.Atributes.Keys
+                    .Where(k => k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                    .Select(k => k[..^suffix.Length]);
+
+                foreach (var type in types)
+                {
+                    var raw = section.Source.Atributes
+                        .GetValueOrDefault($"{type}{suffix}")?
+                        .ToString();
+
+                    if (!TryParseInterval(raw, out double start, out double end))
+                        continue;
+
+                    if (!layers.TryGetValue(type, out var points))
+                    {
+                        points = new List<LayerPoint>();
+                        layers[type] = points;
+                    }
+
+                    points.Add(new LayerPoint
+                    {
+                        X = section.X,
+                        Top = section.Top - start,
+                        Bottom = section.Top - end
+                    });
+                }
+            }
+
+            return layers;
+        }
+
+        private static void DrawIntervalLayer(DrawContext dc, string type, List<LayerPoint> points, double xOffset, int verticalScale)
+        {
+            // одна точка - контур не построить (нечего соединять по горизонтали)
+            if (points.Count < 2)
+                return;
+
+            LayerManager.CreateLayer(dc.Database, dc.Transaction, type);
+
+            var polyline = new Polyline();
+
+            foreach (var point in points)
+            {
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(point.X + xOffset, point.Top * verticalScale),
+                    0, 0, 0);
+            }
+
+            for (int i = points.Count - 1; i >= 0; i--)
+            {
+                var point = points[i];
+
+                polyline.AddVertexAt(
+                    polyline.NumberOfVertices,
+                    new Point2d(point.X + xOffset, point.Bottom * verticalScale),
+                    0, 0, 0);
+            }
+
+            polyline.Closed = true;
+            polyline.Layer = type;
+
+            dc.ModelSpace.AppendEntity(polyline);
+            dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
+
+        private static bool TryParseInterval(string value, out double start, out double end)
+        {
+            start = 0;
+            end = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            var parts = value.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length != 2)
+                return false;
+
+            return TryParseDepth(parts[0], out start) && TryParseDepth(parts[1], out end);
+        }
+
+        private static bool TryParseDepth(string value, out double depth)
+        {
+            value = value.Replace(',', '.');
+
+            var number = new string(
+                value
+                    .Trim()
+                    .TakeWhile(c => char.IsDigit(c) || c == '.')
+                    .ToArray());
+
+            return double.TryParse(
+                number,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out depth);
         }
         #endregion
 
@@ -340,38 +473,38 @@ namespace GeoCadPlugin.Drawers
             for (int i = 0; i < cbhs.Count; i++)
             {
                 // Номера скважин
-                var bh = cbhs[i];
-                var bhX = bh.X + xOffset;
+                var cbh = cbhs[i];
+                var bhX = cbh.X + xOffset;
 
-                boreholeNumbers.Add(new GeoTableRowValue(bh.Id.ToString(), bhX));
+                boreholeNumbers.Add(new GeoTableRowValue(cbh.Id.ToString(), bhX));
 
                 // Интервалы
-                var distance = i != cbhs.Count - 1 ? (cbhs[i + 1].X - bh.X) : 0;
+                var distance = i != cbhs.Count - 1 ? (cbhs[i + 1].X - cbh.X) : 0;
                 var text = distance != 0 ? distance.ToString("F1") : null;
                 boreholeDistances.Add(new GeoTableRowValue(text, bhX + distance / 2, [bhX]));
 
                 // Глубины скважин
-                boreholeDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
+                boreholeDepths.Add(new GeoTableRowValue(cbh.Deapth.ToString("F1"), bhX));
 
                 // Пройдено наносами
-                overburdenDepths.Add(new GeoTableRowValue(bh.Deapth.ToString("F1"), bhX));
+                overburdenDepths.Add(new GeoTableRowValue(cbh.Deapth.ToString("F1"), bhX));
 
                 // Пройдено в РКП
-                string rkp = bh.Source.Atributes.GetValueOrDefault("РКП")?.ToString() ?? "-";
+                string rkp = cbh.Source.Atributes.GetValueOrDefault("РКП")?.ToString() ?? "-";
                 bedrockDepths.Add(new GeoTableRowValue(rkp, bhX));
 
                 // Пройдено в ПКП
-                string pkp = bh.Source.Atributes.GetValueOrDefault("ПКП")?.ToString() ?? "-";
+                string pkp = cbh.Source.Atributes.GetValueOrDefault("ПКП")?.ToString() ?? "-";
                 weatheredBedrockDepths.Add(new GeoTableRowValue(pkp, bhX));
 
                 // Мощность торфов
-                peatThicknesses.Add(new GeoTableRowValue("-", bhX));
+                peatThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.From.ToString() ?? "-", bhX));
 
                 // Мощность пласта песков
-                sandLayerThicknesses.Add(new GeoTableRowValue("-", bhX));
+                sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Length.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на пласт
-                oreGradeValues.Add(new GeoTableRowValue("0,000", bhX));
+                oreGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.AvgGrade.ToString("F1") ?? "0,000", bhX));
 
                 // Вертикальный запас на пласт
                 oreReserveValues.Add(new GeoTableRowValue("0,000", bhX));
@@ -401,6 +534,24 @@ namespace GeoCadPlugin.Drawers
         }
         #endregion
 
+    }
+
+    public class IntervalInfo
+    {
+        public string Type { get; init; } = "";
+        public double Start { get; init; }
+        public double End { get; init; }
+    }
+
+    public class SectionInterval
+    {
+        public string Type { get; init; }
+
+        public double Start { get; init; }
+        public double End { get; init; }
+
+        public double Top => Start;
+        public double Bottom => End;
     }
 
     public class LithologyComparer : IEqualityComparer<List<Lithology>>

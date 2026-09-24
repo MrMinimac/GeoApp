@@ -281,27 +281,13 @@ namespace GeoAppWpf.Services
         private static Dictionary<string, object?> GetIntervalAttributes(ExcelWorksheet worksheet, Dictionary<string, int> cols, int row)
         {
             var atributes = new Dictionary<string, object?>();
-
-            int prsRange = GetColIndex(cols, "ПРС Интервал");
-            int delRange = GetColIndex(cols, "Делювий Интервал");
-            int torfRange = GetColIndex(cols, "Торф Интервал");
-            int alRange = GetColIndex(cols, "Аллювий Интервал");
-            int rkpRange = GetColIndex(cols, "РКП Интервал");
-            int pkpRange = GetColIndex(cols, "ПКП Интервал");
-
-            add("ПРС Интервал", prsRange);
-            add("Делювий Интервал", delRange);
-            add("Торф Интервал", torfRange);
-            add("Аллювий Интервал", alRange);
-            add("РКП Интервал", rkpRange);
-            add("ПКП Интервал", pkpRange);
-
-            void add(string key, int col)
+           
+            foreach (var (header, col) in cols)
             {
-                if (col == -1)
-                    return;
+                if (!header.EndsWith(" Интервал", StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-                atributes.Add(key, GetCellTextSafe(worksheet, row, col));
+                atributes[header] = GetCellTextSafe(worksheet, row, col);
             }
 
             return atributes;
@@ -309,51 +295,24 @@ namespace GeoAppWpf.Services
 
         private static Dictionary<string, object?> GetDescriptionsAtributes(ExcelWorksheet worksheet, Dictionary<string, int> cols)
         {
-            var atributes = new Dictionary<string, object?>();
+            var descriptionColumns = cols
+                .Where(c => c.Key.EndsWith(" Описание", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-            int prsDesc = GetColIndex(cols, "ПРС Описание");
-            int delDesc = GetColIndex(cols, "Делювий Описание");
-            int torfDesc = GetColIndex(cols, "Торф Описание");
-            int alDesc = GetColIndex(cols, "Аллювий Описание");
-            int rkpDesc = GetColIndex(cols, "РКП Описание");
-            int pkpDesc = GetColIndex(cols, "ПКП Описание");
-
-            var descriptions = new Dictionary<string, List<string>>
-            {
-                ["ПРС"] = [],
-                ["Делювий"] = [],
-                ["Торф"] = [],
-                ["Аллювий"] = [],
-                ["РКП"] = [],
-                ["ПКП"] = []
-            };
+            var descriptions = descriptionColumns.ToDictionary(c => c.Key, c => new List<string>());
 
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
             {
-                AddDescription(worksheet, row, prsDesc, descriptions["ПРС"]);
-                AddDescription(worksheet, row, delDesc, descriptions["Делювий"]);
-                AddDescription(worksheet, row, torfDesc, descriptions["Торф"]);
-                AddDescription(worksheet, row, alDesc, descriptions["Аллювий"]);
-                AddDescription(worksheet, row, rkpDesc, descriptions["РКП"]);
-                AddDescription(worksheet, row, pkpDesc, descriptions["ПКП"]);
+                foreach (var (header, col) in descriptionColumns)
+                    AddDescription(worksheet, row, col, descriptions[header]);
             }
 
-            add("ПРС Описание", descriptions["ПРС"], prsDesc);
-            add("Делювий Описание", descriptions["Делювий"], delDesc);
-            add("Торф Описание", descriptions["Торф"], torfDesc);
-            add("Аллювий Описание", descriptions["Аллювий"], alDesc);
-            add("РКП Описание", descriptions["РКП"], rkpDesc);
-            add("ПКП Описание", descriptions["ПКП"], pkpDesc);
+            var atributes = new Dictionary<string, object?>();
+
+            foreach (var (header, values) in descriptions)
+                atributes[header] = values;
 
             return atributes;
-
-            void add(string key, object obj, int column)
-            {
-                if (column == -1)
-                    return;
-
-                atributes.Add(key, obj);
-            }
         }
 
         private static void AddAttributes(Dictionary<string, object?> target, Dictionary<string, object?> source)

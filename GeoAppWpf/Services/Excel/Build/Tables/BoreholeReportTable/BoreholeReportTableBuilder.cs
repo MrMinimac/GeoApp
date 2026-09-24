@@ -232,12 +232,10 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
         {
             var result = new List<(double From, string Text)>();
 
-            AddDescription("ПРС", "ПРС Интервал");
-            AddDescription("Делювий", "Делювий Интервал");
-            AddDescription("Торф", "Торф Интервал");
-            AddDescription("Аллювий", "Аллювий Интервал");
-            AddDescription("РКП", "РКП Интервал");
-            AddDescription("ПКП", "ПКП Интервал");
+            // берём все встречающиеся у скважины типы слоёв - любой ключ
+            // атрибута вида "<Тип> Интервал" - а не жёстко заданный список
+            foreach (var type in GetLayerTypes(borehole))
+                AddDescription(type, $"{type} Интервал");
 
             return string.Join(
                 "\n",
@@ -291,20 +289,11 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
         {
             var layers = new List<GeoLayer>();
 
-            var layerKeys = new[]
+            foreach (var type in GetLayerTypes(borehole))
             {
-                ("ПРС", "ПРС Интервал"),
-                ("Делювий", "Делювий Интервал"),
-                ("Торф", "Торф Интервал"),
-                ("Аллювий", "Аллювий Интервал"),
-                ("РКП", "РКП Интервал"),
-                ("ПКП", "ПКП Интервал")
-            };
-
-            foreach (var (type, key) in layerKeys)
-            {
-                var intervalStr =
-                    borehole.Atributes.GetValueOrDefault(key)?.ToString();
+                var intervalStr = borehole.Atributes
+                    .GetValueOrDefault($"{type} Интервал")?
+                    .ToString();
 
                 if (!TryParseInterval(
                         intervalStr,
@@ -326,6 +315,22 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable
             }
 
             return layers;
+        }
+
+        /// <summary>
+        /// Все типы слоёв, встречающиеся у скважины - определяются по
+        /// наличию атрибута "<Тип> Интервал" (тип = ключ без этого
+        /// суффикса), а не по жёстко заданному списку названий. Новый тип
+        /// слоя подхватывается сам, как только для него появляется
+        /// соответствующий интервал-атрибут (см. ExcelReader).
+        /// </summary>
+        private static IEnumerable<string> GetLayerTypes(Borehole borehole)
+        {
+            const string suffix = " Интервал";
+
+            return borehole.Atributes.Keys
+                .Where(k => k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                .Select(k => k[..^suffix.Length]);
         }
 
         private static string NormalizeInterval(string value)

@@ -6,30 +6,6 @@ using System.Threading.Tasks;
 
 namespace GeoAppCore.Services
 {
-    public static class BoreholeMainOreIntervalExtensions
-    {
-        /// <summary>
-        /// Возвращает "основной" пласт скважины — по умолчанию самый мощный
-        /// (при равной мощности - с более высоким содержанием), или null,
-        /// если у скважины пласта нет вовсе.
-        /// </summary>
-        public static OreInterval? GetMainOreInterval(
-            this Borehole borehole,
-            double minGrade,
-            double? maxWasteThickness = null)
-        {
-            var intervals = borehole.BuildOreIntervals(minGrade, maxWasteThickness);
-
-            if (intervals.Count == 0)
-                return null;
-
-            return intervals
-                .OrderByDescending(x => x.Length)
-                .ThenByDescending(x => x.AvgGrade)
-                .First();
-        }
-    }
-
     /// <summary>
     /// Рудный интервал (пересечение пласта) по одной скважине — 
     /// результат оконтуривания по бортовому содержанию.

@@ -10,91 +10,199 @@ namespace GeoCadPlugin.Drawers
     {
         /// <summary>
         /// Рисует контур основного пласта по разрезу: один замкнутый контур
-        /// на каждый непрерывный участок скважин, где пласт есть. Скважины
-        /// без пласта (GetMainOreInterval == null) образуют разрыв
-        /// (выклинивание) - контур на этом месте обрывается и начинается
-        /// заново со следующей скважины, у которой пласт снова есть.
+        /// на каждый непрерывный участок скважин, где пласт есть.
+        ///
+        /// Разрыв участка происходит в двух случаях:
+        ///  - у скважины пласта нет вовсе (GetMainOreInterval == null);
+        ///  - пласт есть у обеих соседних скважин, но его отметка (середина
+        ///    между кровлей и подошвой) отличается больше, чем на
+        ///    maxElevationJump - считаем, что это уже другой пласт.
+        ///
+        /// На каждом крае участка контур достраивается экстраполяцией за
+        /// пределы крайней скважины, в сторону соседней (независимо от
+        /// того, есть у неё свой пласт или нет):
+        ///  - по расстоянию - на extrapolationFraction (по умолчанию
+        ///    половина) от расстояния до соседней скважины;
+        ///  - по мощности - сохраняя extrapolationThicknessFraction от
+        ///    исходной мощности пласта в крайней скважине (кровля и подошва
+        ///    сдвигаются симметрично относительно средней отметки пласта).
+        ///    1.0 - мощность в точке экстраполяции такая же, как в
+        ///    скважине; 0.5 - вдвое меньше; 0 - сходится в точку
+        ///    (выклинивание "в ноль", как раньше).
         /// </summary>
+        /// <param name="intervals">
+        /// Основной пласт каждой скважины (по индексу, в том же порядке,
+        /// что и sections) - считается один раз в вызывающем коде
+        /// (Borehole.GetMainOreInterval), чтобы этот же список можно было
+        /// переиспользовать при заполнении таблицы (мощность/содержание/
+        /// запас на пласт), а не считать интервалы повторно здесь.
+        /// </param>
         public static void Draw(
             DrawContext dc,
             List<SectionBorehole> sections,
             double xOffset,
             int verticalScale,
-            double minGrade,
-            double? maxWasteThickness = null)
+            double? maxElevationJump = null,
+            double extrapolationFraction = 0.5,
+            double extrapolationThicknessFraction = 1.0)
         {
             if (sections.Count < 2)
                 return;
 
-            var runs = new List<List<(SectionBorehole Section, OreInterval Interval)>>();
-            List<(SectionBorehole, OreInterval)>? current = null;
+            var runs = new List<(int StartIndex, int EndIndex)>();
+            int? runStart = null;
+            double? prevElevation = null;
 
-            foreach (var section in sections)
+            for (int i = 0; i < sections.Count; i++)
             {
-                var interval = section.Source.GetMainOreInterval(minGrade, maxWasteThickness);
+                var interval = sections[i].OreInterval;
 
                 if (interval == null)
                 {
-                    if (current is { Count: > 0 })
-                    {
-                        runs.Add(current);
-                        current = null;
-                    }
+                    if (runStart.HasValue)
+                        runs.Add((runStart.Value, i - 1));
+
+                    runStart = null;
+                    prevElevation = null;
                     continue;
                 }
 
-                current ??= new List<(SectionBorehole, OreInterval)>();
-                current.Add((section, interval));
+                double elevation = sections[i].Top - (interval.From + interval.To) / 2;
+
+                bool tooFarByElevation =
+                    maxElevationJump.HasValue &&
+                    prevElevation.HasValue &&
+                    Math.Abs(elevation - prevElevation.Value) > maxElevationJump.Value;
+
+                if (tooFarByElevation && runStart.HasValue)
+                {
+                    runs.Add((runStart.Value, i - 1));
+                    runStart = null;
+                }
+
+                runStart ??= i;
+                prevElevation = elevation;
             }
 
-            if (current is { Count: > 0 })
-                runs.Add(current);
+            if (runStart.HasValue)
+                runs.Add((runStart.Value, sections.Count - 1));
 
-            foreach (var run in runs)
-                DrawRun(dc, run, xOffset, verticalScale);
+            foreach (var (startIndex, endIndex) in runs)
+            {
+                DrawRun(
+                    dc, sections, startIndex, endIndex,
+                    xOffset, verticalScale, extrapolationFraction, extrapolationThicknessFraction);
+            }
         }
 
         private static void DrawRun(
             DrawContext dc,
-            List<(SectionBorehole Section, OreInterval Interval)> run,
+            List<SectionBorehole> sections,
+            int startIndex,
+            int endIndex,
             double xOffset,
-            int verticalScale)
+            int verticalScale,
+            double extrapolationFraction,
+            double extrapolationThicknessFraction)
         {
-            // одиночная скважина с пластом контуром не рисуется -
-            // не с чем соединять по горизонтали
-            if (run.Count < 2)
+            var top = new List<Point2d>();
+            var bottom = new List<Point2d>();
+
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                var interval = sections[i].OreInterval!;
+                double x = sections[i].X + xOffset;
+
+                top.Add(new Point2d(x, (sections[i].Top - interval.From) * verticalScale));
+                bottom.Add(new Point2d(x, (sections[i].Top - interval.To) * verticalScale));
+            }
+
+            bool hasLeft = TryGetExtrapolatedEdge(
+                sections, startIndex, -1,
+                extrapolationFraction, extrapolationThicknessFraction, xOffset, verticalScale,
+                out var leftTop, out var leftBottom);
+
+            bool hasRight = TryGetExtrapolatedEdge(
+                sections, endIndex, +1,
+                extrapolationFraction, extrapolationThicknessFraction, xOffset, verticalScale,
+                out var rightTop, out var rightBottom);
+
+            var vertices = new List<Point2d>();
+
+            if (hasLeft) vertices.Add(leftTop);
+            vertices.AddRange(top);
+
+            if (hasRight)
+            {
+                vertices.Add(rightTop);
+                vertices.Add(rightBottom);
+            }
+
+            for (int i = bottom.Count - 1; i >= 0; i--)
+                vertices.Add(bottom[i]);
+
+            if (hasLeft) vertices.Add(leftBottom);
+
+            // без экстраполяции одиночная скважина - это 2 точки (верх/низ),
+            // контур из них не построить
+            if (vertices.Count < 3)
                 return;
 
             var polyline = new Polyline();
 
-            // верхняя граница пласта, слева направо
-            foreach (var (section, interval) in run)
-            {
-                double top = (section.Top - interval.From) * verticalScale;
-
-                polyline.AddVertexAt(
-                    polyline.NumberOfVertices,
-                    new Point2d(section.X + xOffset, top),
-                    0, 0, 0);
-            }
-
-            // нижняя граница пласта, справа налево
-            for (int i = run.Count - 1; i >= 0; i--)
-            {
-                var (section, interval) = run[i];
-                double bottom = (section.Top - interval.To) * verticalScale;
-
-                polyline.AddVertexAt(
-                    polyline.NumberOfVertices,
-                    new Point2d(section.X + xOffset, bottom),
-                    0, 0, 0);
-            }
+            foreach (var v in vertices)
+                polyline.AddVertexAt(polyline.NumberOfVertices, v, 0, 0, 0);
 
             polyline.Closed = true;
             polyline.Layer = LayerManager.GetLayerName(GeoLayers.OreBody);
 
             dc.ModelSpace.AppendEntity(polyline);
             dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+        }
+
+        /// <summary>
+        /// Строит пару точек (кровля/подошва) экстраполяции пласта за краем
+        /// участка (edgeIndex) в направлении direction (-1 - влево,
+        /// +1 - вправо): по X - на extrapolationFraction от расстояния до
+        /// соседней скважины, по мощности - сохраняя
+        /// extrapolationThicknessFraction от исходной мощности пласта
+        /// (симметрично относительно средней отметки пласта в крайней
+        /// скважине). Возвращает false, если соседа нет вовсе (край
+        /// разреза) - тогда экстраполировать не к чему.
+        /// </summary>
+        private static bool TryGetExtrapolatedEdge(
+            List<SectionBorehole> sections,
+            int edgeIndex,
+            int direction,
+            double extrapolationFraction,
+            double extrapolationThicknessFraction,
+            double xOffset,
+            int verticalScale,
+            out Point2d topPoint,
+            out Point2d bottomPoint)
+        {
+            topPoint = default;
+            bottomPoint = default;
+
+            int neighborIndex = edgeIndex + direction;
+
+            if (neighborIndex < 0 || neighborIndex >= sections.Count)
+                return false; // край разреза - экстраполировать не к чему
+
+            var edgeSection = sections[edgeIndex];
+            var neighborSection = sections[neighborIndex];
+            var edgeInterval = sections[edgeIndex].OreInterval!;
+
+            double distance = Math.Abs(neighborSection.X - edgeSection.X);
+            double pinchX = edgeSection.X + direction * distance * extrapolationFraction;
+
+            double midElevation = edgeSection.Top - (edgeInterval.From + edgeInterval.To) / 2;
+            double halfThickness = (edgeInterval.To - edgeInterval.From) / 2 * extrapolationThicknessFraction;
+
+            topPoint = new Point2d(pinchX + xOffset, (midElevation + halfThickness) * verticalScale);
+            bottomPoint = new Point2d(pinchX + xOffset, (midElevation - halfThickness) * verticalScale);
+
+            return true;
         }
     }
 }
