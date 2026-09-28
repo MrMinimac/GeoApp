@@ -18,7 +18,7 @@ namespace GeoAppWpf.ViewModels
     public class CommandsProvider
     {
         private readonly WorkspaceManager _workspaceManager;
-        private readonly AutoCadExporter _acadExporter;
+        private readonly AutoCadService _acadExporter;
 
         #region Commands
 
@@ -45,7 +45,7 @@ namespace GeoAppWpf.ViewModels
         public CommandsProvider(IServiceProvider serviceProvider)
         {
             _workspaceManager = serviceProvider.GetRequiredService<WorkspaceManager>();
-            _acadExporter = serviceProvider.GetRequiredService<AutoCadExporter>();
+            _acadExporter = serviceProvider.GetRequiredService<AutoCadService>();
 
             _importCommand = new(Import);
 

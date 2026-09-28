@@ -22,6 +22,8 @@ namespace GeoAppWpf.ViewModels
 
         #region Public Properties
 
+        public LastFilesViewModel LastFilesViewModel { get; }
+
         public ObservableCollection<Node> Nodes { get; set; } = new();
         public IEnumerable<Node> AllNodes => Nodes.SelectMany(n => n.Flatten());
 
@@ -54,6 +56,8 @@ namespace GeoAppWpf.ViewModels
         public HomeViewModel(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
+
+            LastFilesViewModel = _serviceProvider.GetRequiredService<LastFilesViewModel>();
 
             _workspaceManager = _serviceProvider.GetRequiredService<WorkspaceManager>();
             _commandsProvider = _serviceProvider.GetRequiredService<CommandsProvider>();

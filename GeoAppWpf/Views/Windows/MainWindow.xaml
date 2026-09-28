@@ -14,12 +14,13 @@
     mc:Ignorable="d">
 
     <Grid>
+
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="1">
+        <Grid>
 
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="55" />
@@ -53,6 +54,8 @@
 
             <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
         </Grid>
+
+        <components:StatusBarComponent Grid.Row="1" DataContext="{Binding StatusBarViewModel}" />
 
     </Grid>
 

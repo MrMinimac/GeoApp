@@ -38,9 +38,13 @@ namespace GeoCadPlugin.Drawers
                 first,
                 GetTextAngle(line.Azimuth));
 
+            var sections = line.BuildSections();
+
             // рисуем скважины
-            foreach (var bh in boreholes)
-                DrawBorehole(bh, GetTextAngle(line.Azimuth));
+            foreach (var cbh in sections)
+            {
+                DrawBorehole(cbh, GetTextAngle(line.Azimuth));
+            }
         }
 
         private static void DrawLineNumber(string number, Borehole first, double angle)
@@ -102,12 +106,13 @@ namespace GeoCadPlugin.Drawers
             return angle;
         }
 
-        public static void DrawBorehole(Borehole bh, double angle)
+        public static void DrawBorehole(SectionBorehole cbh, double angle)
         {
             ACDOC doc = Application.DocumentManager.MdiActiveDocument;
 
             Database db = doc.Database;
 
+            var bh = cbh.Source;
 
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
@@ -150,17 +155,17 @@ namespace GeoCadPlugin.Drawers
                 tr.AddNewlyCreatedDBObject(deapthText, true);
                 deapthText.Layer = LayerManager.GetLayerName(GeoLayers.Deapths);
 
-                var peatText = BuildText($"0,0", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 1.5, offset: 3);
+                var peatText = BuildText(cbh.OreInterval?.From.ToString("F1") ?? "-", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 1.5, offset: 3);
                 ms.AppendEntity(peatText);
                 tr.AddNewlyCreatedDBObject(peatText, true);
                 peatText.Layer = LayerManager.GetLayerName(GeoLayers.PeatThinckness);
 
-                var sandText = BuildText($"0,0", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: -1.5, offset: 3);
+                var sandText = BuildText(cbh.OreInterval?.Thinkness.ToString("F1") ?? "-", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: -1.5, offset: 3);
                 ms.AppendEntity(sandText);
                 tr.AddNewlyCreatedDBObject(sandText, true);
                 sandText.Layer = LayerManager.GetLayerName(GeoLayers.SandThickness);
 
-                var avgText = BuildText($"0,0", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
+                var avgText = BuildText(cbh.OreInterval?.AvgGrade.ToString("F3") ?? "пс", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
                 ms.AppendEntity(avgText);
                 tr.AddNewlyCreatedDBObject(avgText, true);
                 avgText.Layer = LayerManager.GetLayerName(GeoLayers.Avgs);

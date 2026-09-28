@@ -20,9 +20,11 @@
         </Style>
     </UserControl.Resources>
 
-    <ld:CustomPage HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
+    <ld:CustomPage Margin="0,2,0,0" HeaderMaxWidth="{x:Static sys:Double.PositiveInfinity}">
         <ld:CustomPage.PageContent>
+
             <Grid>
+
                 <Grid Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}}">
 
                     <Grid.ColumnDefinitions>
@@ -98,15 +100,17 @@
 
                 </Grid>
 
-                <TextBlock
-                    Margin="0,0,0,50"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource LabelSmallTextStyle}"
-                    Text="Загрузите документ, что бы увидеть данные."
-                    Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Reversed}" />
+                <Grid Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Reversed}">
+                    <components:LastFilesComponent
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        DataContext="{Binding LastFilesViewModel}" />
+                </Grid>
+
             </Grid>
+
         </ld:CustomPage.PageContent>
+
     </ld:CustomPage>
 
 </UserControl>

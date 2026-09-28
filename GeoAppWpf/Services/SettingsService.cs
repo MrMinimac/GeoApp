@@ -49,17 +49,21 @@ namespace GeoAppWpf.Services
             }
         }
 
-        public string LastDocPath
+        public IReadOnlyList<LastFileModel> LastFiles
         {
-            get => _model.LastDocPath;
-            set
-            {
-                if (_model.LastDocPath == value)
-                    return;
+            get => _model.LastFiles;
+        }
 
-                _model.LastDocPath = value;
-                ScheduleSave();
-            }
+        public void AddLastFile(LastFileModel file)
+        {
+            _model.LastFiles.Add(file);
+            ScheduleSave();
+        }
+
+        public void RemoveLastFile(LastFileModel file)
+        {
+            _model.LastFiles.Remove(file);
+            ScheduleSave();
         }
 
         // ===== Load / Save =====

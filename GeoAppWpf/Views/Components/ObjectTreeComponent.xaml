@@ -18,7 +18,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border
+        <!--<Border
             Margin="4,2,4,2"
             Padding="6,4,6,4"
             Background="{DynamicResource SecondaryBrush}"
@@ -46,12 +46,13 @@
 
             </Grid>
 
-        </Border>
+        </Border>-->
 
         <ld:CustomListBox
             Grid.Row="1"
             ItemsSource="{Binding Nodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
             VerticalScrollBarVisibility="Auto">
+            
             <ld:CustomListBox.ItemTemplate>
                 <DataTemplate>
                     <controls:ObjectItemControl
@@ -62,7 +63,9 @@
                 </DataTemplate>
 
             </ld:CustomListBox.ItemTemplate>
+            
         </ld:CustomListBox>
+        
     </Grid>
 
 </UserControl>

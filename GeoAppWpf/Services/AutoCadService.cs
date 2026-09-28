@@ -6,8 +6,26 @@ using System.Windows;
 
 namespace GeoAppWpf.Services
 {
-    public class AutoCadExporter
+    public class AutoCadService
     {
+        private readonly HttpClient _client = new HttpClient
+        {
+            Timeout = TimeSpan.FromMilliseconds(500)
+        };
+
+        public async Task<bool> CheckConnection()
+        {
+            try
+            {
+                using var response = await _client.PostAsync("http://localhost:5050/check",null);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public async Task ExportSections(GeoDoc document)
         {
             await Export("export-sections", document);

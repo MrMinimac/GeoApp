@@ -45,10 +45,12 @@ namespace GeoAppWpf
             services.AddSingleton<IDocumentLoader, ExcelDocumentLoader>();
             services.AddSingleton<ImportService>();
             services.AddSingleton<WorkspaceManager>();
-            services.AddSingleton<AutoCadExporter>();
+            services.AddSingleton<AutoCadService>();
             services.AddSingleton<IMessageBox, MessageBoxService>();
 
             services.AddSingleton<CommandsProvider>();
+            services.AddSingleton<LastFilesViewModel>();
+            services.AddSingleton<StatusBarViewModel>();
             services.AddSingleton<QuickMenuViewModel>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<SettingsViewModel>();

@@ -22,7 +22,7 @@ namespace GeoCadPlugin
         {
             while (true)
             {
-                var context =await listener.GetContextAsync();
+                var context = await listener.GetContextAsync();
                 await ProcessRequest(context);
             }
         }
@@ -70,7 +70,7 @@ namespace GeoCadPlugin
         private async Task ExportProject(HttpListenerContext context)
         {
             string url = context.Request.Url.AbsolutePath;
-            
+
             using StreamReader reader =
                             new StreamReader(
                                 context.Request.InputStream,
