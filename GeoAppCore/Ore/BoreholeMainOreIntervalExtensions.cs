@@ -11,7 +11,7 @@
 
             return intervals
                 .OrderByDescending(x => x.Thinkness)
-                .ThenByDescending(x => x.AvgGrade)
+                .ThenByDescending(x => x.PureAvgGrade)
                 .First();
         }
     }

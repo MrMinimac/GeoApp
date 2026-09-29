@@ -165,7 +165,7 @@ namespace GeoCadPlugin.Drawers
                 tr.AddNewlyCreatedDBObject(sandText, true);
                 sandText.Layer = LayerManager.GetLayerName(GeoLayers.SandThickness);
 
-                var avgText = BuildText(cbh.OreInterval?.AvgGrade.ToString("F3") ?? "пс", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
+                var avgText = BuildText(cbh.OreInterval?.PureAvgGrade.ToString("F3") ?? "пс", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
                 ms.AppendEntity(avgText);
                 tr.AddNewlyCreatedDBObject(avgText, true);
                 avgText.Layer = LayerManager.GetLayerName(GeoLayers.Avgs);

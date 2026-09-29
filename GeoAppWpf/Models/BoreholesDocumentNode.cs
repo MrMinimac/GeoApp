@@ -25,6 +25,12 @@ namespace GeoAppWpf.Models
             },
             new()
             {
+                Header = "Экспорт ПЗ в Excel",
+                Command = CommandsProvider.ExcelExportConditionsTableCommand,
+                CommandParameter = Document
+            },
+            new()
+            {
                 Header = "Экспорт БД в Excel",
                 Command = CommandsProvider.ExcelExportBoreholesDBCommand,
                 CommandParameter = Document

@@ -36,9 +36,7 @@ namespace GeoAppCore
                 if (total == 0)
                     return 0;
 
-                var avg = Samples.Sum(x => (x.Grade == -1 ? 0 : x.PureVertReserve)) / total;
-
-                return 3;
+                return Samples.Sum(x => (x.Grade == -1 ? 0 : x.PureVertReserve)) / total;
             }
         }
 

@@ -6,11 +6,11 @@ namespace GeoAppWpf.Services.Excel.Build
     public sealed class TableDefinition
     {
         public string Name { get; set; } = string.Empty;
-        public TableStyle Style { get; init; } = new();
+        public TableStyle Style { get; set; } = new();
 
-        public List<TableColumn> Columns { get; init; } = [];
+        public List<TableColumn> Columns { get; set; } = [];
 
-        public List<TableRow> Rows { get; init; } = [];
+        public List<TableRow> Rows { get; set; } = [];
 
         public bool CanUserSortColumns { get; set; } = true;
 
@@ -20,13 +20,13 @@ namespace GeoAppWpf.Services.Excel.Build
 
         public bool HasHeader { get; set; } = true;
 
-        public TableHeaderStyle HeaderStyle { get; init; } = new();
+        public TableHeaderStyle HeaderStyle { get; set; } = new();
 
-        public List<TableMergeRule> MergeRules { get; init; } = [];
+        public List<TableMergeRule> MergeRules { get; set; } = [];
 
-        public List<TableMergeRule> HeaderMergeRules { get; init; } = [];
+        public List<TableMergeRule> HeaderMergeRules { get; set; } = [];
 
-        public List<TableRowStyleRule> RowStyleRules { get; init; } = [];
+        public List<TableRowStyleRule> RowStyleRules { get; set; } = [];
         public TablePrintSettings? PrintSettings { get; set; }
     }
 
@@ -46,19 +46,19 @@ namespace GeoAppWpf.Services.Excel.Build
 
     public sealed class TableRowStyle
     {
-        public bool Bold { get; init; }
+        public bool Bold { get; set; }
 
-        public Color? BackgroundColor { get; init; }
+        public Color? BackgroundColor { get; set; }
 
-        public TableBorderStyle? Border { get; init; }
+        public TableBorderStyle? Border { get; set; }
 
-        public TableHorizontalAlignment? HorizontalAlignment { get; init; }
+        public TableHorizontalAlignment? HorizontalAlignment { get; set; }
 
-        public TableVerticalAlignment? VerticalAlignment { get; init; }
+        public TableVerticalAlignment? VerticalAlignment { get; set; }
 
-        public bool? WrapText { get; init; }
+        public bool? WrapText { get; set; }
 
-        public double? Height { get; init; }
+        public double? Height { get; set; }
 
         public ExcelFillStyle? PatternType { get; set; }
         public Color? PatternColor { get; set; }
@@ -66,90 +66,90 @@ namespace GeoAppWpf.Services.Excel.Build
 
     public sealed class TableStyle
     {
-        public TableBorderStyle? Border { get; init; }
+        public TableBorderStyle? Border { get; set; }
 
-        public bool WrapText { get; init; }
+        public bool WrapText { get; set; }
     }
 
     public sealed class TableRowStyleRule
     {
-        public Func<TableRow, bool> Condition { get; init; }
+        public Func<TableRow, bool> Condition { get; set; }
             = _ => false;
 
-        public string? ColumnKey { get; init; }
+        public string? ColumnKey { get; set; }
 
-        public bool Bold { get; init; }
+        public bool Bold { get; set; }
 
-        public Color? BackgroundColor { get; init; }
+        public Color? BackgroundColor { get; set; }
 
-        public TableBorderStyle? Border { get; init; }
+        public TableBorderStyle? Border { get; set; }
 
-        public TableHorizontalAlignment? HorizontalAlignment { get; init; }
+        public TableHorizontalAlignment? HorizontalAlignment { get; set; }
 
-        public TableVerticalAlignment? VerticalAlignment { get; init; }
+        public TableVerticalAlignment? VerticalAlignment { get; set; }
 
         public bool? WrapText { get; set; }
     }
 
     public sealed class TableBorderStyle
     {
-        public bool Top { get; init; }
+        public bool Top { get; set; }
 
-        public bool Bottom { get; init; }
+        public bool Bottom { get; set; }
 
-        public bool Left { get; init; }
+        public bool Left { get; set; }
 
-        public bool Right { get; init; }
+        public bool Right { get; set; }
 
-        public Color Color { get; init; } = Color.Black;
+        public Color Color { get; set; } = Color.Black;
     }
 
     public sealed class TableHeaderStyle
     {
-        public string FontName { get; init; } = "Times New Roman";
-        public double FontSize { get; init; } = 11;
-        public bool Bold { get; init; } = true;
+        public string FontName { get; set; } = "Times New Roman";
+        public double FontSize { get; set; } = 11;
+        public bool Bold { get; set; } = true;
 
-        public TableHorizontalAlignment HorizontalAlignment { get; init; } = TableHorizontalAlignment.Center;
-        public TableVerticalAlignment VerticalAlignment { get; init; } = TableVerticalAlignment.Center;
+        public TableHorizontalAlignment HorizontalAlignment { get; set; } = TableHorizontalAlignment.Center;
+        public TableVerticalAlignment VerticalAlignment { get; set; } = TableVerticalAlignment.Center;
 
-        public Color BackgroundColor { get; init; } = Color.FromArgb(242, 242, 242);
+        public Color BackgroundColor { get; set; } = Color.FromArgb(242, 242, 242);
 
-        public TableBorderStyle? Border { get; init; }
-        public bool WrapText { get; init; }
-        public double Height { get; init; }
+        public TableBorderStyle? Border { get; set; }
+        public bool WrapText { get; set; }
+        public double Height { get; set; }
     }
 
     public sealed class TableRow
     {
         public Dictionary<string, object?> Values { get; } = [];
-        public TableRowStyle? Style { get; init; }
+        public TableRowStyle? Style { get; set; }
         public bool Highlight { get; set; } = false;
         public double? Height { get; set; }
     }
 
     public sealed class TableColumn
     {
-        public string Header { get; init; } = string.Empty;
+        public string Header { get; set; } = string.Empty;
 
-        public string Key { get; init; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
 
-        public string? Format { get; init; }
+        public string? Format { get; set; }
 
-        public double Width { get; init; } = double.NaN;
+        public double Width { get; set; } = double.NaN;
 
-        public string FontName { get; init; } = "Times New Roman";
+        public string FontName { get; set; } = "Times New Roman";
 
-        public double FontSize { get; init; } = 11;
+        public double FontSize { get; set; } = 11;
 
-        public bool Bold { get; init; }
+        public bool Bold { get; set; }
 
-        public bool WrapText { get; init; }
+        public bool WrapText { get; set; }
 
-        public TableHorizontalAlignment HorizontalAlignment { get; init; }
+        public TableHorizontalAlignment HorizontalAlignment { get; set; }
             = TableHorizontalAlignment.Center;
 
-        public TableVerticalAlignment VerticalAlignment { get; init; }
+        public TableVerticalAlignment VerticalAlignment { get; set; }
             = TableVerticalAlignment.Center;
     }
 
@@ -169,19 +169,19 @@ namespace GeoAppWpf.Services.Excel.Build
 
     public sealed class TableMergeRule
     {
-        public string? ColumnKey { get; init; }
+        public string? ColumnKey { get; set; }
 
-        public string? EndColumnKey { get; init; }
+        public string? EndColumnKey { get; set; }
 
-        public bool Vertical { get; init; }
+        public bool Vertical { get; set; }
 
-        public bool Horizontal { get; init; }
+        public bool Horizontal { get; set; }
 
-        public bool Header { get; init; }
+        public bool Header { get; set; }
 
-        public bool SkipEmpty { get; init; } = true;
+        public bool SkipEmpty { get; set; } = true;
 
-        public Func<TableRow, bool>? CanMerge { get; init; }
+        public Func<TableRow, bool>? CanMerge { get; set; }
 
         public TableHorizontalAlignment? HorizontalAlignment { get; set; } = TableHorizontalAlignment.Center;
         public TableVerticalAlignment? VerticalAlignment { get; set; } = TableVerticalAlignment.Center;

@@ -22,7 +22,6 @@ namespace GeoAppCore.Ore
                     continue;
                 }
 
-                // Мощность торфов — расстояние от начала скважины до устья пласта
                 double peatThickness = samples[i].From;
 
                 double sumLen = 0;
@@ -31,13 +30,14 @@ namespace GeoAppCore.Ore
 
                 int lastGoodEnd = -1;
 
+                IOreConditionResult tempConditionResult = null;
+
                 for (int k = i; k < samples.Count; k++)
                 {
                     var s = samples[k];
                     bool isOre = condition.IsSampleOre(s);
 
                     sumLen += s.Length;
-                    // Накопление метр-граммов по чистому значению
                     sumGradeLen += Math.Max(s.PureAvgGrade, 0) * s.Length;
 
                     if (isOre)
@@ -48,30 +48,28 @@ namespace GeoAppCore.Ore
                     {
                         wasteRun += s.Length;
 
-                        // Если превышен лимит пустых пород внутри пласта — останавливаем расширение
                         if (condition.MaxWasteThickness.HasValue && wasteRun > condition.MaxWasteThickness.Value)
                             break;
                     }
 
-                    // Фиксируем границу, если текущая проба рудная и весь интервал проходит по кондициям
-                    if (isOre && condition.IsIntervalValid(sumLen, sumGradeLen, peatThickness))
+                    var validResult = condition.IsIntervalValid(sumLen, sumGradeLen, peatThickness);
+
+                    if (isOre && validResult.IsValid)
                     {
                         lastGoodEnd = k;
+                        tempConditionResult = validResult;
                     }
                 }
 
-                // Защита: проверяем, сформировался ли валидный пласт
                 if (lastGoodEnd != -1)
                 {
                     var oreSamples = samples.GetRange(i, lastGoodEnd - i + 1);
-                    result.Add(new OreInterval(oreSamples));
+                    result.Add(new OreInterval(oreSamples, tempConditionResult));
 
-                    // Переходим к поиску следующего пласта за пределами найденного
                     i = lastGoodEnd + 1;
                 }
                 else
                 {
-                    // Если пласт не прошел по кондициям, сдвигаемся на 1 пробу вперед
                     i++;
                 }
             }

@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace GeoAppWpf.Helpers
+﻿namespace GeoAppCore.Services
 {
     public class GaussKrugerConverter
     {
@@ -72,6 +65,66 @@ namespace GeoAppWpf.Helpers
             double longitudeDegree = lambda * 180.0 / Math.PI;
 
             return (latitudeDegree, longitudeDegree);
+        }
+
+        /// <summary>
+        /// Переводит геодезические координаты (Широта, Долгота в десятичных градусах) 
+        /// в координаты Гаусса-Крюгера (ГСК-2011).
+        /// </summary>
+        public static (double X, double Y) GeodeticToGK(double latitude, double longitude)
+        {
+            double f = 1.0 / invF;
+            double e2 = 2 * f - f * f; // Квадрат первого эксцентриситета
+            double ep2 = e2 / (1 - e2); // Квадрат второго эксцентриситета
+
+            // Перевод градусов в радианы
+            double phi = latitude * Math.PI / 180.0;
+            double lambda = longitude * Math.PI / 180.0;
+
+            // 1. Определение номера зоны и осевого меридиана
+            int zone = (int)Math.Floor(longitude / 6.0) + 1;
+            double lon0 = (zone * 6 - 3) * Math.PI / 180.0;
+
+            // Разница долгот (в радианах)
+            double l = lambda - lon0;
+
+            // Тригонометрические функции
+            double sinPhi = Math.Sin(phi);
+            double cosPhi = Math.Cos(phi);
+            double tanPhi = Math.Tan(phi);
+
+            // 2. Вычисление длины дуги меридиана (M)
+            double A0 = 1 - e2 / 4.0 - 3 * e2 * e2 / 64.0 - 5 * Math.Pow(e2, 3) / 256.0;
+            double A2 = (3.0 / 8.0) * e2 + (3.0 / 32.0) * e2 * e2 + (45.0 / 1024.0) * Math.Pow(e2, 3);
+            double A4 = (15.0 / 256.0) * e2 * e2 + (45.0 / 1024.0) * Math.Pow(e2, 3);
+            double A6 = (35.0 / 3072.0) * Math.Pow(e2, 3);
+
+            double M = a * (A0 * phi - A2 * Math.Sin(2 * phi) + A4 * Math.Sin(4 * phi) - A6 * Math.Sin(6 * phi));
+
+            // 3. Радиус кривизны и промежуточные переменные
+            double N = a / Math.Sqrt(1 - e2 * sinPhi * sinPhi);
+            double T = tanPhi * tanPhi;
+            double C = ep2 * cosPhi * cosPhi;
+            double A = l * cosPhi;
+
+            // 4. Вычисление координаты X (Север)
+            double x = M + N * tanPhi * (
+                Math.Pow(A, 2) / 2.0
+                + (5 - T + 9 * C + 4 * C * C) * Math.Pow(A, 4) / 24.0
+                + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.Pow(A, 6) / 720.0
+            );
+
+            // 5. Вычисление истинного значения Y (Восток) от осевого меридиана
+            double trueY = N * (
+                A
+                + (1 - T + C) * Math.Pow(A, 3) / 6.0
+                + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.Pow(A, 5) / 120.0
+            );
+
+            // 6. Добавление смещения Y (номер зоны + условный сдвиг 500 км)
+            double y = (zone * 1000000.0) + 500000.0 + trueY;
+
+            return (x, y);
         }
     }
 }

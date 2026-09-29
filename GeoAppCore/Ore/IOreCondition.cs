@@ -7,6 +7,8 @@
         /// </summary>
         double? MaxWasteThickness { get; }
 
+        double WasteGradient { get; }
+
         /// <summary>
         /// Проверка отдельной пробы на борт (рудная/пустая)
         /// </summary>
@@ -15,6 +17,6 @@
         /// <summary>
         /// Проверка накопленного интервала на соответствие кондициям
         /// </summary>
-        bool IsIntervalValid(double sumLen, double sumGradeLen, double peatThickness);
+        IOreConditionResult IsIntervalValid(double sumLen, double sumGradeLen, double peatThickness);
     }
 }

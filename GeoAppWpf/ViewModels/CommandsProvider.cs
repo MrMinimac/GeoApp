@@ -4,7 +4,9 @@ using GeoAppWpf.InputDalogBuilders;
 using GeoAppWpf.Services;
 using GeoAppWpf.Services.Excel.Build;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeDataBaseTable;
+using GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
+using GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -34,6 +36,9 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _generateBoreholesCommand;
         public ICommand GenerateBoreholesCommand => _generateBoreholesCommand;
 
+        private readonly RelayCommand<IDocument> _excelExportConditionsTableCommand;
+        public ICommand ExcelExportConditionsTableCommand => _excelExportConditionsTableCommand;
+
         private readonly RelayCommand<IDocument> _excelExportBoreholesDBCommand;
         public ICommand ExcelExportBoreholesDBCommand => _excelExportBoreholesDBCommand;
 
@@ -54,6 +59,7 @@ namespace GeoAppWpf.ViewModels
 
             _excelExportBoreholesDBCommand = new(ExcelExportBoreholesDB);
             _excelExportBoreholesCommand = new(ExcelExportBoreholes);
+            _excelExportConditionsTableCommand = new(ExcelExportConditionsTable);
 
             _autoCadExportSectionsCommand = new(AutoCadExportSections);
         }
@@ -84,6 +90,18 @@ namespace GeoAppWpf.ViewModels
                 excelDoc.Tables.AddRange(tables);
                 excelDoc.Save(Path.Combine(dialog.FolderName, $"{line.Id}.xlsx"));
             }
+        }
+
+        private void ExcelExportConditionsTable(IDocument document)
+        {
+            var lines = document.GetObjects().OfType<BoreholeLine>();
+
+            if (lines == null || !lines.Any())
+                return;
+
+            var table = ConditionsTableBuilder.Build(lines);
+            var table2 = BoreholeInfluenceTableBuilder.Build(lines);
+            SaveTable(document.Name, [table, table2]);
         }
 
         private void ExcelExportBoreholesDB(IDocument document)
