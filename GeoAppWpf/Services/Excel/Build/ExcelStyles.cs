@@ -56,7 +56,7 @@ namespace GeoAppWpf.Services.Excel.Build
 
             Bold = true,
 
-            BackgroundColor = Color.FromArgb(189, 215, 238),
+            BackgroundColor = Color.FromArgb(255, 226, 239, 218),
 
             Border = new TableBorderStyle
             {

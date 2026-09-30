@@ -9,7 +9,7 @@
         SandThickness,
         AbsoluteElevations,
         Deapths,
-        Avgs,
+        SectionAvgs,
         Rulers,
         Tables,
         Intervals,
@@ -19,5 +19,6 @@
         Surface,
         Litologies,
         OreBody,
+        PlanAvgs,
     }
 }

@@ -3,12 +3,10 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
 using GeoCadPlugin.Managers;
-using System.Data;
 using ACDOC = Autodesk.AutoCAD.ApplicationServices.Document;
 
 namespace GeoCadPlugin.Drawers
 {
-
     public class GeoPlanDrawer
     {
         public static void Draw(GeoDoc project)
@@ -21,67 +19,64 @@ namespace GeoCadPlugin.Drawers
 
         private static void DrawLine(BoreholeLine line)
         {
-            // сортировка по номеру скважины
-            var boreholes = line.Boreholes
-                .OrderBy(x => x.Id)
-                .ToList();
+            var boreholes = line.Boreholes.OrderBy(x => x.Id).ToList();
 
             if (boreholes.Count < 2)
                 return;
 
             Borehole first = boreholes.First();
-            Borehole last = boreholes.Last();
 
-            // рисуем номер буровой линии
-            DrawLineNumber(
-                line.Id,
-                first,
-                GetTextAngle(line.Azimuth));
+            // Базовый физический угол линии (до разворота текста)
+            double baseAngle = NormalizeAngleRadians(GetAngle(line.Azimuth) + Math.PI / 2);
 
+            // Угол для читаемости текста (может быть развернут на 180°)
+            double textAngle = GetTextAngle(line.Azimuth);
+
+            // Отрисовка номера линии с учетом обоих углов
+            DrawLineNumber(line.Id, first, textAngle, baseAngle);
+
+            // Скважины
             var sections = line.BuildSections();
 
-            // рисуем скважины
             foreach (var cbh in sections)
             {
-                DrawBorehole(cbh, GetTextAngle(line.Azimuth));
+                DrawBorehole(cbh, textAngle);
             }
         }
 
-        private static void DrawLineNumber(string number, Borehole first, double angle)
+        private static void DrawLineNumber(string number, Borehole first, double textAngle, double baseAngle)
         {
-            ACDOC doc =
-                Application.DocumentManager.MdiActiveDocument;
-
+            ACDOC doc = Application.DocumentManager.MdiActiveDocument;
             Database db = doc.Database;
 
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
-
                 BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                 BlockTableRecord ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
 
                 double offset = 10;
 
-                // смещение от первой скважины
+                // Позицию вычисляем строго по БАЗОВОМУ углу, 
+                // чтобы точка всегда оставалась перед первой скважиной
                 Point3d position = new Point3d(
-                    first.X - Math.Sin(angle) * offset,
-                    first.Y + Math.Cos(angle) * offset,
+                    first.X - Math.Sin(baseAngle) * offset,
+                    first.Y + Math.Cos(baseAngle) * offset,
                     first.Z);
 
                 DBText text = new DBText
                 {
                     Height = 3,
                     TextString = number,
-                    Rotation = angle,
+                    Rotation = textAngle, // Сам текст поворачиваем для читаемости
                     HorizontalMode = TextHorizontalMode.TextCenter,
                     VerticalMode = TextVerticalMode.TextVerticalMid
                 };
 
-                // теперь это центр текста
                 text.AlignmentPoint = position;
 
                 ms.AppendEntity(text);
                 tr.AddNewlyCreatedDBObject(text, true);
+
                 tr.Commit();
             }
         }
@@ -93,35 +88,48 @@ namespace GeoCadPlugin.Drawers
             if (angle < 0)
                 angle += 360;
 
-            return angle * Math.PI / 180;
+            return angle * Math.PI / 180.0;
         }
 
+        /// <summary>
+        /// Получает угол текста относительно азимута линии.
+        /// Если текст будет читаться вверх ногами,
+        /// разворачивает ВСЮ систему на 180 градусов.
+        /// </summary>
         private static double GetTextAngle(double azimuth)
         {
+            // Основное направление
             double angle = GetAngle(azimuth) + Math.PI / 2;
 
-            if (angle >= Math.PI * 2)
-                angle -= Math.PI * 2;
+            // Нормализуем в диапазон 0..2π
+            angle = NormalizeAngleRadians(angle);
 
-            return angle;
+            // Если направление текста находится в верхней
+            // "перевёрнутой" половине, разворачиваем на 180°.
+            //
+            // 90° ... 270° => текст будет перевёрнут.
+            if (angle > Math.PI / 2 && angle < 3 * Math.PI / 2)
+            {
+                angle += Math.PI;
+            }
+
+            return NormalizeAngleRadians(angle);
         }
 
         public static void DrawBorehole(SectionBorehole cbh, double angle)
         {
             ACDOC doc = Application.DocumentManager.MdiActiveDocument;
-
             Database db = doc.Database;
-
             var bh = cbh.Source;
 
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
-
-
                 BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                 BlockTableRecord ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
 
-                LayerManager.CreateLayers(db, tr,
+                LayerManager.CreateLayers(
+                    db,
+                    tr,
                     [
                         GeoLayers.Boreholes,
                         GeoLayers.BoreholeNumbers,
@@ -129,9 +137,12 @@ namespace GeoCadPlugin.Drawers
                         GeoLayers.Deapths,
                         GeoLayers.PeatThinckness,
                         GeoLayers.SandThickness,
-                        GeoLayers.Avgs,
-                    ]
-                 );
+                        GeoLayers.PlanAvgs,
+                    ]);
+
+                // -------------------------------------------------
+                // Скважина
+                // -------------------------------------------------
 
                 Point3d pt = new Point3d(bh.X, bh.Y, bh.Z);
                 Circle circle = new Circle(pt, Vector3d.ZAxis, 1.5);
@@ -140,35 +151,115 @@ namespace GeoCadPlugin.Drawers
                 ms.AppendEntity(circle);
                 tr.AddNewlyCreatedDBObject(circle, true);
 
+                // -------------------------------------------------
+                // Номер скважины
+                // -------------------------------------------------
+
                 var idText = BuildText(bh.Id.ToString(), bh.X, bh.Y, bh.Z, angle);
+
                 ms.AppendEntity(idText);
                 tr.AddNewlyCreatedDBObject(idText, true);
+
                 idText.Layer = LayerManager.GetLayerName(GeoLayers.BoreholeNumbers);
 
-                var zText = BuildText($"{bh.Z:f1}", bh.X, bh.Y, bh.Z, angle, TextPlacement.Left, verticalOffset: 1.5, offset: 3);
+                // -------------------------------------------------
+                // Абсолютная отметка
+                // -------------------------------------------------
+
+                var zText = BuildText(
+                    $"{bh.Z:f1}",
+                    bh.X,
+                    bh.Y,
+                    bh.Z,
+                    angle,
+                    TextPlacement.Left,
+                    verticalOffset: 1.5,
+                    offset: 3);
+
                 ms.AppendEntity(zText);
                 tr.AddNewlyCreatedDBObject(zText, true);
+
                 zText.Layer = LayerManager.GetLayerName(GeoLayers.AbsoluteElevations);
 
-                var deapthText = BuildText($"{bh.Deapth:f1}", bh.X, bh.Y, bh.Z, angle, TextPlacement.Left, verticalOffset: -1.5, offset: 3);
+                // -------------------------------------------------
+                // Глубина
+                // -------------------------------------------------
+
+                var deapthText = BuildText(
+                    $"{bh.Deapth:f1}",
+                    bh.X,
+                    bh.Y,
+                    bh.Z,
+                    angle,
+                    TextPlacement.Left,
+                    verticalOffset: -1.5,
+                    offset: 3);
+
                 ms.AppendEntity(deapthText);
                 tr.AddNewlyCreatedDBObject(deapthText, true);
+
                 deapthText.Layer = LayerManager.GetLayerName(GeoLayers.Deapths);
 
-                var peatText = BuildText(cbh.OreInterval?.From.ToString("F1") ?? "-", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 1.5, offset: 3);
+                // -------------------------------------------------
+                // Содержание
+                // -------------------------------------------------
+
+                var pureAvgGrade = cbh.OreInterval?.PureAvgGrade;
+
+                var pureAvgGradeText =
+                    pureAvgGrade == null
+                    ? "пс"
+                    : pureAvgGrade == -1
+                        ? "зн"
+                        : pureAvgGrade?.ToString("F3") ?? "пс";
+
+                // Мощность торфов
+                var peatText = BuildText(
+                    cbh.OreInterval?.From.ToString("F1") ?? "-",
+                    bh.X,
+                    bh.Y,
+                    bh.Z,
+                    angle,
+                    TextPlacement.Right,
+                    verticalOffset: 1.5,
+                    offset: 3);
+
                 ms.AppendEntity(peatText);
                 tr.AddNewlyCreatedDBObject(peatText, true);
+
                 peatText.Layer = LayerManager.GetLayerName(GeoLayers.PeatThinckness);
 
-                var sandText = BuildText(cbh.OreInterval?.Thinkness.ToString("F1") ?? "-", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: -1.5, offset: 3);
+                // Мощность песков
+                var sandText = BuildText(
+                    cbh.OreInterval?.Thickness.ToString("F1") ?? "-",
+                    bh.X,
+                    bh.Y,
+                    bh.Z,
+                    angle,
+                    TextPlacement.Right,
+                    verticalOffset: -1.5,
+                    offset: 3);
+
                 ms.AppendEntity(sandText);
                 tr.AddNewlyCreatedDBObject(sandText, true);
+
                 sandText.Layer = LayerManager.GetLayerName(GeoLayers.SandThickness);
 
-                var avgText = BuildText(cbh.OreInterval?.PureAvgGrade.ToString("F3") ?? "пс", bh.X, bh.Y, bh.Z, angle, TextPlacement.Right, verticalOffset: 0, offset: 10);
+                // Среднее содержание
+                var avgText = BuildText(
+                    pureAvgGradeText,
+                    bh.X,
+                    bh.Y,
+                    bh.Z,
+                    angle,
+                    TextPlacement.Right,
+                    verticalOffset: 0,
+                    offset: 10);
+
                 ms.AppendEntity(avgText);
                 tr.AddNewlyCreatedDBObject(avgText, true);
-                avgText.Layer = LayerManager.GetLayerName(GeoLayers.Avgs);
+
+                avgText.Layer = LayerManager.GetLayerName(GeoLayers.PlanAvgs);
 
                 tr.Commit();
             }
@@ -184,7 +275,10 @@ namespace GeoCadPlugin.Drawers
             double offset = 3,
             double verticalOffset = 0)
         {
-            // смещение от скважины в сторону
+            // -------------------------------------------------
+            // Локальное направление относительно скважины
+            // -------------------------------------------------
+
             double sideAngle = placement switch
             {
                 TextPlacement.Forward => angle,
@@ -194,6 +288,10 @@ namespace GeoCadPlugin.Drawers
                 _ => angle
             };
 
+            // -------------------------------------------------
+            // Выравнивание текста
+            // -------------------------------------------------
+
             var hMode = placement switch
             {
                 TextPlacement.Left => TextHorizontalMode.TextRight,
@@ -201,33 +299,63 @@ namespace GeoCadPlugin.Drawers
                 _ => TextHorizontalMode.TextCenter
             };
 
+            // -------------------------------------------------
+            // Вектор бокового смещения
+            // -------------------------------------------------
 
             double sideX = -Math.Sin(sideAngle);
             double sideY = Math.Cos(sideAngle);
 
+            // -------------------------------------------------
+            // Вектор "вверх/вниз" относительно текста
+            // -------------------------------------------------
 
-            // вверх/вниз относительно текста
             double textX = -Math.Sin(angle);
             double textY = Math.Cos(angle);
 
+            // -------------------------------------------------
+            // Итоговая позиция
+            //
+            // ВАЖНО:
+            // angle уже может быть развернут на 180°.
+            // Поэтому ВСЕ offset автоматически вращаются
+            // вокруг исходной точки скважины.
+            // -------------------------------------------------
 
             Point3d position = new Point3d(
                 x + sideX * offset + textX * verticalOffset,
                 y + sideY * offset + textY * verticalOffset,
                 z);
 
-
             DBText text = new DBText
             {
                 TextString = content,
                 Height = 2,
+
+                // Сам текст тоже использует тот же угол
                 Rotation = angle,
+
                 HorizontalMode = hMode,
                 VerticalMode = TextVerticalMode.TextVerticalMid,
-                AlignmentPoint = position,
+
+                AlignmentPoint = position
             };
 
             return text;
+        }
+
+        /// <summary>
+        /// Нормализация угла в радианах:
+        /// 0 <= angle < 2π
+        /// </summary>
+        private static double NormalizeAngleRadians(double angle)
+        {
+            angle %= 2 * Math.PI;
+
+            if (angle < 0)
+                angle += 2 * Math.PI;
+
+            return angle;
         }
     }
 }

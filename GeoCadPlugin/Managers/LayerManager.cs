@@ -15,7 +15,8 @@ namespace GeoCadPlugin.Managers
                 GeoLayers.SandThickness => "Мощности песков",
                 GeoLayers.AbsoluteElevations => "Абсолютные отметки",
                 GeoLayers.Deapths => "Глубины скважин",
-                GeoLayers.Avgs => "Средние содержания",
+                GeoLayers.SectionAvgs => "Средние содержания",
+                GeoLayers.PlanAvgs => "Средние содержания скважин",
                 GeoLayers.Rulers => "Линейки масштаба",
                 GeoLayers.Tables => "Таблицы",
                 GeoLayers.Intervals => "Интервалы проб",
@@ -72,7 +73,7 @@ namespace GeoCadPlugin.Managers
         {
             return layer switch
             {
-                GeoLayers.Avgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
+                GeoLayers.SectionAvgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
                 GeoLayers.NotDeterminedAvgs => Color.FromColorIndex(ColorMethod.ByAci, 1),
                 GeoLayers.OreBody => Color.FromColorIndex(ColorMethod.ByAci, 1),
                 _ => null

@@ -1,4 +1,5 @@
 ﻿using GeoAppCore;
+using GeoAppCore.Services;
 using GeoAppWpf.Helpers;
 using netDxf.Collections;
 using System.Drawing;
@@ -110,7 +111,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable
                     if (!valid) continue;
 
                     var torfThick = cbh.OreInterval?.From ?? 0;
-                    var sandThick = cbh.OreInterval?.Thinkness ?? 0;
+                    var sandThick = cbh.OreInterval?.Thickness ?? 0;
                     var stripRatio = torfThick / sandThick;
                     var fineness = cbh.Source.Samples.FirstOrDefault()?.Fineness ?? 1;
 

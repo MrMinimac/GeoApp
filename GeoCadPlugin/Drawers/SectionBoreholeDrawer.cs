@@ -21,7 +21,7 @@ namespace GeoCadPlugin.Drawers
                 GeoLayers.BoreholeNumbers,
                 GeoLayers.AbsoluteElevations,
                 GeoLayers.Intervals,
-                GeoLayers.Avgs,
+                GeoLayers.SectionAvgs,
                 GeoLayers.EmptyAvgs,
                 GeoLayers.NotDeterminedAvgs,
             ]);
@@ -56,7 +56,7 @@ namespace GeoCadPlugin.Drawers
                 {
                     0 => GeoLayers.EmptyAvgs,
                     -1 => GeoLayers.NotDeterminedAvgs,
-                    _ => GeoLayers.Avgs,
+                    _ => GeoLayers.SectionAvgs,
                 };
 
                 var dbtext = AddText(valueStr, cbhX + 1, textY, layer);

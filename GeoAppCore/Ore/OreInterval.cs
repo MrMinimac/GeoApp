@@ -16,19 +16,19 @@
         public double AvgGrade => VertReserv / Samples.Sum(s => s.Length);
 
         /// <summary> Среднее содержание в пласте песков, г/м³ (х. ч.) </summary>
-        public double PureAvgGrade => PureVertReserv / Samples.Sum(s => s.Length);
+        public double PureAvgGrade => PureVertReserve / Samples.Sum(s => s.Length);
 
         /// <summary> Мощность пласта песков (рудного интервала), м </summary>
-        public double Thinkness => To - From;
+        public double Thickness => To - From;
 
         /// <summary>
         /// Вертикальный (линейный) запас на пласт, г/м².
         /// </summary>
-        public double PureVertReserv
+        public double PureVertReserve
         {
             get
             {
-                if (Thinkness <= 0) return 0;
+                if (Thickness <= 0) return 0;
                 return Samples.Sum(s => Math.Max(s.PureAvgGrade, 0) * s.Length);
             }
         }
@@ -40,16 +40,16 @@
         {
             get
             {
-                if (Thinkness <= 0) return 0;
+                if (Thickness <= 0) return 0;
                 return Samples.Sum(s => Math.Max(s.AvgGrade, 0) * s.Length);
             }
         }
 
         /// <summary> Мощность горной массы (торфы + пески), м </summary>
-        public double RockMassThickness => From + Thinkness;
+        public double RockMassThickness => From + Thickness;
 
         /// <summary> Среднее содержание на горную массу, г/м³ </summary>
-        public double AvgRockMassGrade => PureVertReserv / RockMassThickness;
+        public double AvgRockMassGrade => PureVertReserve / RockMassThickness;
 
         public OreInterval(IEnumerable<Sample> samples, IOreConditionResult conditionResult)
         {

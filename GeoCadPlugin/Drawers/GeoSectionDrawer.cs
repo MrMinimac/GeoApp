@@ -871,13 +871,13 @@ namespace GeoCadPlugin.Drawers
                 peatThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.From.ToString("F1") ?? "-", bhX));
 
                 // Мощность пласта песков
-                sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Thinkness.ToString("F1") ?? "-", bhX));
+                sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Thickness.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на пласт
                 oreGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.PureAvgGrade.ToString("F3") ?? "пс", bhX));
 
                 // Вертикальный запас на пласт
-                oreReserveValues.Add(new GeoTableRowValue(cbh.OreInterval?.PureVertReserv.ToString("F3") ?? "пс", bhX));
+                oreReserveValues.Add(new GeoTableRowValue(cbh.OreInterval?.PureVertReserve.ToString("F3") ?? "пс", bhX));
 
                 // Мощность горной массы
                 rockMassThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.RockMassThickness.ToString("F1") ?? "-", bhX));

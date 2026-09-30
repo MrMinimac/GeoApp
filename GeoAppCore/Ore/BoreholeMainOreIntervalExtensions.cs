@@ -10,7 +10,7 @@
                 return null;
 
             return intervals
-                .OrderByDescending(x => x.Thinkness)
+                .OrderByDescending(x => x.Thickness)
                 .ThenByDescending(x => x.PureAvgGrade)
                 .First();
         }

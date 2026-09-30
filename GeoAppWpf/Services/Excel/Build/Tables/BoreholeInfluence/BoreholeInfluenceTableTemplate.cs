@@ -15,6 +15,18 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
                 HasHeader = true,
                 HeaderStyle = ExcelStyles.DefaultHeader,
 
+                Style = new TableStyle
+                {
+                    Border = new TableBorderStyle
+                    {
+                        Top = true,
+                        Bottom = true,
+                        Left = true,
+                        Right = true,
+                        Color = Color.Black
+                    }
+                },
+
                 HeaderMergeRules =
                 [
                     new()
@@ -22,43 +34,19 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
                         ColumnKey = "Impact10",
                         EndColumnKey = "Impact10_2"
                     },
-
-                    new()
-                    {
-                        ColumnKey = "Impact15",
-                        EndColumnKey = "Impact15_2"
-                    },
-
-                    new()
-                    {
-                        ColumnKey = "Impact20",
-                        EndColumnKey = "Impact20_2"
-                    }
                 ],
 
                 MergeRules =
                 [
                     ExcelStyles.DefaultPartSpliterMergeRule,
-                    new()
+
+                    new TableMergeRule
                     {
-                        ColumnKey = "Wireframe",
-                        Vertical = true,
-                        SkipEmpty = true,
-
-                        CanMerge = row =>
-                        {
-                            row.Values.TryGetValue(
-                                "GroupsNumber",
-                                out var value);
-
-                            var text = value?.ToString();
-
-                            return text != "ВСЕГО ПО ГРУППЕ" &&
-                                   text != "ЛИМИТ 10%" &&
-                                   text != "ЛИМИТ 15%" &&
-                                   text != "ЛИМИТ 20%";
-                        }
+                        ColumnKey = "GroupsNumber",
+                        Horizontal = true,
+                        CanMerge = row => row.Values.TryGetValue("IsRegionHeader", out var isRegion) && isRegion is true
                     },
+
                     new()
                     {
                         ColumnKey = "GroupsNumber",
@@ -73,10 +61,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
 
                             var text = value?.ToString();
 
-                            return text != "ВСЕГО ПО ГРУППЕ" &&
-                                   text != "ЛИМИТ 10%" &&
-                                   text != "ЛИМИТ 15%" &&
-                                   text != "ЛИМИТ 20%";
+                            return text != "ВСЕГО ПО ГРУППЕ" && text != "ЛИМИТ 10%";
                         }
                     },
 
@@ -94,10 +79,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
 
                             var text = value?.ToString();
 
-                            return text == "ВСЕГО ПО ГРУППЕ" ||
-                                   text == "ЛИМИТ 10%" ||
-                                   text == "ЛИМИТ 15%" ||
-                                   text == "ЛИМИТ 20%";
+                            return text == "ВСЕГО ПО ГРУППЕ" || text == "ЛИМИТ 10%";
                         }
                     }
                 ],
@@ -109,23 +91,28 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
                     {
                         Condition = row =>
                         {
-                            row.Values.TryGetValue("GroupsNumber", out var value);
-                            var text = value?.ToString();
-
-                            return text == "ВСЕГО ПО ГРУППЕ" ||
-                                   text == "ЛИМИТ 10%" ||
-                                   text == "ЛИМИТ 15%" ||
-                                   text == "ЛИМИТ 20%";
+                            var text = row.Values.GetValueOrDefault("GroupsNumber")?.ToString();
+                            return text == "ВСЕГО ПО ГРУППЕ" || text == "ЛИМИТ 10%";
                         },
 
                         Bold = true,
-                        BackgroundColor = Color.FromArgb(189, 215, 238),
+                        BackgroundColor = Color.FromArgb(255, 226, 239, 218),
+                        Border = ExcelStyles.DefaultBorder
+                    },
+
+                    new()
+                    {
+                        Condition = row =>
+                        {
+                            var text = row.Values.GetValueOrDefault("BoreholeLine")?.ToString();
+                            return text == "Итого по линии";
+                        },
+
+                        Bold = true,
                         Border = ExcelStyles.DefaultBorder
                     },
 
                     ExcelStyles.DefaultHighlightedCellStyle("Impact10"),
-                    ExcelStyles.DefaultHighlightedCellStyle("Impact15"),
-                    ExcelStyles.DefaultHighlightedCellStyle("Impact20"),
                 ],
 
                 Columns =
@@ -134,16 +121,12 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence
                     new() { Header = "№ Линии", Key = "BoreholeLine" },
                     new() { Header = "№ Скважины", Key = "BoreholeNumber" },
                     new() { Header = "Количество скважин", Key = "HolesCount" },
-                    new() { Header = "Мощность", Key = "Length", Format = "F1" },
-                    new() { Header = "Содержание", Key = "Grade", Format = "F3" },
-                    new() { Header = "Метрограмм", Key = "Grade2", Format = "F3" },
-                    new() { Header = "Влияние скважины", Key = "Impact", Format = "F2" },
-                    new() { Header = "С учетом уравнения 10%", Key = "Impact10", Format = "F3" },
-                    new() { Header = "С учетом уравнения 10%", Key = "Impact10_2", Format = "F2" },
-                    new() { Header = "С учетом уравнения 15%", Key = "Impact15", Format = "F3" },
-                    new() { Header = "С учетом уравнения 15%", Key = "Impact15_2", Format = "F2" },
-                    new() { Header = "С учетом уравнения 20%", Key = "Impact20", Format = "F3" },
-                    new() { Header = "С учетом уравнения 20%", Key = "Impact20_2", Format = "F2" },
+                    new() { Header = "Мощность, м", Key = "Length", Format = "F1" },
+                    new() { Header = "Ср. сод-е Au х/ч, г/м³", Key = "Grade", Format = "F3" },
+                    new() { Header = "Верт. запас х/ч, г/м²", Key = "VertReserv", Format = "F3" },
+                    new() { Header = "Влияние скважины, %", Key = "Impact", Format = "F2" },
+                    new() { Header = "С учетом нивелировки 10%, Ср. сод. Au х/ч, г/м³", Key = "Impact10", Format = "F3" },
+                    new() { Header = "С учетом нивелировки 10%, Ср. сод. Au х/ч, г/м³", Key = "Impact10_2", Format = "F3" },
                 ]
             };
         }

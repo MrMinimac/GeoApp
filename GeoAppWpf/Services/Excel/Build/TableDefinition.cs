@@ -185,5 +185,7 @@ namespace GeoAppWpf.Services.Excel.Build
 
         public TableHorizontalAlignment? HorizontalAlignment { get; set; } = TableHorizontalAlignment.Center;
         public TableVerticalAlignment? VerticalAlignment { get; set; } = TableVerticalAlignment.Center;
+
+        public bool MergeRepeatedHorizontal { get; set; }
     }
 }

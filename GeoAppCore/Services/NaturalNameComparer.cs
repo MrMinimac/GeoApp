@@ -1,4 +1,4 @@
-﻿namespace GeoAppWpf.Helpers
+﻿namespace GeoAppCore.Services
 {
     public sealed class NaturalNameComparer : IComparer<string>
     {

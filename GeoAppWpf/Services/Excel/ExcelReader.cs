@@ -1,6 +1,5 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
-using netDxf.Entities;
 using OfficeOpenXml;
 using System.Globalization;
 using System.IO;

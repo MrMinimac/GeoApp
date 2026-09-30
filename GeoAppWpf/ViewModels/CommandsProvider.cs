@@ -1,12 +1,16 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
+using GeoAppCore.Services;
 using GeoAppWpf.InputDalogBuilders;
 using GeoAppWpf.Services;
 using GeoAppWpf.Services.Excel.Build;
+using GeoAppWpf.Services.Excel.Build.Data;
+using GeoAppWpf.Services.Excel.Build.Tables.BlocksReportTable;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeDataBaseTable;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
 using GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable;
+using GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -99,9 +103,15 @@ namespace GeoAppWpf.ViewModels
             if (lines == null || !lines.Any())
                 return;
 
+            var levelingGroups = LevelingBoreholeGroup.BuildMacroGroups(lines);
+            var blocks = BlockBuilder.Build(lines);
+
             var table = ConditionsTableBuilder.Build(lines);
-            var table2 = BoreholeInfluenceTableBuilder.Build(lines);
-            SaveTable(document.Name, [table, table2]);
+            var table2 = BoreholeInfluenceTableBuilder.Build(levelingGroups);
+            var table3 = BlocksReportTableBuilder.Build(blocks, levelingGroups);
+            var table4 = OreReserveTableBuilder.Build(blocks, lines);
+
+            SaveTable(document.Name, [table, table2, table3, table4]);
         }
 
         private void ExcelExportBoreholesDB(IDocument document)

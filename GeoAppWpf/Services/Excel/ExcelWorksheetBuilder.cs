@@ -455,8 +455,125 @@ namespace GeoAppWpf.Services.Excel
                     MergeRepeatedCells(worksheet, table, rule);
 
                 if (rule.Horizontal)
-                    MergeHorizontalCells(worksheet, table, rule);
+                {
+                    if (rule.EndColumnKey != null)
+                        MergeHorizontalCells(worksheet, table, rule);
+                    else
+                        MergeRepeatedHorizontalCells(worksheet, table, rule);
+                }
             }
+        }
+
+        private static void MergeRepeatedHorizontalCells(
+            ExcelWorksheet worksheet,
+            TableDefinition table,
+            TableMergeRule rule)
+        {
+            int startColumn = rule.ColumnKey != null
+                ? table.Columns.FindIndex(x => x.Key == rule.ColumnKey) + 1
+                : 1;
+
+            if (startColumn <= 0)
+                return;
+
+            for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+            {
+                var row = table.Rows[rowIndex];
+
+                int excelRow = rowIndex + 2;
+
+                int mergeStart = startColumn;
+                object? previousValue = null;
+                bool hasValue = false;
+
+                for (int columnIndex = startColumn;
+                     columnIndex <= table.Columns.Count;
+                     columnIndex++)
+                {
+                    var column = table.Columns[columnIndex - 1];
+
+                    row.Values.TryGetValue(column.Key, out var currentValue);
+
+                    bool isEmpty =
+                        currentValue == null ||
+                        string.IsNullOrWhiteSpace(currentValue.ToString());
+
+                    bool canMerge = rule.CanMerge?.Invoke(row) ?? true;
+
+                    if (!canMerge || (rule.SkipEmpty && isEmpty))
+                    {
+                        FinishHorizontalMerge(
+                            worksheet,
+                            excelRow,
+                            mergeStart,
+                            columnIndex - 1,
+                            rule);
+
+                        mergeStart = columnIndex;
+                        previousValue = null;
+                        hasValue = false;
+
+                        continue;
+                    }
+
+                    if (!hasValue)
+                    {
+                        previousValue = currentValue;
+                        hasValue = true;
+                        mergeStart = columnIndex;
+                        continue;
+                    }
+
+                    if (!Equals(previousValue, currentValue))
+                    {
+                        FinishHorizontalMerge(
+                            worksheet,
+                            excelRow,
+                            mergeStart,
+                            columnIndex - 1,
+                            rule);
+
+                        mergeStart = columnIndex;
+                        previousValue = currentValue;
+                    }
+                }
+
+                FinishHorizontalMerge(
+                    worksheet,
+                    excelRow,
+                    mergeStart,
+                    table.Columns.Count,
+                    rule);
+            }
+        }
+
+        private static void FinishHorizontalMerge(
+            ExcelWorksheet worksheet,
+            int row,
+            int startColumn,
+            int endColumn,
+            TableMergeRule rule)
+        {
+            if (startColumn >= endColumn)
+                return;
+
+            var range = worksheet.Cells[
+                row,
+                startColumn,
+                row,
+                endColumn];
+
+            range.Merge = true;
+
+            range.Style.HorizontalAlignment =
+                rule.HorizontalAlignment.HasValue
+                    ? ConvertHorizontalAlignment(rule.HorizontalAlignment.Value)
+                    : ExcelHorizontalAlignment.Center;
+
+            range.Style.VerticalAlignment =
+                rule.VerticalAlignment.HasValue
+                    ? ConvertVerticalAlignment(rule.VerticalAlignment.Value)
+                    : ExcelVerticalAlignment.Center;
         }
 
         private static void MergeHorizontalCells(ExcelWorksheet worksheet, TableDefinition table, TableMergeRule rule)

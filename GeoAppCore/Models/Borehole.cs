@@ -27,7 +27,7 @@ namespace GeoAppCore
         }
 
         [JsonIgnore]
-        public double AvgValue
+        public double PureAvgValue
         {
             get
             {
@@ -37,6 +37,20 @@ namespace GeoAppCore
                     return 0;
 
                 return Samples.Sum(x => (x.Grade == -1 ? 0 : x.PureVertReserve)) / total;
+            }
+        }
+
+        [JsonIgnore]
+        public double AvgValue
+        {
+            get
+            {
+                double total = Samples.Sum(x => (x.Grade == -1 || x.Grade == 0) ? 0 : x.Length);
+
+                if (total == 0)
+                    return 0;
+
+                return Samples.Sum(x => (x.Grade == -1 ? 0 : x.VertReserve)) / total;
             }
         }
 
