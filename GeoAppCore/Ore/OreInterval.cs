@@ -4,7 +4,7 @@
     {
         public IReadOnlyList<Sample> Samples { get; }
 
-        public IOreConditionResult ConditionResult { get; }
+        public IOreConditionResult? ConditionResult { get; }
 
         /// <summary> Глубина кровли пласта (мощность торфов), м </summary>
         public double From => Samples.First().From;
@@ -13,10 +13,10 @@
         public double To => Samples.Last().To;
 
         /// <summary> Среднее содержание в пласте песков, г/м³ </summary>
-        public double AvgGrade => VertReserv / Samples.Sum(s => s.Length);
+        public double AvgGrade => VertReserv == -1 ? -1 : VertReserv / Samples.Sum(s => s.Length);
 
         /// <summary> Среднее содержание в пласте песков, г/м³ (х. ч.) </summary>
-        public double PureAvgGrade => PureVertReserve / Samples.Sum(s => s.Length);
+        public double PureAvgGrade => PureVertReserve == -1 ? -1 : PureVertReserve / Samples.Sum(s => s.Length);
 
         /// <summary> Мощность пласта песков (рудного интервала), м </summary>
         public double Thickness => To - From;
@@ -29,6 +29,10 @@
             get
             {
                 if (Thickness <= 0) return 0;
+
+                if (Samples.All(x => x.PureAvgGrade == -1))
+                    return -1;
+
                 return Samples.Sum(s => Math.Max(s.PureAvgGrade, 0) * s.Length);
             }
         }
@@ -41,6 +45,10 @@
             get
             {
                 if (Thickness <= 0) return 0;
+
+                if (Samples.All(x => x.AvgGrade == -1))
+                    return -1;
+
                 return Samples.Sum(s => Math.Max(s.AvgGrade, 0) * s.Length);
             }
         }
@@ -51,7 +59,7 @@
         /// <summary> Среднее содержание на горную массу, г/м³ </summary>
         public double AvgRockMassGrade => PureVertReserve / RockMassThickness;
 
-        public OreInterval(IEnumerable<Sample> samples, IOreConditionResult conditionResult)
+        public OreInterval(IEnumerable<Sample> samples, IOreConditionResult? conditionResult)
         {
             Samples = samples.OrderBy(s => s.From).ToList();
             ConditionResult = conditionResult;

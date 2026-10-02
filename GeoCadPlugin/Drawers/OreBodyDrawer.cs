@@ -1,7 +1,6 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore;
-using GeoAppCore.Services;
 using GeoCadPlugin.Managers;
 
 namespace GeoCadPlugin.Drawers
@@ -15,10 +14,14 @@ namespace GeoCadPlugin.Drawers
             int verticalScale,
             double? maxElevationJump = null,
             double extrapolationFraction = 0.5,
-            double extrapolationThicknessFraction = 1.0)
+            double extrapolationThicknessFraction = 1.0,
+            double flagSize = 3)
         {
             if (sections.Count < 2)
                 return;
+
+            // Находим максимальную верхнюю точку для высоты флагштока
+            var maxTop = sections.Max(x => x.Top);
 
             var runs = new List<(int StartIndex, int EndIndex)>();
             int? runStart = null;
@@ -28,7 +31,7 @@ namespace GeoCadPlugin.Drawers
             {
                 var interval = sections[i].OreInterval;
 
-                if (interval == null)
+                if (interval == null || interval.ConditionResult == null || !interval.ConditionResult.IsValid)
                 {
                     if (runStart.HasValue)
                         runs.Add((runStart.Value, i - 1));
@@ -58,15 +61,50 @@ namespace GeoCadPlugin.Drawers
             if (runStart.HasValue)
                 runs.Add((runStart.Value, sections.Count - 1));
 
+            Point2d? overallLeft = null;
+            Point2d? overallRight = null;
+
             foreach (var (startIndex, endIndex) in runs)
             {
-                DrawRun(
-                    dc, sections, startIndex, endIndex,
-                    xOffset, verticalScale, extrapolationFraction, extrapolationThicknessFraction);
+                var (leftTopEdge, rightTopEdge) = DrawRun(
+                    dc,
+                    sections,
+                    startIndex,
+                    endIndex,
+                    xOffset,
+                    verticalScale,
+                    extrapolationFraction,
+                    extrapolationThicknessFraction);
+
+                // Ищем абсолютные края рудного тела для установки флажков
+                if (leftTopEdge.HasValue)
+                {
+                    if (overallLeft == null || leftTopEdge.Value.X < overallLeft.Value.X)
+                        overallLeft = leftTopEdge;
+                }
+
+                if (rightTopEdge.HasValue)
+                {
+                    if (overallRight == null || rightTopEdge.Value.X > overallRight.Value.X)
+                        overallRight = rightTopEdge;
+                }
+            }
+
+            // Отрисовка флажков, если контур был построен
+            if (overallLeft.HasValue && overallRight.HasValue)
+            {
+                double maxY = maxTop * verticalScale;
+
+                // Левый флажок (треугольник смотрит вправо: направление = 1)
+                DrawFlag(dc, overallLeft.Value, maxY, flagSize, 1);
+
+                // Правый флажок (треугольник смотрит влево: направление = -1)
+                DrawFlag(dc, overallRight.Value, maxY, flagSize, -1);
             }
         }
 
-        private static void DrawRun(
+        // Изменили возвращаемый тип на кортеж, чтобы получить крайние точки отрисованного контура
+        private static (Point2d? Left, Point2d? Right) DrawRun(
             DrawContext dc,
             List<SectionBorehole> sections,
             int startIndex,
@@ -117,7 +155,7 @@ namespace GeoCadPlugin.Drawers
             // без экстраполяции одиночная скважина - это 2 точки (верх/низ),
             // контур из них не построить
             if (vertices.Count < 3)
-                return;
+                return (null, null);
 
             var polyline = new Polyline();
 
@@ -129,6 +167,12 @@ namespace GeoCadPlugin.Drawers
 
             dc.ModelSpace.AppendEntity(polyline);
             dc.Transaction.AddNewlyCreatedDBObject(polyline, true);
+
+            // Возвращаем крайнюю левую и крайнюю правую точки верхней границы
+            Point2d runLeftTop = hasLeft ? leftTop : top.First();
+            Point2d runRightTop = hasRight ? rightTop : top.Last();
+
+            return (runLeftTop, runRightTop);
         }
 
         private static bool TryGetExtrapolatedEdge(
@@ -164,6 +208,37 @@ namespace GeoCadPlugin.Drawers
             bottomPoint = new Point2d(pinchX + xOffset, (midElevation - halfThickness) * verticalScale);
 
             return true;
+        }
+
+        // Новый метод для отрисовки флажков
+        private static void DrawFlag(DrawContext dc, Point2d basePt, double maxY, double flagSize, int direction)
+        {
+            // Точка вершины флагштока
+            var poleTopPt = new Point2d(basePt.X, maxY);
+
+            // Флагшток (вертикальная линия)
+            var pole = new Polyline();
+            pole.AddVertexAt(0, basePt, 0, 0, 0);
+            pole.AddVertexAt(1, poleTopPt, 0, 0, 0);
+            pole.Layer = LayerManager.GetLayerName(GeoLayers.OreBody);
+
+            // Треугольник (флажок)
+            var triangle = new Polyline();
+            // Точка 1: Верх флагштока
+            triangle.AddVertexAt(0, poleTopPt, 0, 0, 0);
+            // Точка 2: Вниз по флагштоку на размер flagSize
+            triangle.AddVertexAt(1, new Point2d(poleTopPt.X, poleTopPt.Y - flagSize), 0, 0, 0);
+            // Точка 3: Острие треугольника, вытянутое в сторону direction
+            triangle.AddVertexAt(2, new Point2d(poleTopPt.X + (direction * flagSize), poleTopPt.Y - (flagSize / 2.0)), 0, 0, 0);
+
+            triangle.Closed = true;
+            triangle.Layer = LayerManager.GetLayerName(GeoLayers.OreBody);
+
+            dc.ModelSpace.AppendEntity(pole);
+            dc.Transaction.AddNewlyCreatedDBObject(pole, true);
+
+            dc.ModelSpace.AppendEntity(triangle);
+            dc.Transaction.AddNewlyCreatedDBObject(triangle, true);
         }
     }
 }

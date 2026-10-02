@@ -417,7 +417,6 @@ namespace GeoCadPlugin.Drawers
         {
             return (missingInterval.TopElevation + missingInterval.BottomElevation) / 2.0;
 
-
             if (targetIntervals.Count == 0)
                 return (missingInterval.TopElevation + missingInterval.BottomElevation) / 2.0;
 
@@ -874,16 +873,16 @@ namespace GeoCadPlugin.Drawers
                 sandLayerThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.Thickness.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на пласт
-                oreGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.PureAvgGrade.ToString("F3") ?? "пс", bhX));
+                oreGradeValues.Add(new GeoTableRowValue(DoubleToString(cbh.OreInterval?.PureAvgGrade), bhX));
 
                 // Вертикальный запас на пласт
-                oreReserveValues.Add(new GeoTableRowValue(cbh.OreInterval?.PureVertReserve.ToString("F3") ?? "пс", bhX));
+                oreReserveValues.Add(new GeoTableRowValue(DoubleToString(cbh.OreInterval?.PureVertReserve), bhX));
 
                 // Мощность горной массы
                 rockMassThicknesses.Add(new GeoTableRowValue(cbh.OreInterval?.RockMassThickness.ToString("F1") ?? "-", bhX));
 
                 // Среднее содержание на горную массу
-                rockMassGradeValues.Add(new GeoTableRowValue(cbh.OreInterval?.AvgRockMassGrade.ToString("F3") ?? "пс", bhX));
+                rockMassGradeValues.Add(new GeoTableRowValue(DoubleToString(cbh.OreInterval?.AvgRockMassGrade), bhX));
             }
 
             var table = new GeoTable(tableStartX, tableEndX, tableStartY, verticalScale);
@@ -904,6 +903,17 @@ namespace GeoCadPlugin.Drawers
         }
 
         #endregion
+
+        private static string DoubleToString(double? value)
+        {
+            if (value == null || value == 0)
+                return "пс";
+
+            if (value < 0)
+                return "зн";
+
+            return value?.ToString("F3");
+        }
     }
 
     public class LithologyComparer : IEqualityComparer<List<Lithology>>

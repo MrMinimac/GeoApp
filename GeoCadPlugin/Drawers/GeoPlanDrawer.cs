@@ -91,11 +91,6 @@ namespace GeoCadPlugin.Drawers
             return angle * Math.PI / 180.0;
         }
 
-        /// <summary>
-        /// Получает угол текста относительно азимута линии.
-        /// Если текст будет читаться вверх ногами,
-        /// разворачивает ВСЮ систему на 180 градусов.
-        /// </summary>
         private static double GetTextAngle(double azimuth)
         {
             // Основное направление
@@ -137,7 +132,9 @@ namespace GeoCadPlugin.Drawers
                         GeoLayers.Deapths,
                         GeoLayers.PeatThinckness,
                         GeoLayers.SandThickness,
-                        GeoLayers.PlanAvgs,
+                        GeoLayers.GradeAvgs,
+                        GeoLayers.EmptyAvgs,
+                        GeoLayers.NotDeterminedAvgs,
                     ]);
 
                 // -------------------------------------------------
@@ -200,19 +197,6 @@ namespace GeoCadPlugin.Drawers
 
                 deapthText.Layer = LayerManager.GetLayerName(GeoLayers.Deapths);
 
-                // -------------------------------------------------
-                // Содержание
-                // -------------------------------------------------
-
-                var pureAvgGrade = cbh.OreInterval?.PureAvgGrade;
-
-                var pureAvgGradeText =
-                    pureAvgGrade == null
-                    ? "пс"
-                    : pureAvgGrade == -1
-                        ? "зн"
-                        : pureAvgGrade?.ToString("F3") ?? "пс";
-
                 // Мощность торфов
                 var peatText = BuildText(
                     cbh.OreInterval?.From.ToString("F1") ?? "-",
@@ -245,7 +229,26 @@ namespace GeoCadPlugin.Drawers
 
                 sandText.Layer = LayerManager.GetLayerName(GeoLayers.SandThickness);
 
-                // Среднее содержание
+                // -------------------------------------------------
+                // Содержание
+                // -------------------------------------------------
+
+                var pureAvgGrade = cbh.OreInterval?.PureAvgGrade ?? 0;
+
+                var layer = pureAvgGrade switch
+                {
+                    0 => GeoLayers.EmptyAvgs,
+                    -1 => GeoLayers.NotDeterminedAvgs,
+                    _ => GeoLayers.GradeAvgs,
+                };
+
+                var pureAvgGradeText = pureAvgGrade switch
+                {
+                    0 => "пс",
+                    -1 => "зн",
+                    _ => pureAvgGrade.ToString("F3"),
+                };
+
                 var avgText = BuildText(
                     pureAvgGradeText,
                     bh.X,
@@ -259,7 +262,7 @@ namespace GeoCadPlugin.Drawers
                 ms.AppendEntity(avgText);
                 tr.AddNewlyCreatedDBObject(avgText, true);
 
-                avgText.Layer = LayerManager.GetLayerName(GeoLayers.PlanAvgs);
+                avgText.Layer = LayerManager.GetLayerName(layer);
 
                 tr.Commit();
             }
@@ -344,10 +347,6 @@ namespace GeoCadPlugin.Drawers
             return text;
         }
 
-        /// <summary>
-        /// Нормализация угла в радианах:
-        /// 0 <= angle < 2π
-        /// </summary>
         private static double NormalizeAngleRadians(double angle)
         {
             angle %= 2 * Math.PI;

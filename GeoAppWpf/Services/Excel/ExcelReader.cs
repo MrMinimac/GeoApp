@@ -1,8 +1,10 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
 using OfficeOpenXml;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 
 namespace GeoAppWpf.Services
@@ -277,19 +279,36 @@ namespace GeoAppWpf.Services
             return boreholes;
         }
 
-        private static Dictionary<string, object?> GetIntervalAttributes(ExcelWorksheet worksheet, Dictionary<string, int> cols, int row)
+        private static Dictionary<string, object?> GetIntervalAttributes(ExcelWorksheet worksheet,Dictionary<string, int> cols, int row)
         {
-            var atributes = new Dictionary<string, object?>();
-           
+            var attributes = new Dictionary<string, object?>();
+
             foreach (var (header, col) in cols)
             {
                 if (!header.EndsWith(" Интервал", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                atributes[header] = GetCellTextSafe(worksheet, row, col);
+                string? interval = GetCellTextSafe(worksheet, row, col);
+
+                if (string.IsNullOrWhiteSpace(interval))
+                    continue;
+
+                var matches = Regex.Matches(interval, @"\d+(?:[.,]\d+)?");
+
+                if (matches.Count < 2)
+                    continue;
+
+                string from = matches[0].Value.Replace(',', '.');
+                string to = matches[1].Value.Replace(',', '.');
+
+                var formattedInterval = $"{from}-{to}";
+
+                attributes[header] = formattedInterval;
+
+                Debug.WriteLine($"Parsed: {interval} => {formattedInterval}");
             }
 
-            return atributes;
+            return attributes;
         }
 
         private static Dictionary<string, object?> GetDescriptionsAtributes(ExcelWorksheet worksheet, Dictionary<string, int> cols)

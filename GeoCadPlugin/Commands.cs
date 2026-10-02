@@ -3,6 +3,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
+using GeoCadPlugin.Drawers;
 using Microsoft.Win32;
 using ACDOC = Autodesk.AutoCAD.ApplicationServices.Document;
 

@@ -5,29 +5,36 @@ namespace GeoCadPlugin
 {
     public class Plugin : IExtensionApplication
     {
-        private static WebServer server;
+        private WebServer? _server;
 
         public void Initialize()
         {
-            Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+            var editor = Application.DocumentManager
                 .MdiActiveDocument?
-                .Editor
-                .WriteMessage("\nGeoAppPlugin загружен!");
+                .Editor;
+
+            editor?.WriteMessage("\nGeoAppPlugin загружен!");
 
             Application.Idle += OnIdle;
-            server = new WebServer();
-            server.Start();
+
+            _server = new WebServer();
+            _server.Start();
         }
 
         public void Terminate()
         {
-            Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+            Application.Idle -= OnIdle;
+
+            _server?.Stop();
+            _server = null;
+
+            Application.DocumentManager
                 .MdiActiveDocument?
                 .Editor
-                .WriteMessage("\nLGeoAppPlugin выгружен!");
+                .WriteMessage("\nGeoAppPlugin выгружен!");
         }
 
-        private void OnIdle(object sender, EventArgs e)
+        private void OnIdle(object? sender, EventArgs e)
         {
             CommandQueue.Execute();
         }

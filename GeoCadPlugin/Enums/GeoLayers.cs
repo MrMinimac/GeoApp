@@ -9,16 +9,15 @@
         SandThickness,
         AbsoluteElevations,
         Deapths,
-        SectionAvgs,
         Rulers,
         Tables,
         Intervals,
+        GradeAvgs,
         EmptyAvgs,
         NotDeterminedAvgs,
         Header,
         Surface,
         Litologies,
         OreBody,
-        PlanAvgs,
     }
 }

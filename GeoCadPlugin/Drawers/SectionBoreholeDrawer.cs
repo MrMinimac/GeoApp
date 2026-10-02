@@ -10,6 +10,7 @@ namespace GeoCadPlugin.Drawers
     {
         private DrawContext _dc;
         public int VerticalScale { get; set; } = 10;
+        public double BoreholeTextHeight { get; set; } = 2;
 
         public SectionBoreholeDrawer(DrawContext drawContext)
         {
@@ -21,7 +22,7 @@ namespace GeoCadPlugin.Drawers
                 GeoLayers.BoreholeNumbers,
                 GeoLayers.AbsoluteElevations,
                 GeoLayers.Intervals,
-                GeoLayers.SectionAvgs,
+                GeoLayers.GradeAvgs,
                 GeoLayers.EmptyAvgs,
                 GeoLayers.NotDeterminedAvgs,
             ]);
@@ -56,7 +57,7 @@ namespace GeoCadPlugin.Drawers
                 {
                     0 => GeoLayers.EmptyAvgs,
                     -1 => GeoLayers.NotDeterminedAvgs,
-                    _ => GeoLayers.SectionAvgs,
+                    _ => GeoLayers.GradeAvgs,
                 };
 
                 var dbtext = AddText(valueStr, cbhX + 1, textY, layer);
@@ -69,23 +70,23 @@ namespace GeoCadPlugin.Drawers
         {
             const double yOffset = 7;
             const double textInterval = 2;
-            const double textHeight = 3;
-            const double textHalfHeight = textHeight / 2;
-            const double separatorHalfWidth = 6;
+            const double separatorHalfWidth = 5;
 
-            double elevationY = y + yOffset + textHeight / 2;
+            double textHalfHeight = BoreholeTextHeight / 2;
+
+            double elevationY = y + yOffset + BoreholeTextHeight / 2;
             double separatorY = elevationY + textHalfHeight + textInterval / 2;
-            double numberY = elevationY + textHalfHeight + textInterval + textHeight / 2;
+            double numberY = elevationY + textHalfHeight + textInterval + BoreholeTextHeight / 2;
 
             // Номер скважины
             var nubmberText = AddText(borehole.Id.ToString(), x, numberY, GeoLayers.BoreholeNumbers);
             nubmberText.HorizontalMode = TextHorizontalMode.TextMid;
-            nubmberText.Height = textHeight;
+            nubmberText.Height = BoreholeTextHeight;
 
             // Абс. отметка устья
             var elevationText = AddText(borehole.Top.ToString("F1"), x, elevationY, GeoLayers.AbsoluteElevations);
             elevationText.HorizontalMode = TextHorizontalMode.TextMid;
-            elevationText.Height = textHeight;
+            elevationText.Height = BoreholeTextHeight;
 
             // Сепаратор
             AddLine(x - separatorHalfWidth, separatorY, x + separatorHalfWidth, separatorY);

@@ -9,21 +9,24 @@ namespace GeoCadPlugin
 {
     public class WebServer
     {
-        private HttpListener listener;
+        private HttpListener _listener;
+
+        private bool _running = false;
 
         public void Start()
         {
-            listener = new HttpListener();
-            listener.Prefixes.Add("http://localhost:5050/");
-            listener.Start();
+            _running = true;
+            _listener = new HttpListener();
+            _listener.Prefixes.Add("http://localhost:5050/");
+            _listener.Start();
             Task.Run(() => Listen());
         }
 
         private async Task Listen()
         {
-            while (true)
+            while (_running)
             {
-                var context = await listener.GetContextAsync();
+                var context = await _listener.GetContextAsync();
                 await ProcessRequest(context);
             }
         }
@@ -109,6 +112,7 @@ namespace GeoCadPlugin
                 GeoSectionDrawer.Draw(project);
             }
         }
+
         private void ExportPlan(string json)
         {
             GeoDoc project = JsonConvert.DeserializeObject<GeoDoc>(json);
@@ -122,6 +126,14 @@ namespace GeoCadPlugin
             {
                 GeoPlanDrawer.Draw(project);
             }
+        }
+
+        public void Stop()
+        {
+            _running = false;
+            _listener?.Stop();
+            _listener?.Close();
+            _listener = null;
         }
     }
 }
