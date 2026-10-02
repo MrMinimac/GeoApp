@@ -147,10 +147,11 @@ namespace GeoAppWpf.ViewModels
 
         private async Task AutoCadExportSections(IEnumerable<BoreholeLine> boreholeLines)
         {
-            var geoDoc = new GeoDoc
-            {
-                BoreholeLines = boreholeLines.ToList()
-            };
+
+            var geoDoc = GeoDocInputBuilder.Build(boreholeLines);
+
+            if (geoDoc == null)
+                return;
 
             await _acadExporter.ExportSections(geoDoc);
         }

@@ -1,4 +1,5 @@
 ﻿using GeoAppCore;
+using GeoAppCore.Hatch;
 using GeoAppCore.Services;
 using GeoAppWpf.Services.Excel.Render;
 using System.Diagnostics;

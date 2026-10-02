@@ -5,8 +5,11 @@ namespace GeoAppCore
     public class GeoDoc
     {
         public int VerticalScale { get; set; } = 10;
+
+        public bool DrawHatch { get; set; } = false;
+
         public List<BoreholeLine> BoreholeLines { get; set; } = new();
-        
+
         public string ToJson()
         {
             return JsonConvert.SerializeObject(this, Formatting.Indented);

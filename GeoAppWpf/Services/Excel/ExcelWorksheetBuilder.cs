@@ -1,4 +1,5 @@
-﻿using GeoAppWpf.Services.Excel.Build;
+﻿using GeoAppCore.Hatch;
+using GeoAppWpf.Services.Excel.Build;
 using GeoAppWpf.Services.Excel.Render;
 using OfficeOpenXml;
 using OfficeOpenXml.Drawing;
@@ -728,7 +729,7 @@ namespace GeoAppWpf.Services.Excel
                 TableOrintation.Landscape => eOrientation.Landscape,
                 _ => eOrientation.Portrait
             };
-            
+
             worksheet.PrinterSettings.FitToPage = settings.FitToPage;
 
             worksheet.PrinterSettings.FitToWidth = settings.FitToWidth;
