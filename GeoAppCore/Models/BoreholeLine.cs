@@ -40,11 +40,16 @@ namespace GeoAppCore
 
         public List<SectionBorehole> BuildSections()
         {
+            return BuildSections(Boreholes);
+        }
+
+        public static List<SectionBorehole> BuildSections(List<Borehole> boreholes)
+        {
             var sections = new List<SectionBorehole>();
 
             double distance = 0;
 
-            var boreholes = Boreholes
+            boreholes = boreholes
                 .OrderBy(x => x.Id)
                 .ToList();
 

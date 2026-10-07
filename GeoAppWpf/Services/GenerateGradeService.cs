@@ -10,7 +10,6 @@ namespace GeoAppWpf.Services
 {
     internal class GenerateGradeService
     {
-        private const double BoundaryTolerance = 0.75;
         private const double ReserveToleranceKg = 0.0001;
         private const double Epsilon = 1e-9;
 
@@ -65,7 +64,7 @@ namespace GeoAppWpf.Services
                 throw new ArgumentOutOfRangeException(
                     nameof(properties.MaxRkpSamples));
 
-            var blocks = BuildBlocks(lines, properties.Boundaries);
+            var blocks = BlockBuilder.Build(lines, properties.Boundaries);
 
             // Скважина может входить в несколько контуров - берём каждую только один раз,
             // иначе мощность для неё выбиралась бы несколько раз и объединялась.
@@ -639,35 +638,6 @@ namespace GeoAppWpf.Services
 
         #endregion
 
-        private static List<Block> BuildBlocks(IEnumerable<BoreholeLine> lines, List<BoundaryData> boundaries)
-        {
-            var blocks = new List<Block>();
-            var counter = 1;
-
-            foreach (var boundary in boundaries)
-            {
-                var boreholes = lines
-                    .SelectMany(x => x.Boreholes)
-                    .Where(bh => IsInsideBoundary(bh.X, bh.Y, boundary))
-                    .ToList();
-
-                var sections = BuildSections(boreholes);
-
-                var block = new Block
-                {
-                    Boreholes = sections,
-                    Id = counter.ToString(),
-                    Boundary = boundary
-                };
-
-                blocks.Add(block);
-
-                counter++;
-            }
-
-            return blocks;
-        }
-
         #region Boreholes Helpers
 
         private static void ClearSamplesGradeInBoreholes(IEnumerable<Borehole> boreholes)
@@ -677,156 +647,6 @@ namespace GeoAppWpf.Services
                 foreach (var sample in borehole.Samples)
                     sample.Grade = 0;
             }
-        }
-
-        public static List<SectionBorehole> BuildSections(List<Borehole> boreholes)
-        {
-            var sections = new List<SectionBorehole>();
-
-            double distance = 0;
-
-            boreholes = boreholes
-                .OrderBy(x => x.Id)
-                .ToList();
-
-            for (int i = 0; i < boreholes.Count; i++)
-            {
-                var bh = boreholes[i];
-
-                if (i > 0)
-                {
-                    Borehole prev = boreholes[i - 1];
-
-                    double dx = bh.X - prev.X;
-                    double dy = bh.Y - prev.Y;
-
-                    distance += Math.Sqrt(dx * dx + dy * dy);
-                }
-
-                sections.Add(new SectionBorehole(bh, distance, bh.Z));
-            }
-
-            return sections;
-        }
-
-        #endregion
-
-        #region Boundary
-
-        private static bool IsInsideBoundary(double x, double y, BoundaryData boundary)
-        {
-            if (!boundary.Closed)
-            {
-                Debug.WriteLine("Контур не закрыт.");
-                return false;
-            }
-
-            if (boundary.Points.Count < 3)
-            {
-                Debug.WriteLine("У контура не достаточно точек.");
-                return false;
-            }
-
-            if (IsPointInsideOrNearPolygon(x, y, boundary.Points, BoundaryTolerance))
-                return true;
-
-            return false;
-        }
-
-        private static bool IsPointInsideOrNearPolygon(double x, double y, IReadOnlyList<Point2D> points, double tolerance)
-        {
-            if (IsPointInsidePolygon(x, y, points))
-                return true;
-
-            double toleranceSquared =
-                tolerance * tolerance;
-
-            for (int i = 0; i < points.Count; i++)
-            {
-                var a = points[i];
-                var b = points[(i + 1) % points.Count];
-
-                double distanceSquared = DistanceSquaredToSegment(x, y, a.X, a.Y, b.X, b.Y);
-
-                if (distanceSquared <= toleranceSquared)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsPointInsidePolygon(
-            double x,
-            double y,
-            IReadOnlyList<Point2D> points)
-        {
-            bool inside = false;
-
-            for (int i = 0, j = points.Count - 1;
-                 i < points.Count;
-                 j = i++)
-            {
-                double xi = points[i].X;
-                double yi = points[i].Y;
-
-                double xj = points[j].X;
-                double yj = points[j].Y;
-
-                bool intersect =
-                    ((yi > y) != (yj > y)) &&
-                    x <
-                    (xj - xi) *
-                    (y - yi) /
-                    (yj - yi) +
-                    xi;
-
-                if (intersect)
-                    inside = !inside;
-            }
-
-            return inside;
-        }
-
-        private static double DistanceSquaredToSegment(
-            double px,
-            double py,
-            double x1,
-            double y1,
-            double x2,
-            double y2)
-        {
-            double dx = x2 - x1;
-            double dy = y2 - y1;
-
-            if (dx == 0 && dy == 0)
-            {
-                double ddx = px - x1;
-                double ddy = py - y1;
-
-                return ddx * ddx + ddy * ddy;
-            }
-
-            double t =
-                ((px - x1) * dx +
-                 (py - y1) * dy) /
-                (dx * dx + dy * dy);
-
-            t = Math.Clamp(t, 0.0, 1.0);
-
-            double closestX =
-                x1 + t * dx;
-
-            double closestY =
-                y1 + t * dy;
-
-            double diffX =
-                px - closestX;
-
-            double diffY =
-                py - closestY;
-
-            return diffX * diffX +
-                   diffY * diffY;
         }
 
         #endregion

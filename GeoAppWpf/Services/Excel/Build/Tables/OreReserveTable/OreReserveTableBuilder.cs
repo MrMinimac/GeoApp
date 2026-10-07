@@ -51,6 +51,27 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable
                 };
             }
 
+            TableMergeRule CreateBlockMergeRule(string columnKey)
+            {
+                return new TableMergeRule
+                {
+                    ColumnKey = columnKey,
+                    Vertical = true,
+
+                    MergeGroupKey = row =>
+                        row.Values.GetValueOrDefault("BlockNumber"),
+
+                    CanMerge = row =>
+                        !(row.Values
+                            .GetValueOrDefault("Number")
+                            ?.ToString()
+                            ?.Contains(
+                                "Всего",
+                                StringComparison.InvariantCultureIgnoreCase)
+                            ?? false)
+                };
+            }
+
             return new TableDefinition
             {
                 Name = "Ведомость ПЗ",
@@ -97,6 +118,22 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable
 
                         CanMerge = row => !(row.Values.GetValueOrDefault("Number")?.ToString()?.Contains("Всего") ?? false)
                     },
+
+                    CreateBlockMergeRule("TorfLength"),
+                    CreateBlockMergeRule("SandLength"),
+                    CreateBlockMergeRule("TorfVolume"),
+                    CreateBlockMergeRule("SandVolume"),
+                    CreateBlockMergeRule("BlockLength"),
+                    CreateBlockMergeRule("BlockWidth"),
+                    CreateBlockMergeRule("BlockSquare"),
+                    CreateBlockMergeRule("AvgGrade"),
+                    CreateBlockMergeRule("LevelingAvgGrade"),
+                    CreateBlockMergeRule("LevelingPureAvgGrade"),
+                    CreateBlockMergeRule("AvgReserve"),
+                    CreateBlockMergeRule("LevelingAvgReserve"),
+                    CreateBlockMergeRule("LevelingPureAvgReserve"),
+                    CreateBlockMergeRule("CoefPure"),
+
                     new()
                     {
                         ColumnKey = "Number",
@@ -138,22 +175,24 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable
                     .GroupBy(x => x.Source.BoreholeLineId)
                     .ToList();
 
+                var cbhs = block.Boreholes;
+
+                int holesCount = cbhs.Count;
+
+                double torfLengthSum = cbhs.Sum(x => x.OreInterval?.From ?? 0);
+                double sandLengthSum = cbhs.Sum(x => x.OreInterval?.Thickness ?? 0);
+
+                double avgTorfLength = torfLengthSum / holesCount;
+                double avgSandLength = sandLengthSum / holesCount;
+
+                double area = block.Area / 1000;
+
                 foreach (var boreholeLinesGroup in boreholeLinesGroups)
                 {
                     var line = lines.Where(x => x.Id == boreholeLinesGroup.Key).FirstOrDefault();
 
                     if (line == null)
                         continue;
-
-                    var cbhs = line.BuildSections();
-
-                    int holesCount = block.Boreholes.Count;
-
-                    double torfLengthSum = cbhs.Sum(x => x.OreInterval?.From ?? 0);
-                    double sandLengthSum = cbhs.Sum(x => x.OreInterval?.Thickness ?? 0);
-
-                    double pureVertReserveSum = cbhs.Sum(x => x.OreInterval?.PureVertReserve ?? 0);
-                    double pureAvgGrade = pureVertReserveSum / sandLengthSum;
 
                     table.Rows.Add(new()
                     {
@@ -166,19 +205,19 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable
 
                             ["BlockLength"] = null,
                             ["BlockWidth"] = null,
-                            ["BlockSquare"] = null,
+                            ["BlockSquare"] = area,
 
-                            ["TorfLength"] = torfLengthSum / holesCount,
-                            ["SandLength"] = sandLengthSum / holesCount,
+                            ["TorfLength"] = avgTorfLength,
+                            ["SandLength"] = avgSandLength,
 
-                            ["TorfVolume"] = null,
-                            ["SandVolume"] = null,
+                            ["TorfVolume"] = avgTorfLength * area,
+                            ["SandVolume"] = avgSandLength * area,
 
-                            ["AvgGrade"] = pureAvgGrade,
-                            ["LevelingAvgGrade"] = pureAvgGrade,
-                            ["LevelingPureAvgGrade"] = pureAvgGrade,
+                            ["AvgGrade"] = block.PureAvgGrade,
+                            ["LevelingAvgGrade"] = null,
+                            ["LevelingPureAvgGrade"] = null,
 
-                            ["AvgReserve"] = null,
+                            ["AvgReserve"] = block.ReserveKg,
                             ["LevelingAvgReserve"] = null,
                             ["LevelingPureAvgReserve"] = null,
 

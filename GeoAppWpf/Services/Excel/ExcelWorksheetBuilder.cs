@@ -612,35 +612,58 @@ namespace GeoAppWpf.Services.Excel
             }
         }
 
-        private static void MergeRepeatedCells(ExcelWorksheet worksheet, TableDefinition table, TableMergeRule rule)
+        private static void MergeRepeatedCells(
+            ExcelWorksheet worksheet,
+            TableDefinition table,
+            TableMergeRule rule)
         {
             if (table.Rows.Count == 0)
                 return;
 
-            int columnIndex = table.Columns.FindIndex(x => x.Key == rule.ColumnKey) + 1;
+            int columnIndex =
+                table.Columns.FindIndex(x => x.Key == rule.ColumnKey) + 1;
 
             if (columnIndex <= 0)
                 return;
 
             int startRow = -1;
+
             object? previousValue = null;
+            object? previousGroupKey = null;
 
             for (int i = 0; i < table.Rows.Count; i++)
             {
                 var row = table.Rows[i];
                 int excelRow = i + 2;
 
-                row.Values.TryGetValue(rule.ColumnKey, out var currentValue);
+                row.Values.TryGetValue(
+                    rule.ColumnKey,
+                    out var currentValue);
 
-                bool canMerge = rule.CanMerge?.Invoke(row) ?? true;
+                bool canMerge =
+                    rule.CanMerge?.Invoke(row) ?? true;
 
-                bool isEmpty = currentValue == null || string.IsNullOrWhiteSpace(currentValue.ToString());
+                bool isEmpty =
+                    currentValue == null ||
+                    string.IsNullOrWhiteSpace(
+                        currentValue.ToString());
+
+                object? currentGroupKey =
+                    rule.MergeGroupKey?.Invoke(row);
 
                 if (!canMerge || (rule.SkipEmpty && isEmpty))
                 {
-                    FinishMerge(worksheet, startRow, excelRow - 1, columnIndex, rule);
+                    FinishMerge(
+                        worksheet,
+                        startRow,
+                        excelRow - 1,
+                        columnIndex,
+                        rule);
+
                     startRow = -1;
                     previousValue = null;
+                    previousGroupKey = null;
+
                     continue;
                 }
 
@@ -648,18 +671,38 @@ namespace GeoAppWpf.Services.Excel
                 {
                     startRow = excelRow;
                     previousValue = currentValue;
+                    previousGroupKey = currentGroupKey;
+
                     continue;
                 }
 
-                if (!Equals(previousValue, currentValue))
+                bool sameValue =
+                    Equals(previousValue, currentValue);
+
+                bool sameGroup =
+                    Equals(previousGroupKey, currentGroupKey);
+
+                if (!sameValue || !sameGroup)
                 {
-                    FinishMerge(worksheet, startRow, excelRow - 1, columnIndex, rule);
+                    FinishMerge(
+                        worksheet,
+                        startRow,
+                        excelRow - 1,
+                        columnIndex,
+                        rule);
+
                     startRow = excelRow;
                     previousValue = currentValue;
+                    previousGroupKey = currentGroupKey;
                 }
             }
 
-            FinishMerge(worksheet, startRow, table.Rows.Count + 1, columnIndex, rule);
+            FinishMerge(
+                worksheet,
+                startRow,
+                table.Rows.Count + 1,
+                columnIndex,
+                rule);
         }
 
         private static void FinishMerge(ExcelWorksheet worksheet, int startRow, int endRow, int column, TableMergeRule rule)

@@ -120,8 +120,13 @@ namespace GeoAppWpf.ViewModels
             if (lines == null || !lines.Any())
                 return;
 
+            var properties = OreReserveTableInputBuilder.Build();
+
+            if (properties == null)
+                return;
+
             var levelingGroups = LevelingBoreholeGroup.BuildMacroGroups(lines);
-            var blocks = BlockBuilder.Build(lines);
+            var blocks = BlockBuilder.Build(lines, properties.Boundaries);
 
             var table = ConditionsTableBuilder.Build(lines);
             var table2 = BoreholeInfluenceTableBuilder.Build(levelingGroups);

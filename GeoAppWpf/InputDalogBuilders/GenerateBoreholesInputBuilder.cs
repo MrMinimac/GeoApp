@@ -1,5 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Input;
-using GeoAppCore;
+﻿using GeoAppCore;
 using GeoAppCore.Models;
 using GeoAppWpf.Services;
 using GeoAppWpf.Views.Windows;
@@ -267,6 +266,71 @@ namespace GeoAppWpf.InputDalogBuilders
                 RkpUpperPartProbability = rkpUpperPartProbabilityItem.Value,
                 MaxRkpSamples = maxRkpSamples.Value,
                 MaxRkpOrePercent = maxRkpOrePercent.Value,
+
+            };
+
+            return _lastProperties;
+        }
+    }
+
+    public class OreReserveTableProperties
+    {
+        public List<BoundaryData> Boundaries { get; set; } = new();
+
+    }
+
+    public class OreReserveTableInputBuilder
+    {
+        private static OreReserveTableProperties _lastProperties = new();
+
+        public static OreReserveTableProperties? Build(Window? owner = null)
+        {
+            
+            #region Boundaries
+            CustomActionPropertyItem<List<BoundaryData>>? boundaries = null;
+            boundaries = new CustomActionPropertyItem<List<BoundaryData>>(
+                async () =>
+                {
+                    var result = await AutoCadService.GetBoundaryAsync();
+
+                    if (result == null)
+                        return;
+
+                    if (!result.Success)
+                    {
+                        MessageBox.Show(
+                            result.Error ?? "Не удалось получить контур.",
+                            "AutoCAD",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+
+                        return;
+                    }
+
+                    boundaries!.Value = result.Boundaries;
+                    boundaries!.DisplayValue = $"Выбрано контуров: {result.Boundaries.Count}";
+                });
+
+            boundaries.Header = "Выберите контур оруденения";
+            boundaries.Placeholder = "Выбрать в AutoCAD";
+            #endregion
+
+            var items = new PropertyItem[]
+            {
+                boundaries,
+            };
+
+            bool result = InputWindow.Show(
+                "Генерация",
+                items,
+                owner: owner);
+
+            if (!result)
+                return null;
+
+            _lastProperties = new OreReserveTableProperties
+            {
+                Boundaries = boundaries.Value ?? new List<BoundaryData>(),
 
             };
 

@@ -1,5 +1,4 @@
-﻿using GeoAppCore;
-using GeoAppCore.Services;
+﻿using GeoAppCore.Services;
 using GeoAppWpf.Services.Excel.Build.Data;
 using System.Drawing;
 

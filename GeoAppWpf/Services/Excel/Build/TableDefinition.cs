@@ -183,6 +183,8 @@ namespace GeoAppWpf.Services.Excel.Build
 
         public Func<TableRow, bool>? CanMerge { get; set; }
 
+        public Func<TableRow, object?>? MergeGroupKey { get; set; }
+
         public TableHorizontalAlignment? HorizontalAlignment { get; set; } = TableHorizontalAlignment.Center;
         public TableVerticalAlignment? VerticalAlignment { get; set; } = TableVerticalAlignment.Center;
 
