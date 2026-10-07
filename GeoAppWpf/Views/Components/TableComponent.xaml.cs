@@ -1,8 +1,10 @@
 ﻿using GeoAppCore.Services;
+using GeoAppWpf.Helpers;
 using GeoAppWpf.Models;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace GeoAppWpf.Views.Components
 {
@@ -30,9 +32,9 @@ namespace GeoAppWpf.Views.Components
 
         #endregion
 
-        private void PropertiesDataGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        private void PropertiesDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
-            var info = LocaleService.GetColumnInfo(e.PropertyName);
+            var info = ColumnData.GetColumnInfo(e.PropertyName);
 
             if (info == null)
             {
@@ -46,6 +48,7 @@ namespace GeoAppWpf.Views.Components
                 return;
             }
 
+            e.Column.Header = info.Header;
 
             if (info.CellTemplate != null)
             {
@@ -57,9 +60,12 @@ namespace GeoAppWpf.Views.Components
 
                 e.Column = templateColumn;
             }
-            else
+            else if (info.Converter != null && e.Column is DataGridTextColumn textColumn)
             {
-                e.Column.Header = info.Header;
+                textColumn.Binding = new Binding(e.PropertyName)
+                {
+                    Converter = info.Converter
+                };
             }
         }
     }

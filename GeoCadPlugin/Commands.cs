@@ -3,9 +3,10 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
-using GeoCadPlugin.Drawers;
+using GeoCadPlugin.Topography;
 using Microsoft.Win32;
 using ACDOC = Autodesk.AutoCAD.ApplicationServices.Document;
+using Exception = System.Exception;
 
 namespace GeoCadPlugin
 {
@@ -198,6 +199,162 @@ namespace GeoCadPlugin
             // Очищаем выделение и выводим сообщение
             ed.SetImpliedSelection(Array.Empty<ObjectId>());
             ed.WriteMessage($"\nПолилинии разделены секциями длиной {sectionLength}. Добавлено окружностей: {totalCirclesCreated}.");
+        }
+
+
+        [CommandMethod("FindWellElevation", CommandFlags.UsePickSet)]
+        public void FindWellElevation()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Editor ed = doc.Editor;
+            Database db = doc.Database;
+
+            PromptSelectionResult selection = ed.SelectImplied();
+
+            TypedValue[] circleFilter =
+            {
+                new TypedValue((int)DxfCode.Start, "CIRCLE")
+            };
+
+            if (selection.Status != PromptStatus.OK)
+            {
+                var options = new PromptSelectionOptions
+                {
+                    MessageForAdding = "\nВыберите скважины: "
+                };
+
+                selection = ed.GetSelection(options, new SelectionFilter(circleFilter));
+
+                if (selection.Status != PromptStatus.OK)
+                    return;
+            }
+
+            ElevationFindService.FindWellElevation(selection);
+        }
+
+        [CommandMethod("GETTOPOGRAPHY")]
+        public static async void DownloadDem()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Editor ed = doc.Editor;
+
+            var filter = new SelectionFilter(new[]
+            {
+                new TypedValue((int)DxfCode.Start,"CIRCLE")
+            });
+
+            PromptSelectionResult selection = ed.GetSelection(new PromptSelectionOptions
+            {
+                MessageForAdding = "\nВыберите круги: "
+            }, filter);
+
+            if (selection.Status != PromptStatus.OK)
+                return;
+
+            PromptDoubleOptions intervalOptions =
+                new PromptDoubleOptions(
+                    "\nШаг горизонталей в метрах <10>: ")
+                {
+                    DefaultValue = 10.0,
+                    AllowZero = false,
+                    AllowNegative = false
+                };
+
+            PromptDoubleResult intervalResult =
+                ed.GetDouble(intervalOptions);
+
+            if (intervalResult.Status != PromptStatus.OK)
+                return;
+
+            double contourInterval =
+                intervalResult.Value;
+
+            var demFilePath = await TopographyDownloader.Download(selection);
+
+            if (demFilePath == null)
+                return;
+            try
+            {
+                DemGrid dem =
+                    DemReader.Read(demFilePath);
+
+                ed.WriteMessage(
+                    $"\nDEM: {dem.Width} x {dem.Height}");
+
+                ed.WriteMessage(
+                    $"\nOrigin: " +
+                    $"Lon={dem.OriginLongitude:F8}, " +
+                    $"Lat={dem.OriginLatitude:F8}");
+
+                ed.WriteMessage(
+                    $"\nPixel: " +
+                    $"Lon={dem.PixelWidth:F10}, " +
+                    $"Lat={dem.PixelHeight:F10}");
+
+                double min = double.MaxValue;
+                double max = double.MinValue;
+
+                for (int row = 0;
+                     row < dem.Height;
+                     row++)
+                {
+                    for (int column = 0;
+                         column < dem.Width;
+                         column++)
+                    {
+                        double z =
+                            dem.Elevation[
+                                row,
+                                column];
+
+                        if (z <= -32768)
+                            continue;
+
+                        min =
+                            Math.Min(
+                                min,
+                                z);
+
+                        max =
+                            Math.Max(
+                                max,
+                                z);
+                    }
+                }
+
+                ed.WriteMessage(
+                    $"\nElevation: " +
+                    $"{min:F1} .. {max:F1} м");
+
+                // --------------------------------------------------------
+                // Построение горизонталей
+                // --------------------------------------------------------
+
+                List<ContourLine> contours = ContourBuilder.Build(dem, contourInterval);
+
+                ed.WriteMessage(
+                    $"\nНайдено контуров: " +
+                    $"{contours.Count}");
+
+                using (doc.LockDocument())
+                {
+                    int created =
+                        ContourDrawer.Draw(
+                            doc.Database,
+                            contours);
+
+                    ed.WriteMessage(
+                        $"\nСоздано полилиний: " +
+                        $"{created}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ed.WriteMessage(
+                    $"\nОшибка чтения DEM:");
+                ed.WriteMessage(
+                    $"\n{ex}");
+            }
         }
 
         private static void DrawCircles(Coordinates coordinates)

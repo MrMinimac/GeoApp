@@ -11,6 +11,7 @@ using GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence;
 using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
 using GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable;
 using GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable;
+using GeoAppWpf.Views.Windows;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -30,6 +31,10 @@ namespace GeoAppWpf.ViewModels
 
         private readonly RelayCommand _importCommand;
         public ICommand ImportCommand => _importCommand;
+
+        private readonly RelayCommand<IEnumerable<BoreholeLine>> _showOreIntervalCommand;
+        public ICommand ShowOreIntervalCommand => _showOreIntervalCommand;
+
 
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportPlanCommand;
         public ICommand AutoCadExportPlanCommand => _autoCadExportPlanCommand;
@@ -66,6 +71,18 @@ namespace GeoAppWpf.ViewModels
             _excelExportConditionsTableCommand = new(ExcelExportConditionsTable);
 
             _autoCadExportSectionsCommand = new(AutoCadExportSections);
+
+            _showOreIntervalCommand = new(GenerateGrade);
+        }
+
+        private async Task GenerateGrade(IEnumerable<BoreholeLine> lines)
+        {
+            var properties = GenerateGradeInputBuilder.Build();
+
+            if (properties == null)
+                return;
+
+            GenerateGradeService.Generate(lines, properties);
         }
 
         private void ExcelExportBoreholes(IDocument document)

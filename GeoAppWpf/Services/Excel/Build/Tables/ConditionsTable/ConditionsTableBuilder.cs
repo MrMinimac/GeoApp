@@ -1,7 +1,5 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Services;
-using GeoAppWpf.Helpers;
-using netDxf.Collections;
 using System.Drawing;
 
 namespace GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable
@@ -106,7 +104,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable
 
                 foreach (var cbh in cbhs)
                 {
-                    var valid = cbh.OreInterval?.ConditionResult.IsValid ?? false;
+                    var valid = cbh.OreInterval?.ConditionResult?.IsValid ?? false;
 
                     if (!valid) continue;
 
@@ -128,7 +126,7 @@ namespace GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable
                             ["WasteGradient"] = cbh.OreCondition.WasteGradient,
                             ["Fineness"] = fineness,
                             ["BhAvgGrade"] = cbh.OreInterval?.PureAvgGrade ?? 0,
-                            ["MinGrade"] = cbh.OreInterval?.ConditionResult.MinGradeRequired ?? 0,
+                            ["MinGrade"] = cbh.OreInterval?.ConditionResult?.MinGradeRequired ?? 0,
                             ["ConditionResult"] =  "В подсчет",
                             ["MorfType"] = "",
                         }

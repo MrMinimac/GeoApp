@@ -27,7 +27,7 @@ namespace GeoAppCore
         }
 
         [JsonIgnore]
-        public double PureAvgValue
+        public double PureAvgGrade
         {
             get
             {
@@ -41,7 +41,7 @@ namespace GeoAppCore
         }
 
         [JsonIgnore]
-        public double AvgValue
+        public double AvgGrade
         {
             get
             {

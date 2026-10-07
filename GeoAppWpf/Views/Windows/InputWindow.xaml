@@ -353,6 +353,70 @@
             </Grid>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type local:CustomActionPropertyItem}">
+            <Grid
+                Margin="0,5"
+                IsEnabled="{Binding IsEnabled}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Margin="0,0,0,5"
+                    FontSize="14"
+                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                    Text="{Binding Header}" />
+
+                <ld:FlatButton
+                    Grid.Row="1"
+                    Height="30"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SecondaryBrush}"
+                    BorderBrush="Transparent"
+                    Command="{Binding ActionCommand}"
+                    ContentHorizontalAlignment="Stretch"
+                    CornerRadius="15"
+                    Foreground="{DynamicResource IconBrush}"
+                    HoverBrush="{DynamicResource HoverBrush}">
+
+                    <Grid>
+
+                        <TextBlock
+                            Margin="12,0,40,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundBrush}"
+                            Text="{Binding DisplayValue}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding DisplayValue, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+                        <TextBlock
+                            Margin="12,0,40,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundBrush}"
+                            Text="{Binding Placeholder}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding DisplayValue, Converter={StaticResource StringLengthToVisibilityConverter}, ConverterParameter=Reversed}" />
+
+                    </Grid>
+
+                </ld:FlatButton>
+
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Right"
+                    Foreground="{DynamicResource ErrorBrush}"
+                    Text="{Binding ValidationError}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ValidationError, Converter={StaticResource StringLengthToVisibilityConverter}}" />
+
+            </Grid>
+        </DataTemplate>
+
     </ld:LDWindow.Resources>
 
     <Grid>

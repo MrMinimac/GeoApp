@@ -19,6 +19,12 @@ namespace GeoAppWpf.Models
             },
             new()
             {
+                Header = "Контур минерализации",
+                Command = CommandsProvider.ShowOreIntervalCommand,
+                CommandParameter = Boreholes
+            },
+            new()
+            {
                 Header = "Экспорт в Excel",
                 Command = CommandsProvider.ExcelExportBoreholesCommand,
                 CommandParameter = Document

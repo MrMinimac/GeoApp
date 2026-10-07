@@ -30,6 +30,8 @@ namespace GeoAppWpf.Services
 
             int precision = 3;
 
+            borehole.Samples.Clear();
+
             for (int i = 0; i < samplesCount; i++)
             {
                 double from = Math.Round(i * properties.SampleLength, precision);

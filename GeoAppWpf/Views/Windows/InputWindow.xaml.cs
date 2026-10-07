@@ -377,6 +377,62 @@ namespace GeoAppWpf.Views.Windows
         }
     }
 
+    public abstract class CustomActionPropertyItem : PropertyItem
+    {
+    }
+
+    public class CustomActionPropertyItem<T> : CustomActionPropertyItem
+    {
+        private T? _value;
+        private string _displayValue = string.Empty;
+
+        public T? Value
+        {
+            get => _value;
+            set
+            {
+                if (SetProperty(ref _value, value))
+                {
+                    Validate();
+                    OnPropertyChanged(nameof(Value));
+                }
+            }
+        }
+
+        public string Placeholder { get; set; } = "Выбрать";
+
+        public string DisplayValue
+        {
+            get => _displayValue;
+            set
+            {
+                if (SetProperty(ref _displayValue, value))
+                {
+                    OnPropertyChanged(nameof(DisplayValue));
+                }
+            }
+        }
+
+        public ICommand ActionCommand { get; }
+
+        public Func<T?, string?>? Validator { get; set; }
+
+        public CustomActionPropertyItem(Func<Task> action)
+        {
+            ActionCommand = new RelayCommand(action);
+        }
+
+        public override bool Validate()
+        {
+            if (!IsEnabled || !IsVisible)
+                return true;
+
+            ValidationError = Validator?.Invoke(Value);
+
+            return ValidationError == null;
+        }
+    }
+
     public partial class InputWindow : LDWindow
     {
         public IEnumerable<PropertyItem> Items { get; }

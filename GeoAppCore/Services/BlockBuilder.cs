@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using GeoAppCore.Models;
 
 namespace GeoAppCore.Services
 {
@@ -10,6 +6,18 @@ namespace GeoAppCore.Services
     {
         public string Id { get; set; } = string.Empty;
         public List<SectionBorehole> Boreholes { get; set; } = new();
+        public BoundaryData? Boundary { get; set; }
+        public double Area => Boundary?.Area ?? 0;
+
+        public double TotalThickness => Boreholes.Sum(x => x.OreInterval?.Thickness ?? 0);
+        public double TotalPureVertReserve => Boreholes.Sum(x => x.OreInterval?.PureVertReserve ?? 0);
+        public double AvgThickness => TotalThickness / Boreholes.Where(x => x.OreInterval != null).Count();
+        public double PureAvgGrade => TotalPureVertReserve / TotalThickness;
+        public double Volume => Area * AvgThickness;
+
+        public double ReserveG => PureAvgGrade * Volume;
+
+        public double ReserveKg => ReserveG / 1000;
     }
 
     public class BlockBuilder
@@ -23,7 +31,7 @@ namespace GeoAppCore.Services
 
             var sortedHoles = boreholeLinesList
                 .SelectMany(x => x.BuildSections()
-                    .Where(s => s.OreInterval?.ConditionResult.IsValid ?? false))
+                    .Where(s => s.OreInterval?.ConditionResult?.IsValid ?? false))
                 .ToList();
 
             var blocks = new List<Block>();

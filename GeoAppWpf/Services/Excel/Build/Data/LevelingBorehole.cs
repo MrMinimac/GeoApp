@@ -92,7 +92,7 @@ namespace GeoAppWpf.Services.Excel.Build.Data
                 boreholeLines
                 .OrderBy(w => w.Id.Any(char.IsDigit) ? 0 : 1)
                 .ThenBy(w => w.Id, new NaturalNameComparer())
-                .Select(x => x.BuildSections().Where(x => x.OreInterval?.ConditionResult.IsValid ?? false).ToList())
+                .Select(x => x.BuildSections().Where(x => x.OreInterval?.ConditionResult?.IsValid ?? false).ToList())
                 .ToList();
 
             var restPart = new List<SectionBorehole>();

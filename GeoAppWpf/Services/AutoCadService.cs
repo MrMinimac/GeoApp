@@ -1,4 +1,6 @@
 ﻿using GeoAppCore;
+using GeoAppCore.Models;
+using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
@@ -17,13 +19,28 @@ namespace GeoAppWpf.Services
         {
             try
             {
-                using var response = await _client.PostAsync("http://localhost:5050/check",null);
+                using var response = await _client.PostAsync("http://localhost:5050/check", null);
                 return response.IsSuccessStatusCode;
             }
             catch
             {
                 return false;
             }
+        }
+
+        public static async Task<GetBoundaryResult?> GetBoundaryAsync()
+        {
+            using var client = new HttpClient();
+
+            var response = await client.PostAsync(
+                "http://localhost:5050/get-boundary",
+                null);
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            return JsonConvert.DeserializeObject<GetBoundaryResult>(json);
         }
 
         public async Task ExportSections(GeoDoc document)

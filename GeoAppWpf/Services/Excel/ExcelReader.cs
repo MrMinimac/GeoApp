@@ -304,8 +304,6 @@ namespace GeoAppWpf.Services
                 var formattedInterval = $"{from}-{to}";
 
                 attributes[header] = formattedInterval;
-
-                Debug.WriteLine($"Parsed: {interval} => {formattedInterval}");
             }
 
             return attributes;
