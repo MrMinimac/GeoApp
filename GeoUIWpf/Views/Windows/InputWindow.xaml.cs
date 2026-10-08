@@ -8,8 +8,9 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 
-namespace GeoAppWpf.Views.Windows
+namespace GeoUIWpf.Views.Windows
 {
     public abstract class PropertyItem : BaseViewModel
     {
@@ -97,7 +98,8 @@ namespace GeoAppWpf.Views.Windows
             IEnumerable<T> items,
             T value = default!,
             Func<T, string>? displayFormatter = null,
-            Func<T, bool>? validationRule = null)
+            Func<T, bool>? validationRule = null
+        )
         {
             Header = header;
             Items = items;
@@ -116,7 +118,7 @@ namespace GeoAppWpf.Views.Windows
             {
                 Type t => t.Name,
                 PropertyInfo p => p.Name,
-                _ => item?.ToString() ?? string.Empty
+                _ => item?.ToString() ?? string.Empty,
             };
         }
 
@@ -154,7 +156,8 @@ namespace GeoAppWpf.Views.Windows
 
         public override bool Validate()
         {
-            if (!IsEnabled || !IsVisible) return true;
+            if (!IsEnabled || !IsVisible)
+                return true;
 
             ValidationError = Validator?.Invoke(Value);
             return ValidationError == null;
@@ -184,7 +187,8 @@ namespace GeoAppWpf.Views.Windows
 
         public override bool Validate()
         {
-            if (!IsEnabled || !IsVisible) return true;
+            if (!IsEnabled || !IsVisible)
+                return true;
 
             ValidationError = Validator?.Invoke(Value);
             return ValidationError == null;
@@ -239,7 +243,8 @@ namespace GeoAppWpf.Views.Windows
 
         public override bool Validate()
         {
-            if (!IsEnabled || !IsVisible) return true;
+            if (!IsEnabled || !IsVisible)
+                return true;
 
             if (!TryParseDouble(_text, out var result))
                 return false;
@@ -256,7 +261,12 @@ namespace GeoAppWpf.Views.Windows
                 return false;
             }
 
-            string separator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+            string separator = System
+                .Globalization
+                .CultureInfo
+                .CurrentCulture
+                .NumberFormat
+                .NumberDecimalSeparator;
             string normalizedInput = input.Replace(".", separator).Replace(",", separator);
             return double.TryParse(normalizedInput, out result);
         }
@@ -310,7 +320,8 @@ namespace GeoAppWpf.Views.Windows
 
         public override bool Validate()
         {
-            if (!IsEnabled || !IsVisible) return true;
+            if (!IsEnabled || !IsVisible)
+                return true;
 
             if (!int.TryParse(_text, out var result))
                 return false;
@@ -340,9 +351,7 @@ namespace GeoAppWpf.Views.Windows
         public string Placeholder { get; set; } = "Выберите файл";
 
         public string Value =>
-            Values.Count == 0
-                ? string.Empty
-                : string.Join("; ", Values.Select(Path.GetFileName));
+            Values.Count == 0 ? string.Empty : string.Join("; ", Values.Select(Path.GetFileName));
 
         public ICommand OpenFileDialogCommand { get; set; }
 
@@ -359,7 +368,7 @@ namespace GeoAppWpf.Views.Windows
             {
                 Filter = "DAT files (*.dat)|*.dat",
                 DefaultExt = ".dat",
-                Multiselect = true
+                Multiselect = true,
             };
 
             if (dialog.ShowDialog() != true)
@@ -370,16 +379,15 @@ namespace GeoAppWpf.Views.Windows
 
         public override bool Validate()
         {
-            if (!IsEnabled || !IsVisible) return true;
+            if (!IsEnabled || !IsVisible)
+                return true;
 
             ValidationError = Validator?.Invoke(Values);
             return ValidationError == null;
         }
     }
 
-    public abstract class CustomActionPropertyItem : PropertyItem
-    {
-    }
+    public abstract class CustomActionPropertyItem : PropertyItem { }
 
     public class CustomActionPropertyItem<T> : CustomActionPropertyItem
     {
@@ -439,7 +447,12 @@ namespace GeoAppWpf.Views.Windows
         public ICollectionView ItemsView { get; }
         public PropertyItem? HeaderItem { get; }
 
-        public InputWindow(string title, IEnumerable<PropertyItem> items, PropertyItem? headerItem = null, Window? owner = null)
+        public InputWindow(
+            string title,
+            IEnumerable<PropertyItem> items,
+            PropertyItem? headerItem = null,
+            IntPtr? ownerHandle = null
+        )
         {
             InitializeComponent();
 
@@ -447,8 +460,16 @@ namespace GeoAppWpf.Views.Windows
             Items = items.ToList();
             ItemsView = CollectionViewSource.GetDefaultView(Items);
             HeaderItem = headerItem;
-            Owner = owner;
             DataContext = this;
+
+            // Устанавливаем owner после создания WPF Window
+            if (ownerHandle.HasValue && ownerHandle.Value != IntPtr.Zero)
+            {
+                new WindowInteropHelper(this)
+                {
+                    Owner = ownerHandle.Value
+                };
+            }
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -464,9 +485,14 @@ namespace GeoAppWpf.Views.Windows
             DialogResult = false;
         }
 
-        public static bool Show(string title, IEnumerable<PropertyItem> items, PropertyItem? headerItem = null, Window? owner = null)
+        public static bool Show(
+            string title,
+            IEnumerable<PropertyItem> items,
+            PropertyItem? headerItem = null,
+            IntPtr? ownerHandle = null
+        )
         {
-            var dialog = new InputWindow(title, items, headerItem, owner);
+            var dialog = new InputWindow(title, items, headerItem, ownerHandle);
 
             foreach (var item in dialog.Items)
             {

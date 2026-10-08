@@ -17,6 +17,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\GeoAppCore\GeoAppCore.csproj" />
+		<ProjectReference Include="..\GeoUIWpf\GeoUIWpf.csproj" />
 	</ItemGroup>
 
 

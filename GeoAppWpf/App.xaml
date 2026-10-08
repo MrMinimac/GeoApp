@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="clr-namespace:GeoAppWpf.Converters"
+    xmlns:geouiconverters="clr-namespace:GeoUIWpf.Converters;assembly=GeoUIWpf"
     xmlns:ldconverters="clr-namespace:LegendDesignWpf.Converters;assembly=LegendDesignWpf"
     xmlns:local="clr-namespace:GeoAppWpf">
     <Application.Resources>
@@ -20,6 +21,7 @@
                     <ldconverters:EqualityMultiConverter x:Key="EqualityMultiConverter" />
                     <ldconverters:IntToBoolConverter x:Key="IntToBoolConverter" />
                     <converters:BoolToEyeIconConverter x:Key="BoolToEyeIconConverter" />
+                    <geouiconverters:SelectionItemDisplayConverter x:Key="SelectionItemDisplayConverter" />
                 </ResourceDictionary>
 
                 <ResourceDictionary Source="/LegendDesignWpf;component/Themes/DarkTheme.xaml" />
@@ -33,6 +35,8 @@
                 <ResourceDictionary Source="/AppStyles/DockPanelStyle.xaml" />
                 <ResourceDictionary Source="/AppStyles/ContextMenuStyle.xaml" />
                 <ResourceDictionary Source="/AppStyles/NodeStyles.xaml" />
+
+                <ResourceDictionary Source="/GeoUIWpf;component/Styles/ComboBoxStyle.xaml" />
 
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

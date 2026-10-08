@@ -3,7 +3,10 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
+using Autodesk.AutoCAD.Windows.Data;
+using GeoCadPlugin.InputDialogBuilders;
 using GeoCadPlugin.Topography;
+using GeoUIWpf;
 using Microsoft.Win32;
 using ACDOC = Autodesk.AutoCAD.ApplicationServices.Document;
 using Exception = System.Exception;
@@ -21,16 +24,15 @@ namespace GeoCadPlugin
 
             PromptSelectionResult selection = ed.SelectImplied();
 
-            var filter = new SelectionFilter(new TypedValue[]
-            {
-                new TypedValue((int)DxfCode.Start, "CIRCLE")
-            });
+            var filter = new SelectionFilter(
+                new TypedValue[] { new TypedValue((int)DxfCode.Start, "CIRCLE") }
+            );
 
             if (selection.Status != PromptStatus.OK)
             {
                 var options = new PromptSelectionOptions
                 {
-                    MessageForAdding = "\nВыберите окружности: "
+                    MessageForAdding = "\nВыберите окружности: ",
                 };
 
                 selection = ed.GetSelection(options, filter);
@@ -45,18 +47,19 @@ namespace GeoCadPlugin
                 DefaultValue = 3,
                 AllowNegative = false,
                 AllowZero = false,
-                AllowNone = true
+                AllowNone = true,
             };
 
             PromptDoubleResult distanceResult = ed.GetDouble(distanceOptions);
 
-            if (distanceResult.Status != PromptStatus.OK &&
-                distanceResult.Status != PromptStatus.None)
+            if (
+                distanceResult.Status != PromptStatus.OK
+                && distanceResult.Status != PromptStatus.None
+            )
                 return;
 
-            double maxDistance = distanceResult.Status == PromptStatus.None
-                ? 3
-                : distanceResult.Value;
+            double maxDistance =
+                distanceResult.Status == PromptStatus.None ? 3 : distanceResult.Value;
 
             Random random = new Random();
 
@@ -82,7 +85,6 @@ namespace GeoCadPlugin
                 CheckFileExists = true,
             };
 
-
             if (dialog.ShowDialog() != true)
                 return;
 
@@ -92,8 +94,9 @@ namespace GeoCadPlugin
 
             if (convertedCoords == null)
             {
-                Application.DocumentManager.MdiActiveDocument.Editor
-                    .WriteMessage("\nНе удалось получить координаты.");
+                Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage(
+                    "\nНе удалось получить координаты."
+                );
 
                 return;
             }
@@ -111,16 +114,15 @@ namespace GeoCadPlugin
             // 1. Выбор полилиний (поддерживается предварительный и текущий выбор)
             PromptSelectionResult selection = ed.SelectImplied();
 
-            var filter = new SelectionFilter(new TypedValue[]
-            {
-                new TypedValue((int)DxfCode.Start, "LWPOLYLINE,POLYLINE")
-            });
+            var filter = new SelectionFilter(
+                new TypedValue[] { new TypedValue((int)DxfCode.Start, "LWPOLYLINE,POLYLINE") }
+            );
 
             if (selection.Status != PromptStatus.OK)
             {
                 var selectionOptions = new PromptSelectionOptions
                 {
-                    MessageForAdding = "\nВыберите полилинии: "
+                    MessageForAdding = "\nВыберите полилинии: ",
                 };
 
                 selection = ed.GetSelection(selectionOptions, filter);
@@ -135,14 +137,15 @@ namespace GeoCadPlugin
                 DefaultValue = 100.0,
                 AllowNegative = false,
                 AllowZero = false,
-                AllowNone = true
+                AllowNone = true,
             };
 
             PromptDoubleResult lengthResult = ed.GetDouble(lengthOptions);
             if (lengthResult.Status != PromptStatus.OK && lengthResult.Status != PromptStatus.None)
                 return;
 
-            double sectionLength = lengthResult.Status == PromptStatus.None ? 100.0 : lengthResult.Value;
+            double sectionLength =
+                lengthResult.Status == PromptStatus.None ? 100.0 : lengthResult.Value;
 
             // 3. Запрос радиуса окружностей
             var radiusOptions = new PromptDoubleOptions("\nВведите радиус окружностей <10>: ")
@@ -150,7 +153,7 @@ namespace GeoCadPlugin
                 DefaultValue = 10.0,
                 AllowNegative = false,
                 AllowZero = false,
-                AllowNone = true
+                AllowNone = true,
             };
 
             PromptDoubleResult radiusResult = ed.GetDouble(radiusOptions);
@@ -164,7 +167,8 @@ namespace GeoCadPlugin
 
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
-                BlockTableRecord btr = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
+                BlockTableRecord btr = (BlockTableRecord)
+                    tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
 
                 foreach (SelectedObject selObj in selection.Value)
                 {
@@ -176,7 +180,11 @@ namespace GeoCadPlugin
                         double totalLength = curve.GetDistanceAtParameter(curve.EndParam);
 
                         // Проходим вдоль полилинии с заданным шагом
-                        for (double currentDist = 0; currentDist <= totalLength; currentDist += sectionLength)
+                        for (
+                            double currentDist = 0;
+                            currentDist <= totalLength;
+                            currentDist += sectionLength
+                        )
                         {
                             Point3d point = curve.GetPointAtDist(currentDist);
 
@@ -198,9 +206,10 @@ namespace GeoCadPlugin
 
             // Очищаем выделение и выводим сообщение
             ed.SetImpliedSelection(Array.Empty<ObjectId>());
-            ed.WriteMessage($"\nПолилинии разделены секциями длиной {sectionLength}. Добавлено окружностей: {totalCirclesCreated}.");
+            ed.WriteMessage(
+                $"\nПолилинии разделены секциями длиной {sectionLength}. Добавлено окружностей: {totalCirclesCreated}."
+            );
         }
-
 
         [CommandMethod("FindWellElevation", CommandFlags.UsePickSet)]
         public void FindWellElevation()
@@ -211,16 +220,13 @@ namespace GeoCadPlugin
 
             PromptSelectionResult selection = ed.SelectImplied();
 
-            TypedValue[] circleFilter =
-            {
-                new TypedValue((int)DxfCode.Start, "CIRCLE")
-            };
+            TypedValue[] circleFilter = { new TypedValue((int)DxfCode.Start, "CIRCLE") };
 
             if (selection.Status != PromptStatus.OK)
             {
                 var options = new PromptSelectionOptions
                 {
-                    MessageForAdding = "\nВыберите скважины: "
+                    MessageForAdding = "\nВыберите скважины: ",
                 };
 
                 selection = ed.GetSelection(options, new SelectionFilter(circleFilter));
@@ -238,122 +244,68 @@ namespace GeoCadPlugin
             Document doc = Application.DocumentManager.MdiActiveDocument;
             Editor ed = doc.Editor;
 
-            var filter = new SelectionFilter(new[]
-            {
-                new TypedValue((int)DxfCode.Start,"CIRCLE")
-            });
+            PromptSelectionResult selection = ed.SelectImplied();
 
-            PromptSelectionResult selection = ed.GetSelection(new PromptSelectionOptions
-            {
-                MessageForAdding = "\nВыберите круги: "
-            }, filter);
+            TypedValue[] filter = { new TypedValue((int)DxfCode.Start, "CIRCLE") };
 
             if (selection.Status != PromptStatus.OK)
-                return;
-
-            PromptDoubleOptions intervalOptions =
-                new PromptDoubleOptions(
-                    "\nШаг горизонталей в метрах <10>: ")
+            {
+                var options = new PromptSelectionOptions
                 {
-                    DefaultValue = 10.0,
-                    AllowZero = false,
-                    AllowNegative = false
+                    MessageForAdding = "\nВыберите круги: ",
                 };
 
-            PromptDoubleResult intervalResult =
-                ed.GetDouble(intervalOptions);
+                selection = ed.GetSelection(options, new SelectionFilter(filter));
 
-            if (intervalResult.Status != PromptStatus.OK)
-                return;
-
-            double contourInterval =
-                intervalResult.Value;
+                if (selection.Status != PromptStatus.OK)
+                    return;
+            }
 
             var demFilePath = await TopographyDownloader.Download(selection);
 
             if (demFilePath == null)
                 return;
+
+            var properties = TopographyDialogBuilder.Build(ownerHandle: Application.MainWindow.Handle);
+
+            if (properties == null)
+                return;
+
             try
             {
-                DemGrid dem =
-                    DemReader.Read(demFilePath);
+                DemGrid dem = DemReader.Read(demFilePath);
 
-                ed.WriteMessage(
-                    $"\nDEM: {dem.Width} x {dem.Height}");
-
-                ed.WriteMessage(
-                    $"\nOrigin: " +
-                    $"Lon={dem.OriginLongitude:F8}, " +
-                    $"Lat={dem.OriginLatitude:F8}");
-
-                ed.WriteMessage(
-                    $"\nPixel: " +
-                    $"Lon={dem.PixelWidth:F10}, " +
-                    $"Lat={dem.PixelHeight:F10}");
-
-                double min = double.MaxValue;
-                double max = double.MinValue;
-
-                for (int row = 0;
-                     row < dem.Height;
-                     row++)
+                if (properties.SmoothDem)
                 {
-                    for (int column = 0;
-                         column < dem.Width;
-                         column++)
-                    {
-                        double z =
-                            dem.Elevation[
-                                row,
-                                column];
-
-                        if (z <= -32768)
-                            continue;
-
-                        min =
-                            Math.Min(
-                                min,
-                                z);
-
-                        max =
-                            Math.Max(
-                                max,
-                                z);
-                    }
+                    dem = DemSmoother.Smooth(dem, iterations: properties.SmoothDemIterations);
                 }
 
-                ed.WriteMessage(
-                    $"\nElevation: " +
-                    $"{min:F1} .. {max:F1} м");
+                List<TopographyLine> lines = TopographyBuilder.Build(dem, properties.Interval);
 
-                // --------------------------------------------------------
-                // Построение горизонталей
-                // --------------------------------------------------------
+                if (properties.SimplifyLines)
+                {
+                    lines = ContourSimplifier.Simplify(lines, toleranceMeters: properties.SimplifyTolerance);
+                }
 
-                List<ContourLine> contours = ContourBuilder.Build(dem, contourInterval);
+                if (properties.SmoothLines)
+                {
+                    lines = ContourSmoother.Smooth(lines, stepMeters: properties.SmoothStep);
+                }
 
-                ed.WriteMessage(
-                    $"\nНайдено контуров: " +
-                    $"{contours.Count}");
+                if (properties.JoinLines)
+                {
+                    lines = ContourJoiner.Join(lines, maxGapMeters: properties.JoinMaxGap, maxTailMeters: properties.JoinMaxTail);
+                }
 
                 using (doc.LockDocument())
                 {
-                    int created =
-                        ContourDrawer.Draw(
-                            doc.Database,
-                            contours);
-
-                    ed.WriteMessage(
-                        $"\nСоздано полилиний: " +
-                        $"{created}");
+                    TopographyDrawer.Draw(doc.Database, lines);
                 }
             }
             catch (Exception ex)
             {
-                ed.WriteMessage(
-                    $"\nОшибка чтения DEM:");
-                ed.WriteMessage(
-                    $"\n{ex}");
+                ed.WriteMessage("\nОшибка обработки DEM:");
+                ed.WriteMessage($"\n{ex}");
             }
         }
 
@@ -368,7 +320,7 @@ namespace GeoCadPlugin
                 DefaultValue = 10.0,
                 AllowNegative = false,
                 AllowZero = false,
-                AllowNone = true
+                AllowNone = true,
             };
 
             PromptDoubleResult radiusResult = ed.GetDouble(radiusOptions);
@@ -382,7 +334,8 @@ namespace GeoCadPlugin
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
                 // Получаем текущее пространство (Модель или Лист) для записи
-                BlockTableRecord btr = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
+                BlockTableRecord btr = (BlockTableRecord)
+                    tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
 
                 int count = 0;
 
@@ -414,7 +367,12 @@ namespace GeoCadPlugin
             }
         }
 
-        private static void MoveCircles(PromptSelectionResult selection, double maxDistance, Random random, Transaction tr)
+        private static void MoveCircles(
+            PromptSelectionResult selection,
+            double maxDistance,
+            Random random,
+            Transaction tr
+        )
         {
             foreach (SelectedObject selectedObject in selection.Value)
             {
@@ -434,7 +392,8 @@ namespace GeoCadPlugin
                 Vector3d displacement = new Vector3d(
                     Math.Cos(angle) * distance,
                     Math.Sin(angle) * distance,
-                    0);
+                    0
+                );
 
                 circle.TransformBy(Matrix3d.Displacement(displacement));
             }

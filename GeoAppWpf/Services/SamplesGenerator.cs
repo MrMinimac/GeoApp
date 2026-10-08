@@ -2,29 +2,25 @@
 
 namespace GeoAppWpf.Services
 {
-    public class BoreholesGeneratorProperties
+    public class SamplesGeneratorProperties
     {
-        public bool GenerateSamples { get; set; } = true;
         public double SampleLength { get; set; } = 0.4;
     }
 
-    public class BoreholesGenerator
+    public class SamplesGenerator
     {
-        public static void Generate(IEnumerable<BoreholeLine> lines, BoreholesGeneratorProperties properties)
+        public static void Generate(IEnumerable<BoreholeLine> lines, SamplesGeneratorProperties properties)
         {
             foreach (var line in lines)
             {
-                if (properties.GenerateSamples)
+                foreach (var bh in line.Boreholes)
                 {
-                    foreach (var bh in line.Boreholes)
-                    {
-                        GenerateSamples(bh, properties);
-                    }
+                    GenerateSamples(bh, properties);
                 }
             }
         }
 
-        private static void GenerateSamples(Borehole borehole, BoreholesGeneratorProperties properties)
+        private static void GenerateSamples(Borehole borehole, SamplesGeneratorProperties properties)
         {
             int samplesCount = (int)double.Round(borehole.Deapth / properties.SampleLength, 0);
 

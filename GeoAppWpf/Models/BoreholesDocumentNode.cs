@@ -1,6 +1,8 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
 using GeoAppWpf.ViewModels;
+using LegendDesignWpf.Core.MVVM;
+using System.Windows.Input;
 
 namespace GeoAppWpf.Models
 {
@@ -9,51 +11,59 @@ namespace GeoAppWpf.Models
         public IDocument Document { get; }
         public IEnumerable<BoreholeLine> Boreholes => Document.GetObjects().OfType<BoreholeLine>();
 
+        private readonly RelayCommand _removeNodeCommand;
+        public ICommand RemoveNodeCommand => _removeNodeCommand;
+
         public override IReadOnlyList<NodeMenuItem> MenuItems => new NodeMenuItem[]
         {
             new()
             {
                 Header = "Генерация данных",
-                Command = CommandsProvider.GenerateBoreholesCommand,
-                CommandParameter = Boreholes
+                Items =
+                {
+                    new()
+                    {
+                        Header = "Генерация проб",
+                        Command = CommandsProvider.GenerateSamplesCommand,
+                        CommandParameter = Boreholes
+                    },
+                    new()
+                    {
+                        Header = "Генерация содержаний",
+                        Command = CommandsProvider.GenerateSampleGrades,
+                        CommandParameter = Boreholes
+                    },
+                },
+
             },
             new()
             {
-                Header = "Контур минерализации",
-                Command = CommandsProvider.ShowOreIntervalCommand,
-                CommandParameter = Boreholes
+                Header = "Экспорт",
+                Items =
+                {
+                    new()
+                    {
+                        Header = "Экспорт в Excel",
+                        Command = CommandsProvider.ExportExcelCommand,
+                        CommandParameter = Document
+                    },
+                    new()
+                    {
+                        Header = "Экспорт в AutoCad",
+                        Command = CommandsProvider.AutoCadExportCommand,
+                        CommandParameter = Boreholes
+                    },
+                },
             },
             new()
             {
-                Header = "Экспорт в Excel",
-                Command = CommandsProvider.ExcelExportBoreholesCommand,
-                CommandParameter = Document
-            },
-            new()
-            {
-                Header = "Экспорт ПЗ в Excel",
-                Command = CommandsProvider.ExcelExportConditionsTableCommand,
-                CommandParameter = Document
-            },
-            new()
-            {
-                Header = "Экспорт БД в Excel",
-                Command = CommandsProvider.ExcelExportBoreholesDBCommand,
-                CommandParameter = Document
-            },
-            new()
-            {
-                Header = "Экспорт план в AutoCad",
-                Command = CommandsProvider.AutoCadExportPlanCommand,
-                CommandParameter = Boreholes
-            },
-            new()
-            {
-                Header = "Экспорт разрез в AutoCad",
-                Command = CommandsProvider.AutoCadExportSectionsCommand,
-                CommandParameter = Boreholes
+                Header = "Удалить",
+                Command = RemoveNodeCommand,
+                CommandParameter = this
             },
         };
+
+        public event Action<BoreholesDocumentNode>? OnRemoveRequested;
 
         public BoreholesDocumentNode(IDocument document, CommandsProvider cmdProvider)
             : base(document.Name, cmdProvider)
@@ -71,7 +81,14 @@ namespace GeoAppWpf.Models
 
                     Children.Add(node);
                 }
+
+                _removeNodeCommand = new(RequestRemove);
             }
+        }
+
+        private void RequestRemove()
+        {
+            OnRemoveRequested?.Invoke(this);
         }
     }
 }

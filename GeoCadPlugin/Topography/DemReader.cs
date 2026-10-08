@@ -1,6 +1,4 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
-using Autodesk.AutoCAD.EditorInput;
-using BitMiracle.LibTiff.Classic;
+﻿using BitMiracle.LibTiff.Classic;
 
 namespace GeoCadPlugin.Topography
 {
@@ -41,7 +39,8 @@ namespace GeoCadPlugin.Topography
             double originLongitude,
             double originLatitude,
             double pixelWidth,
-            double pixelHeight)
+            double pixelHeight
+        )
         {
             Width = width;
             Height = height;
@@ -55,26 +54,18 @@ namespace GeoCadPlugin.Topography
             PixelHeight = pixelHeight;
         }
 
-        public (double Longitude, double Latitude) GetCoordinate(
-            double row,
-            double column)
+        public (double Longitude, double Latitude) GetCoordinate(double row, double column)
         {
-            double longitude =
-                OriginLongitude + column * PixelWidth;
+            double longitude = OriginLongitude + column * PixelWidth;
 
-            double latitude =
-                OriginLatitude - row * PixelHeight;
+            double latitude = OriginLatitude - row * PixelHeight;
 
             return (longitude, latitude);
         }
 
-        public (double Longitude, double Latitude) GetCoordinate(
-            int row,
-            int column)
+        public (double Longitude, double Latitude) GetCoordinate(int row, int column)
         {
-            return GetCoordinate(
-                (double)row,
-                (double)column);
+            return GetCoordinate((double)row, (double)column);
         }
     }
 
@@ -82,28 +73,20 @@ namespace GeoCadPlugin.Topography
     {
         public static DemGrid Read(string filePath)
         {
-            using Tiff? tif =
-                Tiff.Open(filePath, "r");
+            using Tiff? tif = Tiff.Open(filePath, "r");
 
             if (tif == null)
             {
-                throw new InvalidOperationException(
-                    $"Не удалось открыть TIFF: {filePath}");
+                throw new InvalidOperationException($"Не удалось открыть TIFF: {filePath}");
             }
 
             // --------------------------------------------------------
             // Размер
             // --------------------------------------------------------
 
-            int width =
-                GetIntField(
-                    tif,
-                    TiffTag.IMAGEWIDTH);
+            int width = GetIntField(tif, TiffTag.IMAGEWIDTH);
 
-            int height =
-                GetIntField(
-                    tif,
-                    TiffTag.IMAGELENGTH);
+            int height = GetIntField(tif, TiffTag.IMAGELENGTH);
 
             // --------------------------------------------------------
             // Формат высот
@@ -113,8 +96,7 @@ namespace GeoCadPlugin.Topography
 
             if (bitsField == null || bitsField.Length == 0)
             {
-                throw new InvalidOperationException(
-                    "В TIFF отсутствует BitsPerSample.");
+                throw new InvalidOperationException("В TIFF отсутствует BitsPerSample.");
             }
 
             int bitsPerSample = bitsField[0].ToInt();
@@ -122,16 +104,15 @@ namespace GeoCadPlugin.Topography
             if (bitsPerSample != 16)
             {
                 throw new NotSupportedException(
-                    $"Ожидался 16-битный DEM. " +
-                    $"BitsPerSample={bitsPerSample}");
+                    $"Ожидался 16-битный DEM. " + $"BitsPerSample={bitsPerSample}"
+                );
             }
 
             // --------------------------------------------------------
             // Количество каналов
             // --------------------------------------------------------
 
-            FieldValue[]? samplesField =
-                tif.GetField(TiffTag.SAMPLESPERPIXEL);
+            FieldValue[]? samplesField = tif.GetField(TiffTag.SAMPLESPERPIXEL);
 
             int samplesPerPixel = 1;
 
@@ -141,56 +122,43 @@ namespace GeoCadPlugin.Topography
             if (samplesPerPixel != 1)
             {
                 throw new NotSupportedException(
-                    $"Ожидался одноканальный DEM. " +
-                    $"SamplesPerPixel={samplesPerPixel}");
+                    $"Ожидался одноканальный DEM. " + $"SamplesPerPixel={samplesPerPixel}"
+                );
             }
 
             // --------------------------------------------------------
             // Геопривязка
             // --------------------------------------------------------
 
-            double[] pixelScale =
-                ReadPixelScale(tif);
+            double[] pixelScale = ReadPixelScale(tif);
 
-            double[] tiePoint =
-                ReadTiePoint(tif);
+            double[] tiePoint = ReadTiePoint(tif);
 
             if (pixelScale.Length < 2)
             {
-                throw new InvalidOperationException(
-                    "Некорректный ModelPixelScaleTag.");
+                throw new InvalidOperationException("Некорректный ModelPixelScaleTag.");
             }
 
             if (tiePoint.Length < 6)
             {
-                throw new InvalidOperationException(
-                    "Некорректный ModelTiepointTag.");
+                throw new InvalidOperationException("Некорректный ModelTiepointTag.");
             }
 
-            double pixelWidth =
-                pixelScale[0];
+            double pixelWidth = pixelScale[0];
 
-            double pixelHeight =
-                pixelScale[1];
+            double pixelHeight = pixelScale[1];
 
-            double originLongitude =
-                tiePoint[3];
+            double originLongitude = tiePoint[3];
 
-            double originLatitude =
-                tiePoint[4];
+            double originLatitude = tiePoint[4];
 
             // --------------------------------------------------------
             // Raster
             // --------------------------------------------------------
 
-            double[,] elevation =
-                new double[height, width];
+            double[,] elevation = new double[height, width];
 
-            ReadRaster(
-                tif,
-                width,
-                height,
-                elevation);
+            ReadRaster(tif, width, height, elevation);
 
             return new DemGrid(
                 width,
@@ -199,21 +167,17 @@ namespace GeoCadPlugin.Topography
                 originLongitude,
                 originLatitude,
                 pixelWidth,
-                pixelHeight);
+                pixelHeight
+            );
         }
 
-        private static int GetIntField(
-            Tiff tif,
-            TiffTag tag)
+        private static int GetIntField(Tiff tif, TiffTag tag)
         {
-            FieldValue[]? field =
-                tif.GetField(tag);
+            FieldValue[]? field = tif.GetField(tag);
 
-            if (field == null ||
-                field.Length == 0)
+            if (field == null || field.Length == 0)
             {
-                throw new InvalidOperationException(
-                    $"В TIFF отсутствует тег {tag}.");
+                throw new InvalidOperationException($"В TIFF отсутствует тег {tag}.");
             }
 
             return field[0].ToInt();
@@ -221,24 +185,22 @@ namespace GeoCadPlugin.Topography
 
         private static double[] ReadPixelScale(Tiff tif)
         {
-            FieldValue[]? field =
-                tif.GetField((TiffTag)33550);
+            FieldValue[]? field = tif.GetField((TiffTag)33550);
 
-            if (field == null ||
-                field.Length < 2)
+            if (field == null || field.Length < 2)
             {
                 throw new InvalidOperationException(
-                    "В TIFF отсутствует или некорректен ModelPixelScaleTag.");
+                    "В TIFF отсутствует или некорректен ModelPixelScaleTag."
+                );
             }
 
-            double[]? result =
-                field[1].ToDoubleArray();
+            double[]? result = field[1].ToDoubleArray();
 
-            if (result == null ||
-                result.Length < 2)
+            if (result == null || result.Length < 2)
             {
                 throw new InvalidOperationException(
-                    "Не удалось прочитать значения ModelPixelScaleTag.");
+                    "Не удалось прочитать значения ModelPixelScaleTag."
+                );
             }
 
             return result;
@@ -246,194 +208,147 @@ namespace GeoCadPlugin.Topography
 
         private static double[] ReadTiePoint(Tiff tif)
         {
-            FieldValue[]? field =
-                tif.GetField((TiffTag)33922);
+            FieldValue[]? field = tif.GetField((TiffTag)33922);
 
-            if (field == null ||
-                field.Length < 2)
+            if (field == null || field.Length < 2)
             {
                 throw new InvalidOperationException(
-                    "В TIFF отсутствует или некорректен ModelTiepointTag.");
+                    "В TIFF отсутствует или некорректен ModelTiepointTag."
+                );
             }
 
-            double[]? result =
-                field[1].ToDoubleArray();
+            double[]? result = field[1].ToDoubleArray();
 
-            if (result == null ||
-                result.Length < 6)
+            if (result == null || result.Length < 6)
             {
                 throw new InvalidOperationException(
-                    "Не удалось прочитать значения ModelTiepointTag.");
+                    "Не удалось прочитать значения ModelTiepointTag."
+                );
             }
 
             return result;
         }
 
-        private static void ReadRaster(
-            Tiff tif,
-            int width,
-            int height,
-            double[,] elevation)
+        private static void ReadRaster(Tiff tif, int width, int height, double[,] elevation)
         {
             if (tif.IsTiled())
             {
-                ReadTiledRaster(
-                    tif,
-                    width,
-                    height,
-                    elevation);
+                ReadTiledRaster(tif, width, height, elevation);
 
                 return;
             }
 
-            ReadStripRaster(
-                tif,
-                width,
-                height,
-                elevation);
+            ReadStripRaster(tif, width, height, elevation);
         }
 
-        private static void ReadStripRaster(
-    Tiff tif,
-    int width,
-    int height,
-    double[,] elevation)
+        private static void ReadStripRaster(Tiff tif, int width, int height, double[,] elevation)
         {
-            int scanlineSize =
-                tif.ScanlineSize();
+            int rowsPerStrip = height;
 
-            byte[] buffer =
-                new byte[scanlineSize];
+            FieldValue[]? rpsField = tif.GetField(TiffTag.ROWSPERSTRIP);
 
-            for (int row = 0; row < height; row++)
+            if (rpsField != null && rpsField.Length > 0)
             {
-                if (row > short.MaxValue)
+                int rps = rpsField[0].ToInt();
+
+                // Значение 2^32-1 (или переполнение в int) означает "весь растр одной полосой"
+                if (rps > 0 && rps < height)
+                    rowsPerStrip = rps;
+            }
+
+            int rowSize = tif.ScanlineSize();
+            int stripCount = tif.NumberOfStrips();
+
+            byte[] buffer = new byte[tif.StripSize()];
+
+            for (int strip = 0; strip < stripCount; strip++)
+            {
+                int bytes = tif.ReadEncodedStrip(strip, buffer, 0, -1);
+
+                if (bytes < 0)
                 {
                     throw new InvalidOperationException(
-                        $"Слишком большая высота TIFF: {height}");
+                        $"Не удалось прочитать полосу TIFF: {strip}"
+                    );
                 }
 
-                bool success =
-                    tif.ReadScanline(
-                        buffer,
-                        0,
-                        (short)row);
+                int firstRow = strip * rowsPerStrip;
+                int rowsInBuffer = bytes / rowSize;
 
-                if (!success)
+                for (int r = 0; r < rowsInBuffer; r++)
                 {
-                    throw new InvalidOperationException(
-                        $"Не удалось прочитать строку TIFF: {row}");
-                }
+                    int row = firstRow + r;
 
-                for (int column = 0;
-                     column < width;
-                     column++)
-                {
-                    int offset =
-                        column * sizeof(short);
+                    if (row >= height)
+                        break;
 
-                    short value =
-                        BitConverter.ToInt16(
+                    int rowOffset = r * rowSize;
+
+                    for (int column = 0; column < width; column++)
+                    {
+                        elevation[row, column] = BitConverter.ToInt16(
                             buffer,
-                            offset);
-
-                    elevation[row, column] =
-                        value;
+                            rowOffset + column * sizeof(short)
+                        );
+                    }
                 }
             }
         }
 
-        private static void ReadTiledRaster(
-    Tiff tif,
-    int width,
-    int height,
-    double[,] elevation)
+        private static void ReadTiledRaster(Tiff tif, int width, int height, double[,] elevation)
         {
-            FieldValue[]? tileWidthField =
-                tif.GetField(TiffTag.TILEWIDTH);
+            FieldValue[]? tileWidthField = tif.GetField(TiffTag.TILEWIDTH);
 
-            FieldValue[]? tileHeightField =
-                tif.GetField(TiffTag.TILELENGTH);
+            FieldValue[]? tileHeightField = tif.GetField(TiffTag.TILELENGTH);
 
-            if (tileWidthField == null ||
-                tileWidthField.Length == 0 ||
-                tileHeightField == null ||
-                tileHeightField.Length == 0)
+            if (
+                tileWidthField == null
+                || tileWidthField.Length == 0
+                || tileHeightField == null
+                || tileHeightField.Length == 0
+            )
             {
                 throw new InvalidOperationException(
-                    "TIFF помечен как tiled, но отсутствует TILEWIDTH/TILELENGTH.");
+                    "TIFF помечен как tiled, но отсутствует TILEWIDTH/TILELENGTH."
+                );
             }
 
-            int tileWidth =
-                tileWidthField[0].ToInt();
+            int tileWidth = tileWidthField[0].ToInt();
 
-            int tileHeight =
-                tileHeightField[0].ToInt();
+            int tileHeight = tileHeightField[0].ToInt();
 
-            int tileSize =
-                tif.TileSize();
+            int tileSize = tif.TileSize();
 
-            int tileRowSize =
-                tif.TileRowSize();
+            int tileRowSize = tif.TileRowSize();
 
-            byte[] buffer =
-                new byte[tileSize];
+            byte[] buffer = new byte[tileSize];
 
-            for (int tileY = 0;
-                 tileY < height;
-                 tileY += tileHeight)
+            for (int tileY = 0; tileY < height; tileY += tileHeight)
             {
-                for (int tileX = 0;
-                     tileX < width;
-                     tileX += tileWidth)
+                for (int tileX = 0; tileX < width; tileX += tileWidth)
                 {
-                    int bytesRead =
-                        tif.ReadTile(
-                            buffer,
-                            0,
-                            tileX,
-                            tileY,
-                            0,
-                            0);
+                    int bytesRead = tif.ReadTile(buffer, 0, tileX, tileY, 0, 0);
 
                     if (bytesRead < 0)
                     {
                         throw new InvalidOperationException(
-                            $"Не удалось прочитать TIFF tile " +
-                            $"X={tileX}, Y={tileY}.");
+                            $"Не удалось прочитать TIFF tile " + $"X={tileX}, Y={tileY}."
+                        );
                     }
 
-                    int actualWidth =
-                        Math.Min(
-                            tileWidth,
-                            width - tileX);
+                    int actualWidth = Math.Min(tileWidth, width - tileX);
 
-                    int actualHeight =
-                        Math.Min(
-                            tileHeight,
-                            height - tileY);
+                    int actualHeight = Math.Min(tileHeight, height - tileY);
 
-                    for (int row = 0;
-                         row < actualHeight;
-                         row++)
+                    for (int row = 0; row < actualHeight; row++)
                     {
-                        for (int column = 0;
-                             column < actualWidth;
-                             column++)
+                        for (int column = 0; column < actualWidth; column++)
                         {
-                            int offset =
-                                row * tileRowSize +
-                                column * sizeof(short);
+                            int offset = row * tileRowSize + column * sizeof(short);
 
-                            short value =
-                                BitConverter.ToInt16(
-                                    buffer,
-                                    offset);
+                            short value = BitConverter.ToInt16(buffer, offset);
 
-                            elevation[
-                                tileY + row,
-                                tileX + column] =
-                                value;
+                            elevation[tileY + row, tileX + column] = value;
                         }
                     }
                 }

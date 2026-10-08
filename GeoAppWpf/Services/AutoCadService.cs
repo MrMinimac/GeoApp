@@ -43,17 +43,7 @@ namespace GeoAppWpf.Services
             return JsonConvert.DeserializeObject<GetBoundaryResult>(json);
         }
 
-        public async Task ExportSections(GeoDoc document)
-        {
-            await Export("export-sections", document);
-        }
-
-        public async Task ExportPlan(GeoDoc document)
-        {
-            await Export("export-plan", document);
-        }
-
-        private async Task Export(string endpoint, GeoDoc document)
+        public async Task Export(GeoDoc document)
         {
             if (document == null)
             {
@@ -69,7 +59,7 @@ namespace GeoAppWpf.Services
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                HttpResponseMessage response = await client.PostAsync($"http://localhost:5050/{endpoint}", content);
+                HttpResponseMessage response = await client.PostAsync($"http://localhost:5050/export", content);
 
                 if (response.IsSuccessStatusCode)
                     MessageBox.Show("Проект отправлен в AutoCAD");

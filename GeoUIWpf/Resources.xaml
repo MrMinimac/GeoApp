@@ -1,0 +1,19 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:GeoUIWpf.Converters"
+    xmlns:ldconverters="clr-namespace:LegendDesignWpf.Converters;assembly=LegendDesignWpf">
+
+    <ldconverters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    <ldconverters:StringLengthToVisibilityConverter x:Key="StringLengthToVisibilityConverter" />
+    <ldconverters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+    <converters:SelectionItemDisplayConverter x:Key="SelectionItemDisplayConverter" />
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/LegendDesignWpf;component/Themes/DarkTheme.xaml" />
+        <ResourceDictionary Source="/LegendDesignWpf;component/Themes/Generic.xaml" />
+        <ResourceDictionary Source="Styles/ComboBoxStyle.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+
+</ResourceDictionary>

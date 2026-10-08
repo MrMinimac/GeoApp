@@ -99,7 +99,7 @@ namespace GeoAppWpf.Services
             }
         }
 
-        private async Task SaveAsync()
+        public async Task SaveAsync()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
 

@@ -1,5 +1,6 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Runtime;
+using GeoUIWpf;
 
 namespace GeoCadPlugin
 {
@@ -12,6 +13,8 @@ namespace GeoCadPlugin
             var editor = Application.DocumentManager
                 .MdiActiveDocument?
                 .Editor;
+
+            GeoUiMain.Initialize();
 
             editor?.WriteMessage("\nGeoAppPlugin загружен!");
 

@@ -4,6 +4,7 @@ using GeoAppWpf.Interfaces;
 using GeoAppWpf.Services;
 using GeoAppWpf.ViewModels;
 using GeoAppWpf.Views.Windows;
+using GeoUIWpf;
 using LegendDesignWpf.Core;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;

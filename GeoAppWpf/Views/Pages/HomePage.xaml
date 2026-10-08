@@ -101,10 +101,7 @@
                 </Grid>
 
                 <Grid Visibility="{Binding DocumentsAny, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Reversed}">
-                    <components:LastFilesComponent
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        DataContext="{Binding LastFilesViewModel}" />
+                    <components:LastFilesComponent DataContext="{Binding LastFilesViewModel}" />
                 </Grid>
 
             </Grid>

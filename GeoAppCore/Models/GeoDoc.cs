@@ -2,11 +2,19 @@
 
 namespace GeoAppCore
 {
+    public enum AcadExportType
+    {
+        Plan,
+        Sections,
+    }
+
     public class GeoDoc
     {
         public int VerticalScale { get; set; } = 10;
 
         public bool DrawHatch { get; set; } = false;
+
+        public AcadExportType ExportType { get; set; }
 
         public List<BoreholeLine> BoreholeLines { get; set; } = new();
 

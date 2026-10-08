@@ -1,5 +1,4 @@
 ﻿using GeoAppCore.Abstractions.Document;
-using GeoAppWpf.Interfaces;
 using GeoAppWpf.Models;
 using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
@@ -7,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Windows;
 using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels
@@ -75,7 +73,14 @@ namespace GeoAppWpf.ViewModels
 
         private void OnWorkspaceManagerDocumentsChanged(IDocument document)
         {
-            Nodes.Add(new BoreholesDocumentNode(document, _commandsProvider));
+            var node = new BoreholesDocumentNode(document, _commandsProvider);
+            Nodes.Add(node);
+            node.OnRemoveRequested += Node_OnRemoveRequested;
+        }
+
+        private void Node_OnRemoveRequested(BoreholesDocumentNode node)
+        {
+            Nodes.Remove(node);
         }
 
         private void SelectNode(NodeSelectionRequest request)

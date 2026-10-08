@@ -89,9 +89,7 @@ namespace GeoCadPlugin
                         await WriteResponse(context, "OK");
                         return;
                     }
-
-                case "/export-sections":
-                case "/export-plan":
+                case "/export":
                     {
                         await ExportProject(context);
                         return;
@@ -127,56 +125,41 @@ namespace GeoCadPlugin
         {
             string url = context.Request.Url.AbsolutePath;
 
-            using StreamReader reader =
-                            new StreamReader(
-                                context.Request.InputStream,
-                                context.Request.ContentEncoding);
+            using StreamReader reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
 
             string json = await reader.ReadToEndAsync();
 
             CommandQueue.Enqueue(() =>
             {
-                switch (url.ToLower())
-                {
-                    case "/export-sections":
-                        ExportSections(json);
-                        break;
-                    case "/export-plan":
-                        ExportPlan(json);
-                        break;
-                }
+                Export(json);
             });
 
             await WriteResponse(context, "Imported");
         }
 
-        private void ExportSections(string json)
+        private void Export(string json)
         {
-            GeoDoc project = JsonConvert.DeserializeObject<GeoDoc>(json);
+            GeoDoc? project = JsonConvert.DeserializeObject<GeoDoc>(json);
 
             var doc =
                 Autodesk.AutoCAD.ApplicationServices.Application
                 .DocumentManager
                 .MdiActiveDocument;
 
-            using (doc.LockDocument())
-            {
-                GeoSectionDrawer.Draw(project);
-            }
-        }
-
-        private void ExportPlan(string json)
-        {
-            GeoDoc project = JsonConvert.DeserializeObject<GeoDoc>(json);
-
-            var doc =
-                Autodesk.AutoCAD.ApplicationServices.Application
-                .DocumentManager
-                .MdiActiveDocument;
+            if (project == null)
+                return;
 
             using (doc.LockDocument())
             {
-                GeoPlanDrawer.Draw(project);
+                switch (project.ExportType)
+                {
+                    case AcadExportType.Plan:
+                        GeoPlanDrawer.Draw(project);
+                        break;
+                    case AcadExportType.Sections:
+                        GeoSectionDrawer.Draw(project);
+                        break;
+                }
             }
         }
 

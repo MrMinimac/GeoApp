@@ -4,6 +4,7 @@ using GeoAppWpf.Services;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualBasic;
+using Newtonsoft.Json.Bson;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -24,12 +25,16 @@ namespace GeoAppWpf.ViewModels
         private readonly RelayCommand<LastFileModel> _loadFileCommand;
         public ICommand LoadFileCommand => _loadFileCommand;
 
+        private readonly RelayCommand<LastFileModel> _removeFileCommand;
+        public ICommand RemoveFileCommand => _removeFileCommand;
+
         public LastFilesViewModel(IServiceProvider serviceProvider)
         {
             _workspaceManager = serviceProvider.GetRequiredService<WorkspaceManager>();
             _workspaceManager.OnDocumentAdded += OnDocumentAdded;
             _settings = serviceProvider.GetRequiredService<SettingsService>();
             _loadFileCommand = new(LoadFile);
+            _removeFileCommand = new(RemoveFile);
 
             _ = Initialize();
         }
@@ -78,19 +83,32 @@ namespace GeoAppWpf.ViewModels
             _settings.AddLastFile(file);
             LastFiles.Add(file);
 
-            while (_settings.LastFiles.Count > 6)
+            while (_settings.LastFiles.Count > 16)
             {
-                _settings.RemoveLastFile(_settings.LastFiles[0]);
-                LastFiles.RemoveAt(0);
+                var lastFileDto = _settings.LastFiles.OrderByDescending(x => x.LastModified).LastOrDefault();
+                var lastFile = LastFiles.FirstOrDefault(x => x.LastModified == lastFileDto?.LastModified);
+
+                if (lastFileDto != null)
+                    _settings.RemoveLastFile(lastFileDto);
+
+                if (lastFile != null)
+                    LastFiles.Remove(lastFile);
             }
         }
 
         private async Task Initialize()
         {
             await _settings.LoadAsync();
+            UpdateFilesList();
+        }
+
+        private void UpdateFilesList()
+        {
             LastFiles.Clear();
 
-            foreach (var lastFile in _settings.LastFiles)
+            var lastFiles = _settings.LastFiles.OrderByDescending(x => x.LastModified);
+
+            foreach (var lastFile in lastFiles)
             {
                 if (!File.Exists(lastFile.FilePath))
                     return;
@@ -112,11 +130,32 @@ namespace GeoAppWpf.ViewModels
                 }
 
                 _workspaceManager?.ImportFiles([path]);
+                lastFile.LastModified = DateTime.Now;
+
+                var lastFileDto = _settings.LastFiles.FirstOrDefault(x => x == lastFile);
+
+                if (lastFileDto != null)
+                {
+                    lastFileDto.LastModified = lastFile.LastModified;
+                    _ = _settings.SaveAsync();
+                }
+
+                UpdateFilesList();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
             }
+        }
+
+        private void RemoveFile(LastFileModel lastFile)
+        {
+            var lastFileDto = _settings.LastFiles.FirstOrDefault(x => x == lastFile);
+
+            if (lastFileDto != null)
+                _settings.RemoveLastFile(lastFileDto);
+
+            LastFiles.Remove(lastFile);
         }
     }
 }

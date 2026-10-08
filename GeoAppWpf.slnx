@@ -6,4 +6,5 @@
   <Project Path="GeoCadPlugin/GeoCadPlugin.csproj" Id="84e8d0f9-dfff-4741-8d91-010d16114226">
     <BuildType Project="Release" />
   </Project>
+  <Project Path="GeoUIWpf/GeoUIWpf.csproj" Id="912f39ee-994c-4d21-99ab-32654197002a" />
 </Solution>

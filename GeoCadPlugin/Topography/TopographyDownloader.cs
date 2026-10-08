@@ -1,11 +1,11 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
+﻿using System.IO;
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using GeoAppCore.Services;
 using GeoAppCore.Topography;
 using Newtonsoft.Json;
-using System.IO;
 
 namespace GeoCadPlugin.Topography
 {
@@ -74,7 +74,7 @@ namespace GeoCadPlugin.Topography
                 (X: minX, Y: minY),
                 (X: minX, Y: maxY),
                 (X: maxX, Y: minY),
-                (X: maxX, Y: maxY)
+                (X: maxX, Y: maxY),
             };
 
             // --------------------------------------------------------
@@ -84,8 +84,9 @@ namespace GeoCadPlugin.Topography
                 .Select(p =>
                     GaussKrugerConverter.GKToGeodetic(
                         p.Y, // GK X — север
-                        p.X  // GK Y — восток
-                    ))
+                        p.X // GK Y — восток
+                    )
+                )
                 .ToList();
 
             // --------------------------------------------------------
@@ -96,12 +97,7 @@ namespace GeoCadPlugin.Topography
             double west = geoPoints.Min(p => p.Longitude);
             double east = geoPoints.Max(p => p.Longitude);
 
-            DemBounds requestedBounds =
-                new DemBounds(
-                    south,
-                    north,
-                    west,
-                    east);
+            DemBounds requestedBounds = new DemBounds(south, north, west, east);
 
             // --------------------------------------------------------
             // 7. Скачать DEM
@@ -109,14 +105,12 @@ namespace GeoCadPlugin.Topography
             string outputDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "GeoCadPlugin",
-                "DEM");
+                "DEM"
+            );
 
             Directory.CreateDirectory(outputDirectory);
 
-            string? existingFile =
-                DemCache.FindCoveringDem(
-                    outputDirectory,
-                    requestedBounds);
+            string? existingFile = DemCache.FindCoveringDem(outputDirectory, requestedBounds);
 
             if (existingFile != null)
             {
@@ -128,25 +122,16 @@ namespace GeoCadPlugin.Topography
             {
                 ed.WriteMessage($"\nПодождите, скачивание DEM...");
 
-                string fileId =
-                    $"{south:F6}_{west:F6}_{north:F6}_{east:F6}"
-                        .Replace('.', '_')
-                        .Replace('-', 'm');
+                string fileId = $"{south:F6}_{west:F6}_{north:F6}_{east:F6}"
+                    .Replace('.', '_')
+                    .Replace('-', 'm');
 
-                string outputFile =
-                    Path.Combine(
-                        outputDirectory,
-                        $"SRTM_{fileId}.tif");
+                string outputFile = Path.Combine(outputDirectory, $"SRTM_{fileId}.tif");
 
                 _demProvider ??= new OpenTopographyDemProvider();
 
                 // Здесь выполнение приостанавливается, а потом возобновляется в фоновом потоке
-                await _demProvider.DownloadSrtm30Async(
-                    south,
-                    north,
-                    west,
-                    east,
-                    outputFile);
+                await _demProvider.DownloadSrtm30Async(south, north, west, east, outputFile);
 
                 ed.WriteMessage($"\nDEM успешно скачан:\n{outputFile}");
 
@@ -160,7 +145,7 @@ namespace GeoCadPlugin.Topography
                     West = west,
                     East = east,
 
-                    FileName = Path.GetFileName(outputFile)
+                    FileName = Path.GetFileName(outputFile),
                 };
 
                 DemCache.Add(outputDirectory, cacheInfo);
@@ -193,12 +178,14 @@ namespace GeoCadPlugin.Topography
                 var min = new Point3d(
                     circle.Center.X - circle.Radius,
                     circle.Center.Y - circle.Radius,
-                    0);
+                    0
+                );
 
                 var max = new Point3d(
                     circle.Center.X + circle.Radius,
                     circle.Center.Y + circle.Radius,
-                    0);
+                    0
+                );
 
                 var circleExtents = new Extents3d(min, max);
 
@@ -226,26 +213,21 @@ namespace GeoCadPlugin.Topography
     {
         private const string CacheFileName = "dem-cache.json";
 
-        public static string? FindCoveringDem(
-            string directory,
-            DemBounds requested)
+        public static string? FindCoveringDem(string directory, DemBounds requested)
         {
             if (!Directory.Exists(directory))
                 return null;
 
-            string cacheFile =
-                Path.Combine(directory, CacheFileName);
+            string cacheFile = Path.Combine(directory, CacheFileName);
 
             if (!File.Exists(cacheFile))
                 return null;
 
             try
             {
-                string json =
-                    File.ReadAllText(cacheFile);
+                string json = File.ReadAllText(cacheFile);
 
-                DemCacheDatabase? database =
-                    JsonConvert.DeserializeObject<DemCacheDatabase>(json);
+                DemCacheDatabase? database = JsonConvert.DeserializeObject<DemCacheDatabase>(json);
 
                 if (database == null)
                     return null;
@@ -254,18 +236,12 @@ namespace GeoCadPlugin.Topography
 
                 foreach (DemCacheInfo info in database.Dems.ToList())
                 {
-                    if (!string.Equals(
-                            info.DemType,
-                            "SRTMGL1",
-                            StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(info.DemType, "SRTMGL1", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
 
-                    string tifPath =
-                        Path.Combine(
-                            directory,
-                            info.FileName);
+                    string tifPath = Path.Combine(directory, info.FileName);
 
                     // Запись в JSON есть, а TIFF уже удалён.
                     if (!File.Exists(tifPath))
@@ -276,12 +252,7 @@ namespace GeoCadPlugin.Topography
                         continue;
                     }
 
-                    DemBounds dem =
-                        new DemBounds(
-                            info.South,
-                            info.North,
-                            info.West,
-                            info.East);
+                    DemBounds dem = new DemBounds(info.South, info.North, info.West, info.East);
 
                     if (!Contains(dem, requested))
                         continue;
@@ -316,12 +287,9 @@ namespace GeoCadPlugin.Topography
 
             // Если такой файл уже зарегистрирован,
             // обновляем запись вместо создания дубликата.
-            DemCacheInfo? existing =
-                database.Dems.FirstOrDefault(x =>
-                    string.Equals(
-                        x.FileName,
-                        info.FileName,
-                        StringComparison.OrdinalIgnoreCase));
+            DemCacheInfo? existing = database.Dems.FirstOrDefault(x =>
+                string.Equals(x.FileName, info.FileName, StringComparison.OrdinalIgnoreCase)
+            );
 
             if (existing != null)
             {
@@ -350,8 +318,7 @@ namespace GeoCadPlugin.Topography
             {
                 string json = File.ReadAllText(cacheFile);
 
-                return
-                    JsonConvert.DeserializeObject<DemCacheDatabase>(json)
+                return JsonConvert.DeserializeObject<DemCacheDatabase>(json)
                     ?? new DemCacheDatabase();
             }
             catch
@@ -362,23 +329,17 @@ namespace GeoCadPlugin.Topography
 
         private static void SaveDatabase(string cacheFile, DemCacheDatabase database)
         {
-            string json =
-                JsonConvert.SerializeObject(
-                    database,
-                    Formatting.Indented);
+            string json = JsonConvert.SerializeObject(database, Formatting.Indented);
 
-            File.WriteAllText(
-                cacheFile,
-                json);
+            File.WriteAllText(cacheFile, json);
         }
 
         private static bool Contains(DemBounds dem, DemBounds requested)
         {
-            return
-                dem.South <= requested.South &&
-                dem.North >= requested.North &&
-                dem.West <= requested.West &&
-                dem.East >= requested.East;
+            return dem.South <= requested.South
+                && dem.North >= requested.North
+                && dem.West <= requested.West
+                && dem.East >= requested.East;
         }
     }
 }

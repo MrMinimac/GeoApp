@@ -6,83 +6,108 @@
     xmlns:ld="clr-namespace:LegendDesignWpf.Controls;assembly=LegendDesignWpf"
     xmlns:local="clr-namespace:GeoAppWpf.Views.Components"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    d:DesignHeight="450"
-    d:DesignWidth="800"
     mc:Ignorable="d">
+
     <Grid>
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
         <TextBlock
-            FontSize="14"
+            Grid.Row="0"
+            MaxWidth="250"
+            Margin="10,0,0,10"
+            VerticalAlignment="Center"
+            FontSize="16"
             Style="{StaticResource LabelSmallTextStyle}"
-            Text="Загрузите документ, что бы увидеть данные."
+            Text="Данных нет, загрузите документ."
             TextAlignment="Center"
-            TextWrapping="Wrap" />
+            TextWrapping="Wrap"
+            Visibility="{Binding LastFiles.Count, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=Reversed}" />
 
-        <StackPanel
-            Grid.Row="1"
-            Margin="0,10,0,0"
-            Visibility="{Binding LastFiles.Count, Converter={StaticResource IntToVisibilityConverter}}">
+        <Grid Visibility="{Binding LastFiles.Count, Converter={StaticResource IntToVisibilityConverter}}">
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
             <TextBlock
-                Margin="0,0,0,10"
-                FontSize="13"
+                Grid.Row="0"
+                MaxWidth="1000"
+                Margin="10,0,0,10"
+                FontSize="16"
                 Foreground="{DynamicResource ForegroundSecondaryBrush}"
-                Text="Последние:"
-                TextAlignment="Center" />
+                Text="Последние загруженные файлы"
+                TextAlignment="Left" />
 
-            <ItemsControl HorizontalAlignment="Center" ItemsSource="{Binding LastFiles}">
-
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel MaxWidth="400" HorizontalAlignment="Center" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-
-                <ItemsControl.ItemTemplate>
+            <ld:CustomListBox
+                Grid.Row="1"
+                ItemsSource="{Binding LastFiles}"
+                VerticalScrollBarVisibility="Visible">
+                <ld:CustomListBox.ItemTemplate>
                     <DataTemplate>
                         <ld:FlatButton
-                            Width="190"
-                            Height="80"
-                            Margin="0,0,5,5"
-                            Background="{DynamicResource AccentBrush}"
+                            Height="Auto"
+                            MaxWidth="1000"
+                            Margin="10,0,10,5"
+                            HorizontalAlignment="Stretch"
+                            Background="{DynamicResource SecondaryBrush}"
                             Command="{Binding DataContext.LoadFileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding}"
-                            CornerRadius="8">
-                            <StackPanel
-                                Margin="20,0,20,0"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                                <TextBlock
-                                    HorizontalAlignment="Center"
-                                    FontSize="13"
-                                    Foreground="{DynamicResource ForegroundBrush}"
-                                    Text="{Binding Name}"
-                                    TextAlignment="Center"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    HorizontalAlignment="Center"
-                                    FontSize="11"
-                                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
-                                    Text="{Binding Directory}"
-                                    TextAlignment="Center" />
-                                <TextBlock
-                                    HorizontalAlignment="Center"
-                                    FontSize="11"
-                                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
-                                    Text="{Binding LastModified, StringFormat=dd.MM.yy HH:mm}"
-                                    TextAlignment="Center" />
-                            </StackPanel>
+                            ContentHorizontalAlignment="Stretch"
+                            CornerRadius="8"
+                            HoverBrush="{DynamicResource HoverBrush}">
+                            
+                            <Grid>
+                                <StackPanel
+                                    Margin="20,7,20,7"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        HorizontalAlignment="Left"
+                                        FontSize="13"
+                                        Foreground="{DynamicResource ForegroundBrush}"
+                                        Text="{Binding Name}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        HorizontalAlignment="Left"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                        Text="{Binding Directory}"
+                                        TextAlignment="Center" />
+                                    <TextBlock
+                                        HorizontalAlignment="Left"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                        Text="{Binding LastModified, StringFormat=dd.MM.yy HH:mm}"
+                                        TextAlignment="Center" />
+                                </StackPanel>
+
+                                <ld:FlatButton
+                                    Width="Auto"
+                                    Height="Auto"
+                                    Margin="0,0,10,0"
+                                    Padding="12"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    Command="{Binding DataContext.RemoveFileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    HoverBrush="{DynamicResource TertiaryBrush}">
+                                    <ld:PackIcon
+                                        Width="12"
+                                        Foreground="{DynamicResource ForegroundBrush}"
+                                        Kind="Close" />
+                                </ld:FlatButton>
+
+                            </Grid>
                         </ld:FlatButton>
                     </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+                </ld:CustomListBox.ItemTemplate>
 
+            </ld:CustomListBox>
+
+
+        </Grid>
     </Grid>
 
 </UserControl>

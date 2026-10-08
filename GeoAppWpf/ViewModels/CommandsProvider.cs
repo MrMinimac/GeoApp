@@ -1,23 +1,13 @@
 ﻿using GeoAppCore;
 using GeoAppCore.Abstractions.Document;
-using GeoAppCore.Services;
 using GeoAppWpf.InputDalogBuilders;
+using GeoAppWpf.Models;
 using GeoAppWpf.Services;
-using GeoAppWpf.Services.Excel.Build;
-using GeoAppWpf.Services.Excel.Build.Data;
-using GeoAppWpf.Services.Excel.Build.Tables.BlocksReportTable;
-using GeoAppWpf.Services.Excel.Build.Tables.BoreholeDataBaseTable;
-using GeoAppWpf.Services.Excel.Build.Tables.BoreholeInfluence;
-using GeoAppWpf.Services.Excel.Build.Tables.BoreholeReportTable;
-using GeoAppWpf.Services.Excel.Build.Tables.ConditionsTable;
-using GeoAppWpf.Services.Excel.Build.Tables.OreReserveTable;
-using GeoAppWpf.Views.Windows;
+using GeoAppWpf.Services.Excel;
 using LegendDesignWpf.Core.MVVM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using System.Diagnostics;
-using System.IO;
-using System.Windows;
 using System.Windows.Input;
 
 namespace GeoAppWpf.ViewModels
@@ -33,26 +23,16 @@ namespace GeoAppWpf.ViewModels
         public ICommand ImportCommand => _importCommand;
 
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _showOreIntervalCommand;
-        public ICommand ShowOreIntervalCommand => _showOreIntervalCommand;
+        public ICommand GenerateSampleGrades => _showOreIntervalCommand;
 
-
-        private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportPlanCommand;
-        public ICommand AutoCadExportPlanCommand => _autoCadExportPlanCommand;
-
-        private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportSectionsCommand;
-        public ICommand AutoCadExportSectionsCommand => _autoCadExportSectionsCommand;
+        private readonly RelayCommand<IEnumerable<BoreholeLine>> _autoCadExportCommand;
+        public ICommand AutoCadExportCommand => _autoCadExportCommand;
 
         private readonly RelayCommand<IEnumerable<BoreholeLine>> _generateBoreholesCommand;
-        public ICommand GenerateBoreholesCommand => _generateBoreholesCommand;
+        public ICommand GenerateSamplesCommand => _generateBoreholesCommand;
 
-        private readonly RelayCommand<IDocument> _excelExportConditionsTableCommand;
-        public ICommand ExcelExportConditionsTableCommand => _excelExportConditionsTableCommand;
-
-        private readonly RelayCommand<IDocument> _excelExportBoreholesDBCommand;
-        public ICommand ExcelExportBoreholesDBCommand => _excelExportBoreholesDBCommand;
-
-        private readonly RelayCommand<IDocument> _excelExportBoreholesCommand;
-        public ICommand ExcelExportBoreholesCommand => _excelExportBoreholesCommand;
+        private readonly RelayCommand<IDocument> _exportExcelCommand;
+        public ICommand ExportExcelCommand => _exportExcelCommand;
 
         #endregion
 
@@ -63,17 +43,15 @@ namespace GeoAppWpf.ViewModels
 
             _importCommand = new(Import);
 
-            _autoCadExportPlanCommand = new(AutoCadExportPlan);
             _generateBoreholesCommand = new(GenerateBoreholes);
 
-            _excelExportBoreholesDBCommand = new(ExcelExportBoreholesDB);
-            _excelExportBoreholesCommand = new(ExcelExportBoreholes);
-            _excelExportConditionsTableCommand = new(ExcelExportConditionsTable);
+            _exportExcelCommand = new(ExportExcel);
 
-            _autoCadExportSectionsCommand = new(AutoCadExportSections);
+            _autoCadExportCommand = new(AutoCadExport);
 
             _showOreIntervalCommand = new(GenerateGrade);
         }
+
 
         private async Task GenerateGrade(IEnumerable<BoreholeLine> lines)
         {
@@ -85,97 +63,35 @@ namespace GeoAppWpf.ViewModels
             GenerateGradeService.Generate(lines, properties);
         }
 
-        private void ExcelExportBoreholes(IDocument document)
+        private void ExportExcel(IDocument document)
         {
-            var lines = document.GetObjects().OfType<BoreholeLine>();
-
-            if (lines == null || !lines.Any())
-                return;
-
-            var dialog = new OpenFolderDialog();
-            dialog.Title = "Выберите директорию сохранения";
-
-            if (dialog.ShowDialog() != true)
-                return;
-
-            foreach (var line in lines)
-            {
-                var tables = new List<TableDefinition>();
-
-                foreach (var bh in line.Boreholes)
-                {
-                    tables.Add(BoreholeReportTableBuilder.Build(bh, $"{bh.BoreholeLineId} СКВ-{bh.Id}"));
-                }
-
-                var excelDoc = new ExcelDocument();
-                excelDoc.Tables.AddRange(tables);
-                excelDoc.Save(Path.Combine(dialog.FolderName, $"{line.Id}.xlsx"));
-            }
-        }
-
-        private void ExcelExportConditionsTable(IDocument document)
-        {
-            var lines = document.GetObjects().OfType<BoreholeLine>();
-
-            if (lines == null || !lines.Any())
-                return;
-
-            var properties = OreReserveTableInputBuilder.Build();
+            var properties = ExportExcelInputBuilder.Build();
 
             if (properties == null)
                 return;
 
-            var levelingGroups = LevelingBoreholeGroup.BuildMacroGroups(lines);
-            var blocks = BlockBuilder.Build(lines, properties.Boundaries);
-
-            var table = ConditionsTableBuilder.Build(lines);
-            var table2 = BoreholeInfluenceTableBuilder.Build(levelingGroups);
-            var table3 = BlocksReportTableBuilder.Build(blocks, levelingGroups);
-            var table4 = OreReserveTableBuilder.Build(blocks, lines);
-
-            SaveTable(document.Name, [table, table2, table3, table4]);
-        }
-
-        private void ExcelExportBoreholesDB(IDocument document)
-        {
-            var lines = document.GetObjects().OfType<BoreholeLine>();
-
-            if (lines == null || !lines.Any())
-                return;
-
-            var table = BoreholeDataBaseTableBuilder.Build(lines);
-            SaveTable(document.Name, [table]);
+            ExcelExporter.Export(document, properties);
         }
 
         private void GenerateBoreholes(IEnumerable<BoreholeLine> boreholeLines)
         {
-            var properties = GenerateBoreholesInputBuilder.Build();
+            var properties = GenerateSamplesInputBuilder.Build();
 
             if (properties == null)
                 return;
 
-            BoreholesGenerator.Generate(boreholeLines, properties);
+            SamplesGenerator.Generate(boreholeLines, properties);
         }
 
-        private async Task AutoCadExportPlan(IEnumerable<BoreholeLine> boreholeLines)
-        {
-            var geoDoc = new GeoDoc
-            {
-                BoreholeLines = boreholeLines.ToList()
-            };
-
-            await _acadExporter.ExportPlan(geoDoc);
-        }
-
-        private async Task AutoCadExportSections(IEnumerable<BoreholeLine> boreholeLines)
+        private async Task AutoCadExport(IEnumerable<BoreholeLine> boreholeLines)
         {
 
-            var geoDoc = GeoDocInputBuilder.Build(boreholeLines);
+            var geoDoc = ExportAutoCadInputBuilder.Build(boreholeLines);
 
             if (geoDoc == null)
                 return;
 
-            await _acadExporter.ExportSections(geoDoc);
+            await _acadExporter.Export(geoDoc);
         }
 
         private void Import()
@@ -196,30 +112,6 @@ namespace GeoAppWpf.ViewModels
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
-            }
-        }
-
-        private void SaveTable(string name, IEnumerable<TableDefinition> tables)
-        {
-            try
-            {
-                var dialog = new SaveFileDialog
-                {
-                    Filter = "Excel files (*.xlsx)|*.xlsx",
-                    DefaultExt = ".xlsx",
-                    FileName = $"{name}.xlsx"
-                };
-
-                if (dialog.ShowDialog() != true)
-                    return;
-
-                var document = new ExcelDocument();
-                document.Tables.AddRange(tables);
-                document.Save(dialog.FileName);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
             }
         }
     }
