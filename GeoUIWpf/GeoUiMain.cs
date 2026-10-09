@@ -25,6 +25,7 @@ namespace GeoUIWpf
                 }
 
                 InitializeResources();
+                _initialized = true;
             }
             catch (Exception ex)
             {

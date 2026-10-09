@@ -1,4 +1,5 @@
-﻿using GeoUIWpf.Views.Windows;
+﻿using GeoAppCore.Models;
+using GeoUIWpf.Views.Windows;
 using System.Windows;
 
 namespace GeoCadPlugin

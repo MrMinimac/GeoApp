@@ -72,6 +72,7 @@ ilrepack ^
     /out:"%OUTPUT%\GeoCadPlugin.dll" ^
     /lib:"%PLUGIN_BIN%" ^
     "%PLUGIN_BIN%\GeoCadPlugin.dll" ^
+    "%PLUGIN_BIN%\GeoUIWpf.dll" ^
     "%PLUGIN_BIN%\BitMiracle.LibTiff.NET.dll" ^
     "%PLUGIN_BIN%\Clipper2Lib.dll" ^
     "%PLUGIN_BIN%\EPPlus.dll" ^
@@ -88,13 +89,36 @@ ilrepack ^
     "%PLUGIN_BIN%\Microsoft.IO.RecyclableMemoryStream.dll" ^
     "%PLUGIN_BIN%\Newtonsoft.Json.dll" ^
     "%PLUGIN_BIN%\System.Security.Cryptography.Pkcs.dll" ^
-    "%PLUGIN_BIN%\System.Security.Cryptography.Xml.dll" ^
-    /internalize
+    "%PLUGIN_BIN%\System.Security.Cryptography.Xml.dll"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ========================================
     echo PLUGIN MERGE FAILED!
+    echo ========================================
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+REM ============================================================
+REM Merge LegendDesignWpf and LegendIcons.Core into single DLL
+REM ============================================================
+
+echo.
+echo ========================================
+echo Merging Legend UI assemblies
+echo ========================================
+
+ilrepack ^
+    /out:"%OUTPUT%\LegendDesignWpf.dll" ^
+    /lib:"%PLUGIN_BIN%" ^
+    "%PLUGIN_BIN%\LegendDesignWpf.dll" ^
+    "%PLUGIN_BIN%\LegendIcons.Core.dll"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ========================================
+    echo LEGEND UI MERGE FAILED!
     echo ========================================
     pause
     exit /b %ERRORLEVEL%

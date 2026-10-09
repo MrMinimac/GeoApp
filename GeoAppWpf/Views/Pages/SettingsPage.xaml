@@ -89,6 +89,48 @@
                         </ld:ExpandableSettingItem.ExpandedContent>
                     </ld:ExpandableSettingItem>
 
+                    <!--  Accent Color  -->
+                    <ld:ExpandableSettingItem
+                        Title="Плагин"
+                        Margin="0,0,0,10"
+                        Description="Установка плагина в AutoCad.">
+                        <ld:ExpandableSettingItem.ExpandedContent>
+                            <StackPanel Margin="0,10">
+
+                                <TextBlock
+                                    FontSize="14"
+                                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                    Visibility="{Binding IsPluginInstalled, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Run Text="Версия:" />
+                                    <Run Text="{Binding PluginVersion}" />
+                                </TextBlock>
+
+                                <TextBlock
+                                    FontSize="14"
+                                    Foreground="{DynamicResource ForegroundSecondaryBrush}"
+                                    Text="Доступно обновление. Переустановите плагин."
+                                    Visibility="{Binding IsPluginUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                                <ld:FlatButton Margin="0,10,0,0" Command="{Binding TogglePluginCommand}">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="Установить" />
+
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPluginInstalled}" Value="True">
+                                                        <Setter Property="Text" Value="Удалить" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </ld:FlatButton>
+
+                            </StackPanel>
+                        </ld:ExpandableSettingItem.ExpandedContent>
+                    </ld:ExpandableSettingItem>
+
                 </StackPanel>
             </ScrollViewer>
         </ld:CustomPage.PageContent>

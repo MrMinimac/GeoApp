@@ -11,17 +11,30 @@ namespace GeoAppWpf.ViewModels
     public class SettingsViewModel : BaseViewModel
     {
         #region Private Fields
+
         private AccentSource _accentSource;
+
         private AppThemes _appTheme;
 
+        private bool _isPluginInstalled = true;
+        private string _pluginVersion;
+        private bool _isPluginUpdateAvailable;
+
         private readonly IServiceProvider _serviceProvider;
+
         private bool _initializing;
+
         private readonly SettingsService _settings;
+
         #endregion
 
+
         #region Collections
+
         public ObservableCollection<AppThemes> ThemeValues { get; } = new(Enum.GetValues<AppThemes>());
+
         public ObservableCollection<AccentSource> AccentSourceValues { get; } = new(Enum.GetValues<AccentSource>());
+
         #endregion
 
         #region Properties
@@ -52,6 +65,45 @@ namespace GeoAppWpf.ViewModels
             }
         }
 
+        public string PluginVersion
+        {
+            get => _pluginVersion;
+            set
+            {
+                if (_pluginVersion == value)
+                    return;
+
+                _pluginVersion = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsPluginInstalled
+        {
+            get => _isPluginInstalled;
+            set
+            {
+                if (_isPluginInstalled == value)
+                    return;
+
+                _isPluginInstalled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsPluginUpdateAvailable
+        {
+            get => _isPluginUpdateAvailable;
+            set
+            {
+                if (_isPluginUpdateAvailable == value)
+                    return;
+
+                _isPluginUpdateAvailable = value;
+                OnPropertyChanged();
+            }
+        }
+
         #endregion
 
         #region Commands
@@ -77,6 +129,8 @@ namespace GeoAppWpf.ViewModels
             LegendDesign.Theme.SetAccentSource(source);
         });
 
+        public ICommand TogglePluginCommand => new RelayCommand(TogglePlugin);
+
         #endregion
 
         public SettingsViewModel(IServiceProvider serviceProvider)
@@ -91,8 +145,37 @@ namespace GeoAppWpf.ViewModels
 
             AppTheme = _settings.AppTheme;
             AccentSource = _settings.AccentSource;
+            IsPluginInstalled = PluginInstaller.IsInstalled();
+            PluginVersion = PluginInstaller.GetInstalledVersion()?.ToString() ?? "";
+            IsPluginUpdateAvailable = GetPluginUpdateStatus();
 
             _initializing = false;
+        }
+
+        private void TogglePlugin()
+        {
+            if (IsPluginInstalled)
+            {
+                if (PluginInstaller.Uninstall())
+                    IsPluginInstalled = PluginInstaller.IsInstalled();
+            }
+            else
+            {
+                PluginInstaller.Install();
+                IsPluginInstalled = PluginInstaller.IsInstalled();
+                PluginVersion = PluginInstaller.GetInstalledVersion()?.ToString() ?? "";
+            }
+        }
+
+        private bool GetPluginUpdateStatus()
+        {
+            var installedVer = PluginInstaller.GetInstalledVersion();
+            var embeddedVer = PluginInstaller.GetEmbeddedVersion();
+
+            if (installedVer == null || embeddedVer == null)
+                return false;
+
+            return installedVer < embeddedVer;
         }
     }
 }
